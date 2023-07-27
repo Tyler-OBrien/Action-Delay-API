@@ -8,10 +8,8 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
 {
     public class NATSDNSRequest
     {
-        public string Domain { get; set; }
-
-        public string Type { get; set; }
-
-        public string Resolver { get; set; }
+        public string QueryName { get; set; }
+        public string QueryType { get; set; }
+        public string DnsServer { get; set; }
     }
 }

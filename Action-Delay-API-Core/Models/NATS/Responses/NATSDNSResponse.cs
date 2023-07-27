@@ -6,7 +6,19 @@ using System.Threading.Tasks;
 
 namespace Action_Delay_API_Core.Models.NATS.Responses
 {
-    internal class NATSDNSResponse
+    public class SerializableDNSResponse
     {
+        public string QueryName { get; set; }
+        public string QueryType { get; set; }
+        public string ResponseCode { get; set; }
+        public List<SerializableDnsAnswer> Answers { get; set; }
+    }
+    public class SerializableDnsAnswer
+    {
+        public string DomainName { get; set; }
+        public int TTL { get; set; }
+        public string RecordType { get; set; }
+        public string RecordClass { get; set; }
+        public string Value { get; set; }
     }
 }

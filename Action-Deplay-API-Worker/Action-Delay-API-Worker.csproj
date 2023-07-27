@@ -5,7 +5,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <PublishAot>true</PublishAot>
     <UserSecretsId>dotnet-Action_Deplay_API_Worker-b9528608-968c-4f06-b6b1-e15ed9e0102e</UserSecretsId>
     <RootNamespace>Action_Deplay_API_Worker</RootNamespace>
   </PropertyGroup>

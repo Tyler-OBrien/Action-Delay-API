@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.33808.371
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API", "Action-Delay-API\Action-Delay-API.csproj", "{11277B13-4E90-400B-8A60-810A5D7F3AAB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API", "Action-Delay-API\Action-Delay-API.csproj", "{11277B13-4E90-400B-8A60-810A5D7F3AAB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Core", "Action-Delay-API-Core\Action-Delay-API-Core.csproj", "{0DA713D1-0630-4729-9F32-EAC62A6CCF96}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Core", "Action-Delay-API-Core\Action-Delay-API-Core.csproj", "{0DA713D1-0630-4729-9F32-EAC62A6CCF96}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Deplay-API-Worker", "Action-Deplay-API-Worker\Action-Deplay-API-Worker.csproj", "{B5B0C69B-528C-40DE-A25D-B426E3832BE2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Worker", "Action-Deplay-API-Worker\Action-Delay-API-Worker.csproj", "{B5B0C69B-528C-40DE-A25D-B426E3832BE2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

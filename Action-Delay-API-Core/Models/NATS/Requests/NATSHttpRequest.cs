@@ -10,6 +10,10 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
     {
         public string URL { get; set; }
 
-        public Dictionary<string, string> Headers { get; set; }
+        public Dictionary<string, string> Headers
+        {
+            get;
+            set;
+        }
     }
 }

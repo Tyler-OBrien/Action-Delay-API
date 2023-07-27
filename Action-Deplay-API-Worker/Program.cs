@@ -67,7 +67,7 @@ namespace Action_Deplay_API_Worker
 
                     services.AddTransient<IHttpService, HttpService>();
                     services.AddTransient<IDnsService, DnsService>();
-          
+
                     services.AddHostedService<Worker>();
 
               

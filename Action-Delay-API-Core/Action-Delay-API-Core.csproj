@@ -5,16 +5,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <PublishAot>true</PublishAot>
     <UserSecretsId>dotnet-Action_Delay_API_Core-d70128d1-fab6-4d42-94cf-7600870d3be1</UserSecretsId>
     <RootNamespace>Action_Delay_API_Core</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentResults" Version="3.15.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0-preview.5.23280.8" />
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="7.0.9" />
     <PackageReference Include="NATS.Client.Core" Version="2.0.0-alpha.0" />
     <PackageReference Include="Sentry" Version="3.34.0" />
+    <PackageReference Include="Sentry.Extensions.Logging" Version="3.34.0" />
     <PackageReference Include="Sentry.Serilog" Version="3.34.0" />
     <PackageReference Include="Serilog" Version="3.0.1" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="7.0.0" />
