@@ -37,15 +37,17 @@ namespace Action_Delay_API_Core.Services
 
         public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location)
         {
-            var tryGetReply = await _natsConnection.RequestAsync<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request);
-            if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) return Result.Fail("Failed to get result");
+            var tryGetReply = await _natsConnection.RequestAsync<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, null);
+            if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) 
+                return Result.Fail("Failed to get result");
             return tryGetReply.Value!.Data!;
         }
 
         public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location)
         {
             var tryGetReply = await _natsConnection.RequestAsync<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request);
-            if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) return Result.Fail("Failed to get result");
+            if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) 
+                return Result.Fail("Failed to get result");
             return tryGetReply.Value!.Data!;
         }
     }

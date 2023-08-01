@@ -14,12 +14,18 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string NATSConnectionURL { get; set; }
 
+        public string PostgresConnectionString { get; set; }
+
+        public string ClickhouseConnectionString { get; set; }
+
+
+
 
         public string Location { get; set; }
 
         public string NodeName { get; set; }
 
-        public List<string> Locations { get; set; }
+        public List<Location> Locations { get; set; }
 
         public int Min_Locations { get; set; }
 

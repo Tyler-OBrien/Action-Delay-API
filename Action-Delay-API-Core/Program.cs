@@ -12,7 +12,10 @@ using Polly;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Action_Delay_API_Core
 {
@@ -74,6 +77,14 @@ namespace Action_Delay_API_Core
                     services.AddSentry<SentryLoggingOptions>();
                     services.AddLogging();
 
+                    services.AddDbContext<ActionDelayDatabaseContext>(options =>
+                    {
+                        options.UseNpgsql(baseConfiguration.PostgresConnectionString);
+                    });
+
+                    services.AddSingleton<IClickHouseService, ClickHouseService>();
+
+
                     services.AddHttpClient<ICloudflareAPIBroker, CloudflareAPIBroker>()
                         .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                         .AddPolicyHandler(GetRetryPolicy());
@@ -82,15 +93,15 @@ namespace Action_Delay_API_Core
 
                     services.AddSingleton<IQueue, NATSQueue>();
 
-                    // Add all of the Jobs
-                    var jobType = typeof(IBaseJob);
 
                     var jobs =
                         Assembly.GetExecutingAssembly()
                             .GetExportedTypes()
-                            .Where(x => jobType.IsAssignableFrom(x) && x.GetConstructors().Any());
+                            .Where(x => typeof(IBaseJob).IsAssignableFrom(x) && x.GetConstructors().Any()).ToArray();
 
-                    foreach (var job in jobs) services.AddSingleton(jobType, job);
+                    foreach (var job in jobs) services.AddScoped(job);
+
+
 
 
 

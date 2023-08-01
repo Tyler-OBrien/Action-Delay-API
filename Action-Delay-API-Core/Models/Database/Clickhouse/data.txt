@@ -1,0 +1,31 @@
+
+CREATE TABLE job_runs
+(
+ `job_name` String,
+ `run_time` DateTime,
+ `run_length` UInt64, 
+ `run_status` String
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, job_name)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, job_name);
+
+
+CREATE TABLE job_runs_locations
+(
+ `job_name` String,
+ `location_name` String,
+ `run_time` DateTime,
+ `run_length` UInt64, 
+ `run_status` String
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, job_name, location_name)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, job_name, location_name);
+
+
+
+:] Failure to write to Clickhouse ClickHouse.Client.Copy.ClickHouseBulkCopySerializationException: Error when serializing data
+Aug 01 03:49:39 action-delay-api Action-Delay-API-Core[312910]:  ---> System.InvalidCastException: Unable to cast object of type 'System.UInt64' to type 'System.DateTime'.

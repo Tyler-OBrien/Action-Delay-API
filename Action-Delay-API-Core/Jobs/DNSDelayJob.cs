@@ -12,6 +12,8 @@ using Action_Delay_API_Core.Models.CloudflareAPI.DNS;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
+using System.Net;
+using Action_Delay_API_Core.Models.Database.Postgres;
 
 namespace Action_Delay_API_Core.Jobs
 {
@@ -22,8 +24,9 @@ namespace Action_Delay_API_Core.Jobs
         private readonly LocalConfig _config;
         private readonly ILogger _logger;
         private readonly IQueue _queue;
+        private string _valueToLookFor;
 
-        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue)
+        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext )
         {
             _apiBroker = apiBroker;
             _config = config.Value;
@@ -38,16 +41,22 @@ namespace Action_Delay_API_Core.Jobs
         public override TimeSpan Interval => TimeSpan.FromSeconds(60);
         public override string Name => "DNS Delay Job";
 
-        public override async Task Execute()
+
+        public override async Task HandleCompletion()
         {
-            var newValueToLookFor = $"Is Walshy Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R}";
+          _logger.LogInformation($"Completed {Name}..");
+        }
+
+        public  override async Task RunAction()
+        {
+            _valueToLookFor = $"Are Blobs Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R}";
             var newUpdateRequest = new UpdateRecordRequest()
             {
                 Comment = "Blame Walshy",
-                Content = newValueToLookFor,
+                Content = _valueToLookFor,
                 Name = _config.DNSJob.Name,
                 Proxied = false,
-                Tags = new[] { "Blame-Walshy", "Free-Canadians", "If-your-reading-this-im-sorry" },
+                Tags = new[] { "Blame-Blobs", "Free-Canadians", "If-your-reading-this-im-sorry" },
                 Ttl = 1,
                 Type = "TXT"
             };
@@ -57,56 +66,36 @@ namespace Action_Delay_API_Core.Jobs
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
-            // Ok, one job done.
-            var locationsTasks = new Dictionary<string, Task<Result<SerializableDNSResponse>>>();
+        }
+
+        public async override Task<RunLocationResult> RunLocation(Location location)
+        {
             var newRequest = new NATSDNSRequest()
             {
                 QueryName = _config.DNSJob.Name,
                 QueryType = "TXT",
                 DnsServer = _config.DNSJob.NameServers
             };
-            foreach (var location in _config.Locations)
+            var tryGetResult = await _queue.DNS(newRequest, location.NATSName ?? location.Name);
+            if (tryGetResult.IsFailed)
             {
-                var startGet = _queue.DNS(newRequest, location);
-                locationsTasks.Add(location, startGet);
+                _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
+                return new RunLocationResult(false, "Queue Error");
             }
+            var getResponse = tryGetResult.Value;
 
-            while (locationsTasks.Any())
+            _logger.LogInformation($"One DNS Request returned from {location.NATSName} - Success {getResponse.ResponseCode}");
+            string tryGetAnswer = getResponse.Answers.FirstOrDefault()?.Value ?? "";
+            if (tryGetAnswer.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var location in locationsTasks)
-                {
-                    if (location.Value.IsCompleted)
-                    {
-                        var tryGetResult = await location.Value;
-                        if (tryGetResult.IsFailed)
-                        {
-                            _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
-                            locationsTasks.Remove(location.Key);
-                            continue;
-                        }
-
-                        var getResponse = tryGetResult.Value;
-
-                        _logger.LogInformation($"One DNS Request returned from {location.Key} - Success {getResponse.ResponseCode}");
-                        string tryGetAnswer = getResponse.Answers.FirstOrDefault()?.Value ?? "";
-                        if (tryGetAnswer.Equals(newValueToLookFor, StringComparison.OrdinalIgnoreCase))
-                        {
-                            // We got the right value!
-                            _logger.LogInformation($"{location.Key} sees the change! Let's remove this and move on..");
-                            locationsTasks.Remove(location.Key);
-                        }
-                        else
-                        {
-                            _logger.LogInformation($"{location.Key} sees {tryGetAnswer} instead of {newValueToLookFor}! Let's try again...");
-                            // REDO THIS MUCH BETTER LATER, A PROPER QUEUE!!!!
-                            var key = location.Key;
-                            await Task.Delay(1000);
-                            var startGet = _queue.DNS(newRequest, key);
-                            locationsTasks[key] = startGet;
-                        }
-
-                    }
-                }
+                // We got the right value!
+                _logger.LogInformation($"{location.Name} sees the change! Let's remove this and move on..");
+                return new RunLocationResult(true, "Deployed");
+            }
+            else
+            {
+                _logger.LogInformation($"{location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}! Let's try again...");
+                return new RunLocationResult(false, "Undeployed");
             }
         }
     }

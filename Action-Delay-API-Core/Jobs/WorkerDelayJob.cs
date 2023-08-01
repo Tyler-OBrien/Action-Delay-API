@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS.Requests;
@@ -20,9 +22,10 @@ namespace Action_Delay_API_Core.Jobs
         private readonly LocalConfig _config;
         private readonly ILogger _logger;
         private readonly IQueue _queue;
+        private string _generatedValue { get; set; }
         public override TimeSpan Interval => TimeSpan.FromSeconds(60);
 
-        public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue)
+        public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext)
         {
             _apiBroker = apiBroker;
             _config = config.Value;
@@ -31,15 +34,14 @@ namespace Action_Delay_API_Core.Jobs
         }
 
         public override string Name => "Worker Script Delay Job";
-
-        public override async Task Execute()
+        public override async Task RunAction()
         {
-            _logger.LogInformation("Runing Delay Job");
-            var valueToLookFor = $"{Guid.NewGuid()}-Cookies";
+            _logger.LogInformation("Running Delay Job");
+            _generatedValue = $"{Guid.NewGuid()}-Cookies";
             // Appending 'worker.js' field
             string workerJsContent = $@"export default {{
   async fetch(request, env, ctx) {{
-    return new Response('{valueToLookFor}');
+    return new Response('{_generatedValue}');
   }},
 }};".ReplaceLineEndings(" ");
 
@@ -61,56 +63,44 @@ namespace Action_Delay_API_Core.Jobs
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
-            // Ok, one job done.
-            var locationsTasks = new Dictionary<string, Task<Result<SerializableHttpResponse>>>();
+            _logger.LogInformation("Changed Worker script...");
+        }
+
+        public override async Task<RunLocationResult> RunLocation(Location location)
+        {
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>(),
                 URL = _config.DelayJob.ScriptUrl,
             };
-            foreach (var location in _config.Locations)
+            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name);
+
+            if (tryGetResult.IsFailed)
             {
-                var startGet = _queue.HTTP(newRequest, location);
-                locationsTasks.Add(location, startGet);
+                _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, aborting location..");
+                return new RunLocationResult(false, "Queue Error");
             }
+            var getResponse = tryGetResult.Value;
 
-            while (locationsTasks.Any())
+            _logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
+
+            if (getResponse.Body.Equals(_generatedValue, StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var location in locationsTasks)
-                {
-                    if (location.Value.IsCompleted)
-                    {
-                        var tryGetResult = await location.Value;
-                        if (tryGetResult.IsFailed)
-                        {
-                            _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
-                            locationsTasks.Remove(location.Key);
-                            continue;
-                        }
-
-                        var getResponse = tryGetResult.Value;
-
-                        _logger.LogInformation($"One HTTP Request returned from {location.Key} - Success {getResponse.WasSuccess}");
-
-                        if (getResponse.Body.Equals(valueToLookFor, StringComparison.OrdinalIgnoreCase))
-                        {
-                            // We got the right value!
-                            _logger.LogInformation($"{location.Key} sees the change! Let's remove this and move on..");
-                            locationsTasks.Remove(location.Key);
-                        }
-                        else
-                        {
-                            _logger.LogInformation($"{location.Key} sees {getResponse.Body} instead of {valueToLookFor}! Let's try again...");
-                            // REDO THIS MUCH BETTER LATER, A PROPER QUEUE!!!!
-                            var key = location.Key;
-                            await Task.Delay(1000);
-                            var startGet = _queue.HTTP(newRequest, key);
-                            locationsTasks[key] = startGet;
-                        }
-
-                    }
-                }
+                // We got the right value!
+                _logger.LogInformation($"{location.NATSName} sees the change! Let's remove this and move on..");
+                return new RunLocationResult(true, "Deployed");
+            }
+            else
+            {
+                _logger.LogInformation($"{location.NATSName} sees {getResponse.Body} instead of {_generatedValue}! Let's try again...");
+                return new RunLocationResult(false, "Undeployed");
             }
         }
+
+        public override async Task HandleCompletion()
+        {
+            _logger.LogInformation($"Completed {Name}..");
+        }
+
     }
 }
