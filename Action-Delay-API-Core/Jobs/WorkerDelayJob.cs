@@ -61,6 +61,8 @@ namespace Action_Delay_API_Core.Jobs
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
+                throw new InvalidOperationException(
+                    $"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
             _logger.LogInformation("Changed Worker script...");
@@ -87,12 +89,12 @@ namespace Action_Delay_API_Core.Jobs
             if (getResponse.Body.Equals(_generatedValue, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{location.NATSName} sees the change! Let's remove this and move on..");
+                _logger.LogInformation($"{location.Name} sees the change! Let's remove this and move on..");
                 return new RunLocationResult(true, "Deployed");
             }
             else
             {
-                _logger.LogInformation($"{location.NATSName} sees {getResponse.Body} instead of {_generatedValue}! Let's try again...");
+                _logger.LogInformation($"{location.Name} sees {getResponse.Body} instead of {_generatedValue}! Let's try again...");
                 return new RunLocationResult(false, "Undeployed");
             }
         }

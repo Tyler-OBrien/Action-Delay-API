@@ -33,6 +33,9 @@ namespace Action_Delay_API_Core
         public static async Task<int> Main(string[] args)
         {
             Log.Logger = new LoggerConfiguration().MinimumLevel.Information()
+#if !DEBUG
+            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+#endif
                 .WriteTo.File($"Logs/Log.log", outputTemplate: outputFormat,
                     restrictedToMinimumLevel: LogEventLevel.Information, retainedFileCountLimit: 10,
                     rollingInterval: RollingInterval.Day).WriteTo.Console(outputTemplate: outputFormat, restrictedToMinimumLevel: LogEventLevel.Information).Enrich.FromLogContext().CreateLogger();
