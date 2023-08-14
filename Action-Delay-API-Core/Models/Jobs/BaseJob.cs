@@ -206,7 +206,7 @@ namespace Action_Delay_API_Core.Models.Jobs
 
 
 
-        protected TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
+        public virtual TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
         {
             var secondsUntilNextAlarm = 0.5;
             var deployLagSeconds = totalWaitTimeInSeconds / 1000;

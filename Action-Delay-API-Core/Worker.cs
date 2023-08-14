@@ -28,7 +28,7 @@ namespace Action_Delay_API_Core
                     .Where(x => typeof(IBaseJob).IsAssignableFrom(x) && x.GetConstructors().Any());
             foreach (var job in jobs)
             {
-                
+             _logger.LogInformation($"Found the {job.Name} job...");   
                 _jobs.Add(new MemoryJob() { JobName = job.Name, JobType = job });
             }
         }

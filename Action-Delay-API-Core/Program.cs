@@ -102,7 +102,10 @@ namespace Action_Delay_API_Core
                             .GetExportedTypes()
                             .Where(x => typeof(IBaseJob).IsAssignableFrom(x) && x.GetConstructors().Any()).ToArray();
 
-                    foreach (var job in jobs) services.AddScoped(job);
+                    foreach (var job in jobs)
+                    {
+                        services.AddScoped(job);
+                    }
 
 
 

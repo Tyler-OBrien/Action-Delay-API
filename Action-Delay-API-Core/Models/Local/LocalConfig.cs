@@ -33,6 +33,8 @@ namespace Action_Delay_API_Core.Models.Local
 
         public DNSDelayJobConfig DNSJob { get; set; }
 
+        public CustomRuleUpdateConfig WAFJob { get; set; }
+
     }
 
     public class WorkerDelayJobConfig
@@ -56,6 +58,18 @@ namespace Action_Delay_API_Core.Models.Local
         public string RecordId { get; set; }
         public string Name { get; set; }
         public string NameServers { get; set; }
+
+    }
+
+    public class CustomRuleUpdateConfig
+    {
+        public string API_Key { get; set; }
+        public string ZoneId { get; set; }
+
+        public string RuleSetId { get; set; }
+        public string RuleId { get; set; }
+
+        public string HostName { get; set; }
 
     }
 }
