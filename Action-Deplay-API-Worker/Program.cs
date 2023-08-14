@@ -63,7 +63,16 @@ namespace Action_Deplay_API_Worker
                     services.AddLogging();
 
                     services.AddHttpClient<IHttpService, HttpService>()
-                        .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+                        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                        {
+                            PooledConnectionLifetime = TimeSpan.FromMilliseconds(1),
+                            // Add other configurations if needed
+                        }).ConfigureHttpClient((client =>
+                        {
+                            
+                            client.DefaultRequestHeaders.ConnectionClose = true;
+                            
+                        }));
 
                     services.AddTransient<IHttpService, HttpService>();
                     services.AddTransient<IDnsService, DnsService>();
