@@ -1,0 +1,19 @@
+{
+  "name": "Action-Delay-API-Durable-Object-Proxy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wrangler": "^3.5.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230814.0",
+    "typescript": "^5.1.6"
+  }
+}

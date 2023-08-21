@@ -1,0 +1,13 @@
+name = "action-delay-api-durable-object-proxy"
+main = "src/index.ts"
+compatibility_date = "2023-08-21"
+
+
+
+[durable_objects]
+bindings = [{name = "DO", class_name = "DO"}]
+
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["DO"]
