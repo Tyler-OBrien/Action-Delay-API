@@ -23,7 +23,7 @@ namespace Action_Delay_API_Core.Jobs
         private readonly ILogger _logger;
         private readonly IQueue _queue;
         private string _generatedValue { get; set; }
-        public override TimeSpan Interval => TimeSpan.FromSeconds(60);
+        public override int TargetExecutionSecond => 30;
 
         public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext)
         {

@@ -11,7 +11,7 @@ namespace Action_Delay_API_Core.Models.Local
     {
         public Task? RunningTask { get; set; }
 
-        public DateTime LastExecutedUtc { get; set; }
+        public DateTime? NextExecutionTime { get; set; }
 
         public string JobName { get; set; }
 

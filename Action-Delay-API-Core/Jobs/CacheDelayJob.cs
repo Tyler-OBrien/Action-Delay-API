@@ -45,8 +45,8 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public override TimeSpan Interval => TimeSpan.FromSeconds(60);
         public override string Name => "Single URL Purge Delay Job";
+        public override int TargetExecutionSecond => 40;
 
 
         public override async Task HandleCompletion()
@@ -61,8 +61,6 @@ namespace Action_Delay_API_Core.Jobs
             List<Task> preInitWarmTasks = new List<Task>();
             foreach (var location in _config.Locations)
             {
-                preInitWarmTasks.Add(SendRequest(location));
-                preInitWarmTasks.Add(SendRequest(location));
                 preInitWarmTasks.Add(SendRequest(location));
             }
 

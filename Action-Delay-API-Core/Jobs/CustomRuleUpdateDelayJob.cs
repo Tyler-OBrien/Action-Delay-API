@@ -38,7 +38,7 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public override TimeSpan Interval => TimeSpan.FromSeconds(60);
+        public override int TargetExecutionSecond => 50;
         public override string Name => "Custom Rule Block Delay Job";
 
 

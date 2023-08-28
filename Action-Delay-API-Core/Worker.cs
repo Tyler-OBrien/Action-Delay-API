@@ -50,14 +50,48 @@ namespace Action_Delay_API_Core
                 
                 foreach (var memoryJob in _jobs)
                 {
-                    if ((memoryJob.RunningTask == null || memoryJob.RunningTask.IsCompleted) && (DateTime.UtcNow - memoryJob.LastExecutedUtc) > TimeSpan.FromMinutes(1))
+                    if (memoryJob.NextExecutionTime == null)
+                    {
+                        using var jobScope = _scopeFactory.CreateScope();
+                        var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as IBaseJob;
+
+                        var currentDateTime = DateTime.UtcNow;
+                        var targetDateTime = new DateTime(currentDateTime.Year, currentDateTime.Month, currentDateTime.Day,
+                                                    currentDateTime.Hour, currentDateTime.Minute, 0, currentDateTime.Kind);
+
+                        if (currentDateTime.Second >= job!.TargetExecutionSecond)
+                        {
+                            targetDateTime = targetDateTime.AddMinutes(1);
+                        }
+
+                        memoryJob.NextExecutionTime = targetDateTime.AddSeconds(job!.TargetExecutionSecond);
+
+                        _logger.LogInformation($"First Start, Scheduling {job.Name} to begin at {memoryJob.NextExecutionTime}, about {(memoryJob.NextExecutionTime.Value - DateTime.UtcNow).TotalSeconds} seconds from now, run instantly? {(DateTime.UtcNow >= memoryJob.NextExecutionTime)}.");
+                    }
+                    if ((memoryJob.RunningTask == null || memoryJob.RunningTask.IsCompleted) &&
+                        (DateTime.UtcNow >= memoryJob.NextExecutionTime))
                     {
                         var jobScope = _scopeFactory.CreateScope();
                         var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as IBaseJob;
 
+
+
+                        var currentDateTime = DateTime.UtcNow;
+                        var targetDateTime = new DateTime(currentDateTime.Year, currentDateTime.Month, currentDateTime.Day,
+                            currentDateTime.Hour, currentDateTime.Minute, 0, currentDateTime.Kind);
+
+                        if (currentDateTime.Second >= job!.TargetExecutionSecond)
+                        {
+                            targetDateTime = targetDateTime.AddMinutes(1);
+                        }
+
+                        memoryJob.NextExecutionTime = targetDateTime.AddSeconds(job!.TargetExecutionSecond);
+
+
+
                         _logger.LogInformation(
-                            $"Running {job.Name} because it's been {(DateTime.UtcNow - memoryJob.LastExecutedUtc).TotalMinutes} minutes, and interval is {job.Interval.TotalMinutes}");
-                        memoryJob.LastExecutedUtc = DateTime.UtcNow;
+                            $"Running {job.Name} at {DateTime.UtcNow}, next run scheduled at about {(memoryJob.NextExecutionTime.Value - DateTime.UtcNow).TotalSeconds} seconds from now");
+
                         // now execute
                         memoryJob.Scope = jobScope;
                         var task = RunJobAsync(job, memoryJob);

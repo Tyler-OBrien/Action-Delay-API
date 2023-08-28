@@ -38,7 +38,7 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public override TimeSpan Interval => TimeSpan.FromSeconds(60);
+        public override int TargetExecutionSecond => 10;
         public override string Name => "DNS Delay Job";
 
 

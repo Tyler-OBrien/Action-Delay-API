@@ -37,14 +37,14 @@ namespace Action_Delay_API_Core.Models.Jobs
             _dbContext = context;
         }
 
-        public abstract TimeSpan Interval { get; }
-
         public DateTime ConfirmedUpdateUtc { get; set; }
 
         public JobData JobData { get; set; }
 
 
         public abstract string Name { get; }
+
+        public abstract int TargetExecutionSecond { get; }
 
         public abstract Task RunAction();
         public abstract Task<RunLocationResult> RunLocation(Location location);
