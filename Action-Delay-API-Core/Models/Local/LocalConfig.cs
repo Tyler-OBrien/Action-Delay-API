@@ -34,6 +34,7 @@ namespace Action_Delay_API_Core.Models.Local
         public DNSDelayJobConfig DNSJob { get; set; }
 
         public CustomRuleUpdateConfig WAFJob { get; set; }
+        public CacheDelayJobConfig CacheJob { get; set; }
 
     }
 
@@ -70,6 +71,19 @@ namespace Action_Delay_API_Core.Models.Local
         public string RuleId { get; set; }
 
         public string HostName { get; set; }
+
+    }
+
+    public class CacheDelayJobConfig
+    {
+        public string API_Key { get; set; }
+        public string ZoneId { get; set; }
+
+        public string URL { get; set; }
+
+        public string ProxyURL { get; set; }
+
+        public string ProxyAPIKey { get; set; }
 
     }
 }

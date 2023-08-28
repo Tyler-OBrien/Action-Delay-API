@@ -22,6 +22,8 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
 
         public DbSet<JobDataLocation> JobLocations { get; set; }
 
+        public DbSet<GenericJobData> GenericJobData { get; set; }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
         }
@@ -41,6 +43,12 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
                 .HasOne<JobData>()
                 .WithMany()
                 .HasForeignKey(location => location.JobName);
+
+
+
+            modelBuilder.Entity<GenericJobData>().ToTable("JobData");
+            modelBuilder.Entity<GenericJobData>().HasKey(job => job.JobName);
+
 
         }
 

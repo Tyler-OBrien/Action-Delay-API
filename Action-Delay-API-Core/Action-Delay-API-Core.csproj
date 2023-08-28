@@ -7,7 +7,15 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <UserSecretsId>dotnet-Action_Delay_API_Core-d70128d1-fab6-4d42-94cf-7600870d3be1</UserSecretsId>
     <RootNamespace>Action_Delay_API_Core</RootNamespace>
+	  <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+	  <SelfContained>true</SelfContained>
+	  <GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Remove="appsettings.json" />
+  </ItemGroup>
+
 
   <ItemGroup>
     <PackageReference Include="ClickHouse.Client" Version="6.7.3" />
@@ -33,5 +41,11 @@
 
   <ItemGroup>
     <Folder Include="Helpers\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="appsettings.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>
