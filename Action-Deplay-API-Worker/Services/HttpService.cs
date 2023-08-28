@@ -39,7 +39,7 @@ namespace Action_Deplay_API_Worker.Services
             {
                 WasSuccess = response.IsSuccessStatusCode,
                 StatusCode = response.StatusCode,
-                Headers = response.Headers.ToDictionary(x => x.Key, pair => pair.Value.ToString()),
+                Headers = response.Headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value)),
                 Body = await response.Content.ReadAsStringAsync()
             };
 

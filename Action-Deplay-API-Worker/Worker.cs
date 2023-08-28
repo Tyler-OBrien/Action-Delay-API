@@ -69,7 +69,7 @@ namespace Action_Deplay_API_Worker
                         }
                         catch (Exception e)
                         {
-                            Log.Error(e, "Error with Discordhook");
+                            Log.Error(e, "Error with HTTP Hook");
                         }
                     }
                 }
@@ -101,7 +101,7 @@ namespace Action_Deplay_API_Worker
                         }
                         catch (Exception e)
                         {
-                            Log.Error(e, "Error with Discordhook");
+                            Log.Error(e, "Error with DNS Hook");
                         }
                     }
                 }
