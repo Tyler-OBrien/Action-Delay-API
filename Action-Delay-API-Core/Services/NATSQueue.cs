@@ -29,23 +29,28 @@ namespace Action_Delay_API_Core.Services
             _configuration = baseConfiguration.Value;
             _logger = logger;
 
-            var options = NatsOptions.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(30)}; 
+            var options = NatsOptions.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(30) }; 
             _natsConnection = new NatsConnection(options);
+           
             _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.ConnectionState}");
         }
 
 
-        public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location)
+        public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location, CancellationToken token)
         {
-            var tryGetReply = await _natsConnection.RequestAsync<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, null);
+            using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
+            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
+            var tryGetReply = await _natsConnection.RequestAsync<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, null, cancellationToken: newCancellationTokenSource.Token);
             if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) 
                 return Result.Fail("Failed to get result");
             return tryGetReply.Value!.Data!;
         }
 
-        public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location)
+        public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location, CancellationToken token)
         {
-            var tryGetReply = await _natsConnection.RequestAsync<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request);
+            using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
+            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
+            var tryGetReply = await _natsConnection.RequestAsync<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request, cancellationToken: newCancellationTokenSource.Token);
             if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) 
                 return Result.Fail("Failed to get result");
             return tryGetReply.Value!.Data!;

@@ -68,14 +68,14 @@ namespace Action_Delay_API_Core.Jobs
             _logger.LogInformation("Changed Worker script...");
         }
 
-        public override async Task<RunLocationResult> RunLocation(Location location)
+        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
         {
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>(),
                 URL = _config.DelayJob.ScriptUrl,
             };
-            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name);
+            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
 
             if (tryGetResult.IsFailed)
             {

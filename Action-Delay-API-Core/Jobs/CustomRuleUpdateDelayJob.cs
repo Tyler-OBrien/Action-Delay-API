@@ -79,14 +79,14 @@ namespace Action_Delay_API_Core.Jobs
             }
         }
 
-        public override async Task<RunLocationResult> RunLocation(Location location)
+        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
         {
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>(),
                 URL = "https://" + _config.WAFJob.HostName + $"/{_specialPath}",
             };
-            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name);
+            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
 
             if (tryGetResult.IsFailed)
             {

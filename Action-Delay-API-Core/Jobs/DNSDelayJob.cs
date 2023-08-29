@@ -70,7 +70,7 @@ namespace Action_Delay_API_Core.Jobs
             }
         }
 
-        public async override Task<RunLocationResult> RunLocation(Location location)
+        public async override Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
         {
             var newRequest = new NATSDNSRequest()
             {
@@ -78,7 +78,7 @@ namespace Action_Delay_API_Core.Jobs
                 QueryType = "TXT",
                 DnsServer = _config.DNSJob.NameServers
             };
-            var tryGetResult = await _queue.DNS(newRequest, location.NATSName ?? location.Name);
+            var tryGetResult = await _queue.DNS(newRequest, location.NATSName ?? location.Name, token);
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");

@@ -58,21 +58,22 @@ namespace Action_Delay_API_Core.Jobs
         {
             // pre-arm all of the locations
 
-            List<Task> preInitWarmTasks = new List<Task>();
+            Dictionary<Location, Task> preInitWarmTasks = new();
             foreach (var location in _config.Locations)
             {
-                preInitWarmTasks.Add(SendRequest(location));
+                preInitWarmTasks.Add(location, SendRequest(location, CancellationToken.None));
             }
 
-            try
+            foreach (var preInitTask in preInitWarmTasks)
             {
-                await Task.WhenAll(preInitWarmTasks);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex, $"Failure warming locations");
-                throw new InvalidOperationException(
-                    $"Failure warming cache, logs: {ex}", ex);
+                try
+                {
+                    await preInitTask.Value;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, $"Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}");
+                }
             }
 
             foreach (var location in _config.Locations)
@@ -82,7 +83,7 @@ namespace Action_Delay_API_Core.Jobs
                 {
                     for (int i = 0; i < retries; i++)
                     {
-                        var tryGetResult = await SendRequest(location);
+                        var tryGetResult = await SendRequest(location, CancellationToken.None);
                         if (tryGetResult.IsFailed)
                         {
                             _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, retrying..");
@@ -177,7 +178,7 @@ namespace Action_Delay_API_Core.Jobs
 
         }
 
-        public  Task<Result<SerializableHttpResponse>> SendRequest(Location location)
+        public  Task<Result<SerializableHttpResponse>> SendRequest(Location location, CancellationToken token)
         {
             var newRequest = new NATSHttpRequest()
             {
@@ -189,15 +190,15 @@ namespace Action_Delay_API_Core.Jobs
             {
                 newRequest.Headers.Add("APIKEY", _config.CacheJob.ProxyAPIKey);
             }
-            return  _queue.HTTP(newRequest, location.NATSName ?? location.Name);
+            return  _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
         }
 
 
 
-        public override async Task<RunLocationResult> RunLocation(Location location)
+        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
         {
 
-            var tryGetResult = await SendRequest(location);
+            var tryGetResult = await SendRequest(location, token);
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, aborting location..");

@@ -11,8 +11,8 @@ namespace Action_Delay_API_Core.Models.Services
 {
     public interface IQueue
     {
-        Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location);
-        Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location);
+        Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location, CancellationToken token);
+        Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location, CancellationToken token);
 
     }
 }

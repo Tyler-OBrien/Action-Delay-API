@@ -46,12 +46,15 @@ namespace Action_Delay_API_Core.Models.Jobs
 
         public abstract int TargetExecutionSecond { get; }
 
+        public virtual TimeSpan CancelAfterIfHalfDone => TimeSpan.FromMinutes(15);
+
         public abstract Task RunAction();
-        public abstract Task<RunLocationResult> RunLocation(Location location);
+        public abstract Task<RunLocationResult> RunLocation(Location location, CancellationToken token);
         public abstract Task HandleCompletion();
 
         public async Task BaseRun()
         {
+            var cancellationTokenSource = new CancellationTokenSource();
             // Pre-init job and locations in database
             _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
             JobData = await _dbContext.JobData.FirstOrDefaultAsync(job => job.JobName == Name);
@@ -69,7 +72,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 JobData.LastRunLengthMs = JobData.CurrentRunLengthMs;
                 JobData.LastRunTime = JobData.CurrentRunTime;
 
-                JobData.CurrentRunStatus = null;
+                JobData.CurrentRunStatus = "Undeployed";
                 JobData.CurrentRunLengthMs = null;
             }
             JobData.CurrentRunTime = DateTime.UtcNow;
@@ -100,30 +103,47 @@ namespace Action_Delay_API_Core.Models.Jobs
             // Start monitoring on each Location
             foreach (var location in _config.Locations.Where(location => location.Disabled == false))
             {
-                var task = BaseRunLocation(location);
+                var task = BaseRunLocation(location, cancellationTokenSource.Token);
                 RunningLocations[location] = task;
             }
 
             // Check the status of tasks continuously
-            while (RunningLocations.Count > 0)
+            while (RunningLocations.Count > 0 || cancellationTokenSource.Token.IsCancellationRequested)
             {
-                // Get the task that finishes first
-                var completedTask = await Task.WhenAny(RunningLocations.Values);
-                var endTime = DateTime.UtcNow;
-                var completedLocation = RunningLocations.First(x => x.Value == completedTask).Key;
-
-                // Remove the completed task from the running tasks
-                RunningLocations.Remove(completedLocation);
-
-                //  if more then half are done, we just say the entire job is.
-                if (RunningLocations.Count < (_config.Locations.Count(location => location.Disabled == false) / 2) || RunningLocations.Count <= 0)
+                try
                 {
-                    this.JobData.CurrentRunLengthMs =
-                        (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                    this.JobData.CurrentRunStatus = "Deployed";
-                    TrySave();
+                    // Get the task that finishes first
+                    var completedTask = await Task.WhenAny(RunningLocations.Values);
+                    var endTime = DateTime.UtcNow;
+                    var completedLocation = RunningLocations.First(x => x.Value == completedTask).Key;
+
+                    // Remove the completed task from the running tasks
+                    RunningLocations.Remove(completedLocation);
+
+                    //  if more then half are done, we just say the entire job is.
+                    if (RunningLocations.Count <=
+                        (_config.Locations.Count(location => location.Disabled == false) / 2) ||
+                        RunningLocations.Count <= 0)
+                    {
+                        if (this.JobData.CurrentRunStatus.Equals("Deployed", StringComparison.OrdinalIgnoreCase) ==
+                            false)
+                        {
+                            _logger.LogInformation(
+                                $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
+                            cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
+                            this.JobData.CurrentRunLengthMs =
+                                (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
+                            this.JobData.CurrentRunStatus = "Deployed";
+                            TrySave();
+                        }
+                    }
                 }
-                
+                catch (OperationCanceledException)
+                {
+                    _logger.LogInformation(
+                        $"{JobData.JobName} had {RunningLocations.Count} locations, namely: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))} timed out.");
+                    /* NOM NOM */
+                }
             }
             await HandleCompletion();
             await TrySave(true);
@@ -132,7 +152,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 {
                     JobName = JobData.JobName, RunStatus = JobData.CurrentRunStatus!,
                     RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value
-                }, this.RunningLocationsData.Select(locationDataKv => new ClickhouseJobLocationRun()
+                }, this.RunningLocationsData.Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null && locDataKv!.Value!.CurrentRunStatus!.Equals("Deployed", StringComparison.OrdinalIgnoreCase)).Select(locationDataKv => new ClickhouseJobLocationRun()
                 {JobName = locationDataKv.Value.JobName,
                     RunStatus = locationDataKv.Value.CurrentRunStatus!,
                     LocationName = locationDataKv.Value.LocationName,
@@ -141,34 +161,48 @@ namespace Action_Delay_API_Core.Models.Jobs
                 }).ToList());
         }
 
-        public async Task BaseRunLocation(Location location)
+        public async Task BaseRunLocation(Location location, CancellationToken token)
         {
-            DateTime utcStart = DateTime.UtcNow;
-
-            // Perform the action to send the request at the Location
-            while (true)
+            try
             {
-                // Send a request and get a response
-                var response = await RunLocation(location);
-                var endTime = DateTime.UtcNow;
+                DateTime utcStart = DateTime.UtcNow;
 
-                // modifying inmemory jobdata
-                this.RunningLocationsData[location].CurrentRunLengthMs =
-                    (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                if (response.Done == false)
+                // Perform the action to send the request at the Location
+                while (true)
                 {
-                    this.RunningLocationsData[location].CurrentRunStatus = "Undeployed";
-                    TrySave();
-                    // Use a backoff strategy for the delay between retries
-                    var delay = CalculateBackoff((DateTime.UtcNow - utcStart).TotalSeconds);
-                    await Task.Delay(delay);
+                    if (token.IsCancellationRequested) throw new OperationCanceledException();
+                    // Send a request and get a response
+                    var response = await RunLocation(location, token);
+                    var endTime = DateTime.UtcNow;
+
+                    // modifying inmemory jobdata
+                    this.RunningLocationsData[location].CurrentRunLengthMs =
+                        (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
+                    if (response.Done == false)
+                    {
+                        this.RunningLocationsData[location].CurrentRunStatus = "Undeployed";
+                        TrySave();
+                        // Use a backoff strategy for the delay between retries
+                        var delay = CalculateBackoff((DateTime.UtcNow - utcStart).TotalSeconds);
+                        await Task.Delay(delay, token);
+                    }
+                    else
+                    {
+                        this.RunningLocationsData[location].CurrentRunStatus = "Deployed";
+                        TrySave();
+                        break;
+                    }
                 }
-                else
-                {
-                    this.RunningLocationsData[location].CurrentRunStatus = "Deployed";
-                    TrySave();
-                    break;
-                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                this.RunningLocationsData[location].CurrentRunStatus = "Errored";
+                _logger.LogError(ex, $"Location {location.Name} timed out");
+            }
+            catch (Exception ex)
+            {
+                this.RunningLocationsData[location].CurrentRunStatus = "Errored";
+                _logger.LogError(ex, $"Error running location {location.Name}");
             }
         }
 
