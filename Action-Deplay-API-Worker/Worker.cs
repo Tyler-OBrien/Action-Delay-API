@@ -52,7 +52,7 @@ namespace Action_Deplay_API_Worker
             {
                 while (await natsSub.Msgs.WaitToReadAsync(stoppingToken))
                 {
-                    await foreach (var msg in natsSub.Msgs.ReadAllAsync())
+                    await foreach (var msg in natsSub.Msgs.ReadAllAsync(stoppingToken))
                     {
                         try
                         {
@@ -65,7 +65,7 @@ namespace Action_Deplay_API_Worker
                             //https://github.com/nats-io/nats.net/issues/467
                             var response =
                                 new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reply)));
-                            await msg.ReplyAsync(response);
+                            await msg.ReplyAsync(response, cancellationToken: stoppingToken);
                         }
                         catch (Exception e)
                         {
@@ -83,7 +83,7 @@ namespace Action_Deplay_API_Worker
             {
                 while (await natsSubDns.Msgs.WaitToReadAsync(stoppingToken))
                 {
-                    await foreach (var msg in natsSubDns.Msgs.ReadAllAsync())
+                    await foreach (var msg in natsSubDns.Msgs.ReadAllAsync(stoppingToken))
                     {
                         try
                         {
@@ -97,7 +97,7 @@ namespace Action_Deplay_API_Worker
                             //https://github.com/nats-io/nats.net/issues/467
                             var response =
                                 new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reply)));
-                            await msg.ReplyAsync(response);
+                            await msg.ReplyAsync(response, cancellationToken: stoppingToken);
                         }
                         catch (Exception e)
                         {
