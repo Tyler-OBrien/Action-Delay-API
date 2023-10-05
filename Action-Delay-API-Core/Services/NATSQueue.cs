@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS.Requests;
@@ -9,7 +10,8 @@ using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Models.Services;
 using FluentResults;
 using Microsoft.Extensions.Options;
-using NATS.Client.Core;
+using NATS.Client;
+using Options = NATS.Client.Options;
 
 namespace Action_Delay_API_Core.Services
 {
@@ -19,7 +21,9 @@ namespace Action_Delay_API_Core.Services
 
         private readonly LocalConfig _configuration;
 
-        private NatsConnection _natsConnection;
+        private IConnection _natsConnection;
+
+        private readonly ConnectionFactory _connectionFactory;
 
 
         private readonly ILogger _logger;
@@ -29,10 +33,10 @@ namespace Action_Delay_API_Core.Services
             _configuration = baseConfiguration.Value;
             _logger = logger;
 
-            var options = NatsOptions.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(30) }; 
-            _natsConnection = new NatsConnection(options);
-           
-            _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.ConnectionState}");
+            _connectionFactory = new ConnectionFactory();
+            _natsConnection = _connectionFactory.CreateConnection(GetOpts());
+
+            _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.State}");
         }
 
 
@@ -40,20 +44,70 @@ namespace Action_Delay_API_Core.Services
         {
             using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
             newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
-            var tryGetReply = await _natsConnection.RequestAsync<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, null, cancellationToken: newCancellationTokenSource.Token);
-            if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) 
+            var tryGetReply = await SendMessage<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, cancellationToken: newCancellationTokenSource.Token);
+            if (tryGetReply.IsFailed)
+                return Result.Fail(tryGetReply.Errors);
+            if (tryGetReply.ValueOrDefault == null)
                 return Result.Fail("Failed to get result");
-            return tryGetReply.Value!.Data!;
+            return tryGetReply.ValueOrDefault;
         }
 
         public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location, CancellationToken token)
         {
             using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
             newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
-            var tryGetReply = await _natsConnection.RequestAsync<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request, cancellationToken: newCancellationTokenSource.Token);
-            if (tryGetReply.HasValue == false || tryGetReply.Value.Data == null) 
+            var tryGetReply = await SendMessage<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request, cancellationToken: newCancellationTokenSource.Token);
+            if (tryGetReply.IsFailed)
+                return Result.Fail(tryGetReply.Errors);
+            if (tryGetReply.ValueOrDefault == null) 
                 return Result.Fail("Failed to get result");
-            return tryGetReply.Value!.Data!;
+            return tryGetReply.ValueOrDefault;
+        }
+
+        public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken)
+        {
+            try
+            {
+                if (_natsConnection.IsReconnecting() == false &&
+                    _natsConnection.IsClosed())
+                {
+                    if (_natsConnection.IsClosed() == false)
+                        _natsConnection.Close();
+                    _natsConnection.Dispose();
+
+
+                    _natsConnection =
+                        _connectionFactory.CreateConnection(GetOpts());
+                }
+
+                var inputStr = Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(message));
+                var tryGetMessage = await _natsConnection.RequestAsync(subject, inputStr, 5000);
+
+                if (tryGetMessage == null)
+                    return Result.Fail($"Failed to get message from {subject}");
+                var data = Encoding.UTF8.GetString(tryGetMessage.Data);
+
+                if (string.IsNullOrEmpty(data))
+                    return Result.Fail($"Failed to get message from {subject}, empty string returned");
+
+                var updateInfo = JsonSerializer.Deserialize<tOut>(data);
+                return updateInfo;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "NATS Connection to {subject} failed.", subject);
+            }
+
+            return Result.Fail("NATS Connection Failed");
+        }
+
+        private  Options GetOpts()
+        {
+            var opts = ConnectionFactory.GetDefaultOptions();
+            opts.Url = _configuration.NATSConnectionURL;
+            opts.AllowReconnect = true;
+            opts.MaxReconnect = Options.ReconnectForever;
+            return opts;
         }
     }
 }

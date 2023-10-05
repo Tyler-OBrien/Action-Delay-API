@@ -96,6 +96,7 @@ public class Program
                 IConfiguration configuration = hostContext.Configuration.GetSection("Base");
                 var baseConfiguration = configuration.Get<LocalConfig>();
                 services.Configure<LocalConfig>(configuration);
+                services.AddSingleton<LocalConfig>(baseConfiguration);
 
                 SENTRY_DSN = baseConfiguration.SENTRY_DSN;
 
