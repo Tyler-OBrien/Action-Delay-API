@@ -78,6 +78,9 @@ namespace Action_Delay_API_Core.Services
 
                     _natsConnection =
                         _connectionFactory.CreateConnection(GetOpts());
+
+                    _logger.LogInformation($"NATS Connection closed, re-establishing, Connection Status: {_natsConnection.State}");
+
                 }
 
                 var inputStr = Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(message));
@@ -108,6 +111,22 @@ namespace Action_Delay_API_Core.Services
             opts.AllowReconnect = true;
             opts.MaxReconnect = Options.ReconnectForever;
             return opts;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+        this.Dispose();
+        }
+
+        public void Dispose()
+        {
+            if (_natsConnection.IsClosed() == false)
+            {
+                _natsConnection.Close();
+                _natsConnection.Dispose();
+                _logger.LogInformation($"NATS Connection closed, ending task.");
+            }
+            _logger.LogInformation($"NATS Connection already closed, ending task.");
         }
     }
 }
