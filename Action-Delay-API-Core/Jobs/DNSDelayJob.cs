@@ -26,7 +26,7 @@ namespace Action_Delay_API_Core.Jobs
         private readonly IQueue _queue;
         private string _valueToLookFor;
 
-        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext )
+        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue )
         {
             _apiBroker = apiBroker;
             _config = config.Value;
@@ -82,7 +82,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
-                return new RunLocationResult(false, "Queue Error");
+                return new RunLocationResult("Queue Error");
             }
             var getResponse = tryGetResult.Value;
 

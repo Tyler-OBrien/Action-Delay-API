@@ -14,8 +14,17 @@ namespace Action_Delay_API_Core.Models.Jobs
             Reason = reason;
         }
 
+        public RunLocationResult(string exception)
+        {
+            Errored = true;
+            Done = false;
+            Reason = exception;
+        }
+
         public bool Done { get; set; }
 
         public string Reason { get; set; }
+
+        public bool Errored { get; set; }
     }
 }

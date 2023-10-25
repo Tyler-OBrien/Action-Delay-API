@@ -32,7 +32,7 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public CacheDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CacheDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext)
+        public CacheDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CacheDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
             _apiBroker = apiBroker;
             _config = config.Value;
@@ -202,7 +202,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, aborting location..");
-                return new RunLocationResult(false, "Queue Error");
+                return new RunLocationResult("Queue Error");
             }
             var getResponse = tryGetResult.Value;
 
