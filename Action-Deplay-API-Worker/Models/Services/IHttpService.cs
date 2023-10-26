@@ -1,4 +1,5 @@
-﻿using Action_Deplay_API_Worker.Models.API.Response;
+﻿using Action_Deplay_API_Worker.Models.API.Request;
+using Action_Deplay_API_Worker.Models.API.Response;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +10,6 @@ namespace Action_Deplay_API_Worker.Models.Services
 {
     public interface IHttpService
     {
-        Task<SerializableHttpResponse> PerformRequestAsync(string url, Dictionary<string, string> headers);
+        Task<SerializableHttpResponse> PerformRequestAsync(SerializableHttpRequest request);
     }
 }

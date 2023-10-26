@@ -12,6 +12,8 @@ namespace Action_Deplay_API_Worker.Models.API.Response
         public string QueryType { get; set; }
         public string ResponseCode { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
+        public string? Info { get; set; }
+
     }
     public class SerializableDnsAnswer
     {
@@ -20,5 +22,7 @@ namespace Action_Deplay_API_Worker.Models.API.Response
         public string RecordType { get; set; }
         public string RecordClass { get; set; }
         public string Value { get; set; }
+
+
     }
 }

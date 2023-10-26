@@ -15,5 +15,9 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
             get;
             set;
         }
+
+        public int? TimeoutMs { get; set; }
+
+        public NetType? NetType { get; set; }
     }
 }

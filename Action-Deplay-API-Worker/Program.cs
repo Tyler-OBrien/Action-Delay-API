@@ -1,3 +1,4 @@
+using System.Diagnostics.Eventing.Reader;
 using Action_Deplay_API_Worker.Models.Config;
 using Action_Deplay_API_Worker.Models.Services;
 using Action_Deplay_API_Worker.Services;
@@ -7,6 +8,9 @@ using Sentry.Extensions.Logging;
 using Sentry.Extensions.Logging.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Events;
+using System.Net.Sockets;
+using System.Net;
+using Action_Deplay_API_Worker.Models;
 
 namespace Action_Deplay_API_Worker
 {
@@ -62,18 +66,7 @@ namespace Action_Deplay_API_Worker
                     services.AddSentry<SentryLoggingOptions>();
                     services.AddLogging();
 
-                    services.AddHttpClient<IHttpService, HttpService>()
-                        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-                        {
-                            PooledConnectionLifetime = TimeSpan.FromMilliseconds(1),
-                            // Add other configurations if needed
-                        }).ConfigureHttpClient((client =>
-                        {
-                            
-                            client.DefaultRequestHeaders.ConnectionClose = true;
-                            
-                        }));
-
+                    
                     services.AddTransient<IHttpService, HttpService>();
                     services.AddTransient<IDnsService, DnsService>();
 

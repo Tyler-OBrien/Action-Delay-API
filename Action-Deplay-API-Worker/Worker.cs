@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Net;
 using System.Text;
 using Action_Deplay_API_Worker.Models.API.Response;
 using Action_Deplay_API_Worker.Models.Config;
@@ -8,8 +9,12 @@ using Polly;
 using Microsoft.Extensions.Options;
 using Serilog;
 using System.Text.Json;
+using Action_Deplay_API_Worker.Extensions;
 using Action_Deplay_API_Worker.Models.API.Request;
-using NATS.Client.Core;
+using Microsoft.Extensions.Configuration;
+using NATS.Client;
+using Options = NATS.Client.Options;
+using DnsClient;
 
 namespace Action_Deplay_API_Worker
 {
@@ -22,6 +27,12 @@ namespace Action_Deplay_API_Worker
         private readonly IDnsService _dnsService;
 
 
+
+        private IConnection _natsConnection;
+
+        private readonly ConnectionFactory _connectionFactory;
+
+
         public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IOptions<LocalConfig> probeConfiguration, IHttpService httpService, IDnsService dnsService)
         {
             _logger = logger;
@@ -29,6 +40,8 @@ namespace Action_Deplay_API_Worker
             _localConfig = probeConfiguration.Value;
             _httpService = httpService;
             _dnsService = dnsService;
+            _connectionFactory = new ConnectionFactory();
+            _natsConnection = _connectionFactory.CreateConnection(GetOpts());
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -41,79 +54,101 @@ namespace Action_Deplay_API_Worker
                 return;
             }
 
-            var options = NatsOptions.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL};
-            var natsConnection = new NatsConnection(options);
 
-            var natsSub = await natsConnection.SubscribeAsync($"HTTP-{_localConfig.Location}", null, stoppingToken);
-
-
-
-            var tryHttp = Task.Run(async () =>
+            _natsConnection.SubscribeAsync($"HTTP-{_localConfig.Location}", async (sender, args) =>
             {
-                while (await natsSub.Msgs.WaitToReadAsync(stoppingToken))
+                try
                 {
-                    await foreach (var msg in natsSub.Msgs.ReadAllAsync(stoppingToken))
+                    var httpRequest = args.Message.Data.Deserialize<SerializableHttpRequest>();
+                    if (httpRequest == null)
                     {
-                        try
+                        args.Message.Respond(new SerializableHttpResponse
                         {
-                            var DATA = Encoding.UTF8.GetString(msg.Data.Span);
-                            var httpRequest = JsonSerializer.Deserialize<SerializableHttpRequest>(DATA);
-
-                            var reply = await _httpService.PerformRequestAsync(httpRequest.URL, httpRequest.Headers);
-
-                            //To expand a bit on @sixlettervariables, there is a Request API that essentially publishes and waits for a response on a unique subject. The responder subscribes to a subject, and when it receives a message, it can either publish on the reply subject, or use a convenience method to reply with msg.Respond()
-                            //https://github.com/nats-io/nats.net/issues/467
-                            var response =
-                                new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reply)));
-                            await msg.ReplyAsync(response, cancellationToken: stoppingToken);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error(e, "Error with HTTP Hook");
-                        }
+                            Body = string.Empty,
+                            WasSuccess = false,
+                            Headers = new Dictionary<string, string>(),
+                            StatusCode = HttpStatusCode.BadGateway,
+                            Info = "Failed due to Null Request/unparsable"
+                        }.Serialize());
+                        return;
                     }
+                    var reply = await _httpService.PerformRequestAsync(httpRequest);
+
+                    // old
+                    //To expand a bit on @sixlettervariables, there is a Request API that essentially publishes and waits for a response on a unique subject. The responder subscribes to a subject, and when it receives a message, it can either publish on the reply subject, or use a convenience method to reply with msg.Respond()
+                    //https://github.com/nats-io/nats.net/issues/467
+
+                    args.Message.Respond(reply.Serialize());
                 }
-            }, stoppingToken);
+                catch (Exception e)
+                {
+                    Log.Error(e, "Error with HTTP Hook");
+                    args.Message.Respond(new SerializableHttpResponse
+                    {
+                        Body = string.Empty,
+                        Headers = new Dictionary<string, string>(),
+                        Info = "An Error occured",
+                        StatusCode = HttpStatusCode.BadGateway,
+                        WasSuccess = false
+                    }.Serialize());
+                }
+            });
 
-            var natsSubDns = await natsConnection.SubscribeAsync($"DNS-{_localConfig.Location}", null, stoppingToken);
 
 
 
-            var tryDNS = Task.Run(async () =>
+
+            _natsConnection.SubscribeAsync($"DNS-{_localConfig.Location}", async (sender, args) =>
             {
-                while (await natsSubDns.Msgs.WaitToReadAsync(stoppingToken))
+                try
                 {
-                    await foreach (var msg in natsSubDns.Msgs.ReadAllAsync(stoppingToken))
+                    var dnsRequest = args.Message.Data.Deserialize<SerializableDNSRequest>();
+                    if (dnsRequest == null)
                     {
-                        try
+                        args.Message.Respond(new SerializableDNSResponse()
                         {
-                            var DATA = Encoding.UTF8.GetString(msg.Data.Span);
-                            var dnsRequest = JsonSerializer.Deserialize<SerializableDNSRequest>(DATA);
-
-                            var reply = await _dnsService.PerformDnsLookupAsync(dnsRequest.QueryName,
-                                dnsRequest.QueryType, dnsRequest.DnsServer);
-
-                            //To expand a bit on @sixlettervariables, there is a Request API that essentially publishes and waits for a response on a unique subject. The responder subscribes to a subject, and when it receives a message, it can either publish on the reply subject, or use a convenience method to reply with msg.Respond()
-                            //https://github.com/nats-io/nats.net/issues/467
-                            var response =
-                                new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(reply)));
-                            await msg.ReplyAsync(response, cancellationToken: stoppingToken);
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error(e, "Error with DNS Hook");
-                        }
+                            Answers = new List<SerializableDnsAnswer>(),
+                            QueryType = "Unknown",
+                            QueryName = "Unknown",
+                            ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                            Info = "Failed due to Null Request"
+                        }.Serialize());
+                        return;
                     }
-                }
-            }, stoppingToken);
+                    var reply = await _dnsService.PerformDnsLookupAsync(dnsRequest);
 
-            _logger.LogInformation($"NATS Enabled, Connection State: {natsConnection.ConnectionState}");
-            await Task.WhenAll(tryDNS, tryHttp);
+                    //To expand a bit on @sixlettervariables, there is a Request API that essentially publishes and waits for a response on a unique subject. The responder subscribes to a subject, and when it receives a message, it can either publish on the reply subject, or use a convenience method to reply with msg.Respond()
+                    //https://github.com/nats-io/nats.net/issues/467
+                    args.Message.Respond(reply.Serialize());
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "Error with DNS Hook");
+                    args.Message.Respond(new SerializableDNSResponse()
+                    {
+                        Answers = new List<SerializableDnsAnswer>(),
+                        QueryType = "Unknown",
+                        QueryName = "Unknown",
+                        ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                        Info = "An error occured"
+                    }.Serialize());
+                }
+            });
+
+            _logger.LogInformation($"NATS Enabled, Connection State: {_natsConnection.State}");
+            await Task.Delay(Timeout.Infinite, stoppingToken);
             _logger.LogInformation($"NATS Done..");
 
         }
 
-
+        private Options GetOpts()
+        {
+            var opts = ConnectionFactory.GetDefaultOptions();
+            opts.Url = _localConfig.NATSConnectionURL;
+            opts.AllowReconnect = true;
+            opts.MaxReconnect = Options.ReconnectForever;
+            return opts;
+        }
 
     }
 }

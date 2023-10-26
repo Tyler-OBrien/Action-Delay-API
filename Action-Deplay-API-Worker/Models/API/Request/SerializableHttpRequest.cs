@@ -16,5 +16,10 @@ namespace Action_Deplay_API_Worker.Models.API.Request
             get;
             set;
         }
+        public int? TimeoutMs { get; set; }
+
+        public NetType? NetType { get; set; }
     }
+
+
 }

@@ -14,6 +14,7 @@ using System.Runtime.InteropServices.JavaScript;
 using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.CloudflareAPI.PurgeCache;
+using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Responses;
 using FluentResults;
 using Microsoft.EntityFrameworkCore;
@@ -183,7 +184,9 @@ namespace Action_Delay_API_Core.Jobs
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>(),
-                URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}" // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
+                URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}", // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
+                NetType = location.NetType ?? NetType.Either,
+                TimeoutMs = 5000
             };
             if (String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false &&
                 String.IsNullOrEmpty(_config.CacheJob.ProxyAPIKey) == false)

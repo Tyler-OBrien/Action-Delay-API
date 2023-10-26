@@ -8,6 +8,7 @@ using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Models.Services;
@@ -74,6 +75,8 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Headers = new Dictionary<string, string>(),
                 URL = _config.DelayJob.ScriptUrl,
+                NetType = location.NetType ?? NetType.Either,
+                TimeoutMs = 5000
             };
             var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
 

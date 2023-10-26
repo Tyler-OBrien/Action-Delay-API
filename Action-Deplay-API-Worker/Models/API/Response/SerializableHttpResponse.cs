@@ -13,5 +13,7 @@ namespace Action_Deplay_API_Worker.Models.API.Response
         public HttpStatusCode StatusCode { get; set; }
         public Dictionary<string, string> Headers { get; set; }
         public string Body { get; set; }
+        public string? Info { get; set; }
+
     }
 }

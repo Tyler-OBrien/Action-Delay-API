@@ -14,6 +14,7 @@ using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
 using System.Net;
 using Action_Delay_API_Core.Models.Database.Postgres;
+using Action_Delay_API_Core.Models.NATS;
 
 namespace Action_Delay_API_Core.Jobs
 {
@@ -76,7 +77,9 @@ namespace Action_Delay_API_Core.Jobs
             {
                 QueryName = _config.DNSJob.Name,
                 QueryType = "TXT",
-                DnsServer = _config.DNSJob.NameServers
+                DnsServer = _config.DNSJob.NameServers,
+                NetType = location.NetType ?? NetType.Either,
+                TimeoutMs = 5000
             };
             var tryGetResult = await _queue.DNS(newRequest, location.NATSName ?? location.Name, token);
             if (tryGetResult.IsFailed)

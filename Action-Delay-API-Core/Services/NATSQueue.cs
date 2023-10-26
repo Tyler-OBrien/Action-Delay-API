@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using Action_Delay_API_Core.Models.NATS.Responses;
@@ -83,8 +84,7 @@ namespace Action_Delay_API_Core.Services
 
                 }
 
-                var inputStr = Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(message));
-                var tryGetMessage = await _natsConnection.RequestAsync(subject, inputStr, 5000);
+                var tryGetMessage = await _natsConnection.RequestAsync(subject, message.Serialize(), 5000);
 
                 if (tryGetMessage == null)
                     return Result.Fail($"Failed to get message from {subject}");
@@ -114,8 +114,8 @@ namespace Action_Delay_API_Core.Services
         }
 
         public async ValueTask DisposeAsync()
-        {
-        this.Dispose();
+        { 
+            this.Dispose();
         }
 
         public void Dispose()

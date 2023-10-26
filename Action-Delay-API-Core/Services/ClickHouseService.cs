@@ -79,7 +79,7 @@ namespace Action_Delay_API_Core.Services
             await using var command = connection.CreateCommand();
 
             command.CommandText =
-                $"SELECT toUnixTimestamp(run_time) AS t, run_length as workers_deploy_lag, toUnixTimestamp(run_time) AS run_time FROM \"default\".\"job_runs\" WHERE run_time >= NOW() - INTERVAL '3' HOUR and job_name = 'Worker Script Delay Job' ORDER BY t";
+                $"SELECT toUnixTimestamp(run_time) AS t, run_length as workers_deploy_lag, toUnixTimestamp(run_time) AS run_time FROM \"default\".\"job_runs\" WHERE run_time >= NOW() - INTERVAL '3' HOUR and job_name = 'Worker Script Delay Job' and run_status = 'Deployed'  ORDER BY t";
             var result = await command.ExecuteReaderAsync(token);
             List<DeploymentStatistic> data = new List<DeploymentStatistic>(3 * 60);
             while (await result.ReadAsync(token))

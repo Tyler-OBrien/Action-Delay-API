@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using Action_Deplay_API_Worker.Models;
+using Action_Deplay_API_Worker.Models.API.Request;
 using Action_Deplay_API_Worker.Models.API.Response;
 using Action_Deplay_API_Worker.Models.Services;
 using DnsClient;
@@ -36,8 +39,13 @@ namespace Action_Deplay_API_Worker.Services
                 .OrResult<IDnsQueryResponse>(r => r.HasError)
                 .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
 
-        public async Task<SerializableDNSResponse> PerformDnsLookupAsync(string queryName, string queryType, string dnsServer)
+        public async Task<SerializableDNSResponse> PerformDnsLookupAsync(SerializableDNSRequest request)
         {
+            var cancellationTokenSource = new CancellationTokenSource(request.TimeoutMs ?? 5_000);
+            var token = cancellationTokenSource.Token;
+            var queryType = request.QueryType;
+            var queryName = request.QueryName;
+            var dnsServer = request.DnsServer;
             try
             {
                 if (!Enum.TryParse(queryType, true, out QueryType parsedQueryType))
@@ -50,12 +58,68 @@ namespace Action_Deplay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ResponseCode = DnsHeaderResponseCode.Refused.ToString(),
-                        Answers = new List<SerializableDnsAnswer>()
+                        Answers = new List<SerializableDnsAnswer>(),
+                        Info = $"Invalid QueryType: {queryType}, trying to query {queryName} via {dnsServer}"
                     };
                 }
 
-                var dnsServerAddresses =
-                    await nameServerqueryRetryPolicy.ExecuteAsync(() => Dns.GetHostAddressesAsync(dnsServer));
+                IPAddress[] dnsServerAddresses = null;
+                try
+                {
+                    dnsServerAddresses =
+                        await nameServerqueryRetryPolicy.ExecuteAsync(() =>
+                        {
+                            AddressFamily addressFamily = AddressFamily.Unspecified;
+                            if (request.NetType == NetType.IPv4)
+                                addressFamily = AddressFamily.InterNetwork;
+                            else if (request.NetType == NetType.IPv6)
+                                addressFamily = AddressFamily.InterNetworkV6;
+                            return Dns.GetHostAddressesAsync(dnsServer, addressFamily, token);
+                        });
+                }
+                catch (Exception ex) when (ex is SocketException or ArgumentOutOfRangeException or ArgumentException)
+                {
+                    _logger.LogWarning(ex,
+                        "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
+                        queryName, queryType, dnsServer);
+                    return new SerializableDNSResponse()
+                    {
+                        QueryName = queryName,
+                        QueryType = queryType,
+                        ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                        Answers = new List<SerializableDnsAnswer>(),
+                        Info = $"Internal Error when trying to resolve DnsServer into IP: {ex.Message}"
+                    };
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
+                {
+                    _logger.LogWarning(ex,
+                        "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but it timed out on resolving dnsServer",
+                        queryName, queryType, dnsServer);
+                    return new SerializableDNSResponse()
+                    {
+                        QueryName = queryName,
+                        QueryType = queryType,
+                        ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                        Answers = new List<SerializableDnsAnswer>(),
+                        Info = $"Timeout on resolving DnsServer :("
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
+                        queryName, queryType, dnsServer);
+                    return new SerializableDNSResponse()
+                    {
+                        QueryName = queryName,
+                        QueryType = queryType,
+                        ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                        Answers = new List<SerializableDnsAnswer>(),
+                        Info = $"Unhandled Internal Error when trying to resolve DnsServer into IP :("
+                    };
+                }
+
                 if (dnsServerAddresses.Length == 0)
                 {
                     _logger.LogInformation(
@@ -66,7 +130,8 @@ namespace Action_Deplay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
-                        Answers = new List<SerializableDnsAnswer>()
+                        Answers = new List<SerializableDnsAnswer>(),
+                        Info = $"Unable to resolve DNS server: {dnsServer}, trying to query {queryType} of {queryName}"
                     };
                 }
 
@@ -74,7 +139,8 @@ namespace Action_Deplay_API_Worker.Services
                 var lookupClient = new LookupClient(lookupClientOptions);
 
                 var response =
-                    await dnsRetryPolicy.ExecuteAsync(() => lookupClient.QueryAsync(queryName, parsedQueryType));
+                    await dnsRetryPolicy.ExecuteAsync(() =>
+                        lookupClient.QueryAsync(queryName, parsedQueryType, cancellationToken: token));
 
                 var dnsResponse = new SerializableDNSResponse()
                 {
@@ -133,10 +199,39 @@ namespace Action_Deplay_API_Worker.Services
 
                     dnsResponse.Answers.Add(dnsAnswer);
                 }
+
                 _logger.LogInformation(
                     "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers",
                     queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count);
                 return dnsResponse;
+            }
+            catch (DnsClient.DnsResponseException dnsResponseException)
+            {
+                _logger.LogWarning(dnsResponseException,
+                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but we had a dnsError {dnsError}, {dnsMessage}",
+                    queryName, queryType, dnsServer, dnsResponseException.Code, dnsResponseException.Message);
+                return new SerializableDNSResponse()
+                {
+                    QueryName = queryName,
+                    QueryType = queryType,
+                    ResponseCode = dnsResponseException.Code.ToString(),
+                    Answers = new List<SerializableDnsAnswer>(),
+                    Info = $"Dns Error, Code: {dnsResponseException.Code}, Message: {dnsResponseException.Message}"
+                };
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
+            {
+                _logger.LogWarning(ex,
+                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but it timed out",
+                    queryName, queryType, dnsServer);
+                return new SerializableDNSResponse()
+                {
+                    QueryName = queryName,
+                    QueryType = queryType,
+                    ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                    Answers = new List<SerializableDnsAnswer>(),
+                    Info = $"Timeout :("
+                };
             }
             catch (Exception ex)
             {
@@ -148,7 +243,8 @@ namespace Action_Deplay_API_Worker.Services
                     QueryName = queryName,
                     QueryType = queryType,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
-                    Answers = new List<SerializableDnsAnswer>()
+                    Answers = new List<SerializableDnsAnswer>(),
+                    Info = $"Unhandled Internal Error :("
                 };
             }
         }
