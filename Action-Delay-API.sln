@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API", "Action-
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Core", "Action-Delay-API-Core\Action-Delay-API-Core.csproj", "{0DA713D1-0630-4729-9F32-EAC62A6CCF96}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Worker", "Action-Deplay-API-Worker\Action-Delay-API-Worker.csproj", "{B5B0C69B-528C-40DE-A25D-B426E3832BE2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Worker", "Action-Delay-API-Worker\Action-Delay-API-Worker.csproj", "{B5B0C69B-528C-40DE-A25D-B426E3832BE2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

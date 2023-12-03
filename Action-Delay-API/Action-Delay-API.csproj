@@ -10,25 +10,33 @@
 	  <SelfContained>true</SelfContained>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
   <ItemGroup>
     <Content Remove="appsettings.json" />
   </ItemGroup>
 
   <ItemGroup>
-	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.9" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.7">
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	  </PackageReference>
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="7.0.9" />
-	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.18.1" />
-	  <PackageReference Include="prometheus-net.AspNetCore" Version="8.0.0" />
-	  <PackageReference Include="Sentry" Version="3.34.0" />
-	  <PackageReference Include="Sentry.AspNetCore" Version="3.34.0" />
-	  <PackageReference Include="Sentry.Serilog" Version="3.34.0" />
-	  <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.0" />
+	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
+	  <PackageReference Include="prometheus-net.AspNetCore" Version="8.1.0" />
+	  <PackageReference Include="Sentry" Version="3.41.0" />
+	  <PackageReference Include="Sentry.AspNetCore" Version="3.41.0" />
+	  <PackageReference Include="Sentry.Serilog" Version="3.41.0" />
+	  <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
 	  <PackageReference Include="Serilog.Sinks.Async" Version="1.5.0" />
-	  <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
+	  <PackageReference Include="Serilog.Sinks.Console" Version="5.0.0" />
 	  <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
 	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
 	  <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.5.0" />
