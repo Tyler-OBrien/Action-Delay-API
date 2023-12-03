@@ -9,6 +9,7 @@ using Action_Delay_API_Core.Models.Services;
 using Action_Delay_API_Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Database.Postgres;
+using Action_Delay_API_Core.Models.Local;
 
 namespace Action_Delay_API;
 
@@ -60,6 +61,14 @@ public class Program
         IConfiguration configuration = builder.Configuration.GetSection("Base");
         var apiConfiguration = configuration.Get<APIConfig>();
         builder.Services.Configure<APIConfig>(configuration);
+
+        var newLocalConfig = new LocalConfig()
+        {
+            ClickhouseConnectionString = apiConfiguration.ClickhouseConnectionString,
+            PostgresConnectionString = apiConfiguration.PostgresConnectionString
+        };
+
+        builder.Services.AddSingleton<LocalConfig>(newLocalConfig);
 
 
         builder.Host.UseSerilog();

@@ -40,21 +40,26 @@ namespace Action_Delay_API_Core.Services
             return new(_config.ClickhouseConnectionString);
         }
 
-        public async Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun> locations, CancellationToken token = default)
+        public async Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, CancellationToken token = default)
         {
             try
             {
                 await using var connection = CreateConnection();
-                using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
+                if (locations != null && locations.Any())
                 {
-                    DestinationTableName = "job_runs_locations",
-                    BatchSize = 100000
-                };
+                    using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
+                    {
+                        DestinationTableName = "job_runs_locations",
+                        BatchSize = 100000
+                    };
 
-                await bulkCopyInterface.WriteToServerAsync(
-                    locations.Select(server => new object[]
-                            { server.JobName, server.LocationName, server.RunTime, server.RunLength, server.RunStatus })
-                        .ToArray(), token);
+                    await bulkCopyInterface.WriteToServerAsync(
+                        locations.Select(server => new object[]
+                            {
+                                server.JobName, server.LocationName, server.RunTime, server.RunLength, server.RunStatus
+                            })
+                            .ToArray(), token);
+                }
 
                 using var bulkCopyRun = new ClickHouseBulkCopy(connection)
                 {
