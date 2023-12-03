@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
+using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS;
@@ -35,6 +36,11 @@ namespace Action_Delay_API_Core.Jobs
         }
 
         public override string Name => "Worker Script Delay Job";
+        public override async Task PreWarmRunLocation(Location location)
+        {
+            await SendLocation(location, CancellationToken.None);
+        }
+
         public override async Task RunAction()
         {
             _logger.LogInformation("Running Delay Job");
@@ -50,7 +56,6 @@ namespace Action_Delay_API_Core.Jobs
             var metadataContent = System.Text.Json.JsonSerializer.Serialize(new
             {
                 compatibility_date = "2023-07-26",
-                usage_model = "bundled",
                 main_module = "worker.js"
             });
 
@@ -62,23 +67,32 @@ namespace Action_Delay_API_Core.Jobs
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
-                throw new InvalidOperationException(
+                throw new CustomAPIError(
                     $"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
             _logger.LogInformation("Changed Worker script...");
         }
 
-        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
+        private async Task<Result<SerializableHttpResponse>> SendLocation(Location location, CancellationToken token)
         {
             var newRequest = new NATSHttpRequest()
             {
-                Headers = new Dictionary<string, string>(),
+                Headers = new Dictionary<string, string>()
+                {
+                    { "User-Agent", $"Action-Delay-API {Name}"}
+                },
                 URL = _config.DelayJob.ScriptUrl,
                 NetType = location.NetType ?? NetType.Either,
-                TimeoutMs = 5000
+                TimeoutMs = 10_000
             };
-            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+            return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+        }
+
+        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
+        {
+     
+            var tryGetResult = await SendLocation(location, token);
 
             if (tryGetResult.IsFailed)
             {
@@ -97,7 +111,12 @@ namespace Action_Delay_API_Core.Jobs
             }
             else
             {
-                _logger.LogInformation($"{location.Name} sees {getResponse.Body} instead of {_generatedValue}! Let's try again...");
+                _logger.LogInformation($"{location.Name} sees {getResponse.Body} instead of {_generatedValue}! Status Code: {getResponse.StatusCode} Let's try again...");
+                if (getResponse is { WasSuccess: false, StatusCode: HttpStatusCode.BadGateway })
+                {
+                    _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
+                    return new RunLocationResult("Proxy Error");
+                }
                 return new RunLocationResult(false, "Undeployed");
             }
         }

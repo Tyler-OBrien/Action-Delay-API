@@ -15,17 +15,19 @@ using Microsoft.Extensions.Options;
 using System.Net;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.NATS;
+using Action_Delay_API_Core.Models.Errors;
 
 namespace Action_Delay_API_Core.Jobs
 {
     public class DNSDelayJob : IBaseJob
     {
 
-        private readonly ICloudflareAPIBroker _apiBroker;
-        private readonly LocalConfig _config;
-        private readonly ILogger _logger;
-        private readonly IQueue _queue;
-        private string _valueToLookFor;
+        internal readonly ICloudflareAPIBroker _apiBroker;
+        internal readonly LocalConfig _config;
+        internal readonly ILogger _logger;
+        internal readonly IQueue _queue;
+        internal DNSDelayJobConfig _jobConfig;
+        internal string _valueToLookFor;
 
         public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue )
         {
@@ -33,9 +35,12 @@ namespace Action_Delay_API_Core.Jobs
             _config = config.Value;
             _logger = logger;
             _queue = queue;
+            if (_jobConfig == null)
+                _jobConfig = _config.DNSJob;
         }
 
 
+        
 
 
 
@@ -48,6 +53,11 @@ namespace Action_Delay_API_Core.Jobs
           _logger.LogInformation($"Completed {Name}..");
         }
 
+        public override async Task PreWarmRunLocation(Location location)
+        {
+            await SendRequest(location, CancellationToken.None);
+        }
+
         public  override async Task RunAction()
         {
             _valueToLookFor = $"Are Blobs Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R}";
@@ -55,51 +65,58 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Comment = "Blame Walshy",
                 Content = _valueToLookFor,
-                Name = _config.DNSJob.Name,
+                Name = _jobConfig.Name,
                 Proxied = false,
-                Tags = new[] { "Blame-Blobs", "Free-Canadians", "If-your-reading-this-im-sorry" },
                 Ttl = 1,
                 Type = "TXT"
             };
-            var tryPutAPI = await _apiBroker.UpdateDNSRecord(_config.DNSJob.RecordId, _config.DNSJob.ZoneId, newUpdateRequest, _config.DNSJob.API_Key, CancellationToken.None);
+            var tryPutAPI = await _apiBroker.UpdateDNSRecord(_jobConfig.RecordId, _jobConfig.ZoneId, newUpdateRequest, _jobConfig.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
-                throw new InvalidOperationException(
+                throw new CustomAPIError(
                     $"Failure updating DNS Record, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
         }
 
-        public async override Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
+        public async Task<Result<SerializableDNSResponse>> SendRequest(Location location, CancellationToken token)
         {
             var newRequest = new NATSDNSRequest()
             {
-                QueryName = _config.DNSJob.Name,
+                QueryName = _jobConfig.Name,
                 QueryType = "TXT",
-                DnsServer = _config.DNSJob.NameServers,
+                DnsServer = _jobConfig.NameServers,
                 NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 5000
-            };
-            var tryGetResult = await _queue.DNS(newRequest, location.NATSName ?? location.Name, token);
+            }; 
+            return await _queue.DNS(newRequest, location.NATSName ?? location.Name, token);
+        }
+
+        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
+        {
+            var tryGetResult = await SendRequest(location, token);
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
                 return new RunLocationResult("Queue Error");
             }
+
             var getResponse = tryGetResult.Value;
 
-            _logger.LogInformation($"One DNS Request returned from {location.NATSName} - Success {getResponse.ResponseCode}");
+
+
+            _logger.LogInformation($"{Name}: One DNS Request returned from {location.NATSName} - Success {getResponse.ResponseCode}");
             string tryGetAnswer = getResponse.Answers.FirstOrDefault()?.Value ?? "";
             if (tryGetAnswer.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{location.Name} sees the change! Let's remove this and move on..");
+                _logger.LogInformation($"{Name}: {location.Name} sees the change! Let's remove this and move on..");
                 return new RunLocationResult(true, "Deployed");
             }
             else
             {
-                _logger.LogInformation($"{location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}! Let's try again...");
+                _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}! Let's try again...");
                 return new RunLocationResult(false, "Undeployed");
             }
         }

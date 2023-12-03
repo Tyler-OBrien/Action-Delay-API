@@ -12,6 +12,7 @@ using Action_Delay_API_Core.Models.Services;
 using FluentResults;
 using Microsoft.Extensions.Options;
 using NATS.Client;
+using Polly;
 using Options = NATS.Client.Options;
 
 namespace Action_Delay_API_Core.Services
@@ -44,7 +45,7 @@ namespace Action_Delay_API_Core.Services
         public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location, CancellationToken token)
         {
             using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
-            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
+            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(12));
             var tryGetReply = await SendMessage<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, cancellationToken: newCancellationTokenSource.Token);
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
@@ -56,7 +57,7 @@ namespace Action_Delay_API_Core.Services
         public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location, CancellationToken token)
         {
             using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
-            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(5));
+            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(12));
             var tryGetReply = await SendMessage<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request, cancellationToken: newCancellationTokenSource.Token);
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
@@ -84,7 +85,7 @@ namespace Action_Delay_API_Core.Services
 
                 }
 
-                var tryGetMessage = await _natsConnection.RequestAsync(subject, message.Serialize(), 5000);
+                var tryGetMessage = await _natsConnection.RequestAsync(subject, message.Serialize(), 12000);
 
                 if (tryGetMessage == null)
                     return Result.Fail($"Failed to get message from {subject}");
@@ -104,12 +105,18 @@ namespace Action_Delay_API_Core.Services
             return Result.Fail("NATS Connection Failed");
         }
 
+        private static readonly IAsyncPolicy natsRetryPolicy =
+            Policy.Handle<NATSTimeoutException>()
+                .Or<NATSProtocolException>()
+                .WaitAndRetryAsync(1, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
+
         private  Options GetOpts()
         {
             var opts = ConnectionFactory.GetDefaultOptions();
             opts.Url = _configuration.NATSConnectionURL;
             opts.AllowReconnect = true;
-            opts.MaxReconnect = Options.ReconnectForever;
+            opts.MaxReconnect = 2;
+            opts.Timeout = 4000;
             return opts;
         }
 
@@ -120,13 +127,21 @@ namespace Action_Delay_API_Core.Services
 
         public void Dispose()
         {
-            if (_natsConnection.IsClosed() == false)
+            try
             {
-                _natsConnection.Close();
-                _natsConnection.Dispose();
-                _logger.LogInformation($"NATS Connection closed, ending task.");
+                if (_natsConnection.IsClosed() == false)
+                {
+                    _natsConnection.Close();
+                    _natsConnection.Dispose();
+                    _logger.LogInformation($"NATS Connection closed, ending task.");
+                }
+
+                _logger.LogInformation($"NATS Connection already closed, ending task.");
             }
-            _logger.LogInformation($"NATS Connection already closed, ending task.");
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error disposing NATS");
+            }
         }
     }
 }

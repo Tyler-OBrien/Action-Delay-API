@@ -22,8 +22,7 @@ namespace Action_Delay_API_Core.Broker
                 $"{BasePath}/zones/{zoneId}/rulesets/{ruleSetId}/rules/{ruleId}");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             request.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(newUpdateRequest));
-            var response = await _httpClient.SendAsync(request, token);
-            var tryPut = await response.ProcessHttpResponseAsync<UpdateCustomRuleResponseDto, object>($"Updating Custom Rule",
+            var tryPut = await _httpClient.ProcessHttpRequestAsync<UpdateCustomRuleResponseDto>(request, $"Updating Custom Rule",
                 _logger);
             if (tryPut.IsFailed) return FluentResults.Result.Fail(tryPut.Errors);
             return tryPut.Value!;

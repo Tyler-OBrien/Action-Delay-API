@@ -18,6 +18,7 @@ using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Responses;
 using FluentResults;
 using Microsoft.EntityFrameworkCore;
+using Action_Delay_API_Core.Models.Errors;
 
 namespace Action_Delay_API_Core.Jobs
 {
@@ -55,29 +56,14 @@ namespace Action_Delay_API_Core.Jobs
             _logger.LogInformation($"Completed {Name}..");
         }
 
+        public override async Task PreWarmRunLocation(Location location)
+        {
+            await SendRequest(location, CancellationToken.None);
+        }
+
         public override async Task RunAction()
         {
-            // pre-arm all of the locations
-
-            Dictionary<Location, Task> preInitWarmTasks = new();
-            foreach (var location in _config.Locations)
-            {
-                preInitWarmTasks.Add(location, SendRequest(location, CancellationToken.None));
-            }
-
-            foreach (var preInitTask in preInitWarmTasks)
-            {
-                try
-                {
-                    await preInitTask.Value;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogCritical(ex, $"Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}");
-                }
-            }
-
-            foreach (var location in _config.Locations)
+            foreach (var location in _config.Locations.Where(location => location.Disabled == false))
             {
                 int retries = 5;
                 try
@@ -127,7 +113,7 @@ namespace Action_Delay_API_Core.Jobs
                             continue;
                         }
                     }
-           
+
                 }
                 catch (Exception ex)
                 {
@@ -150,7 +136,7 @@ namespace Action_Delay_API_Core.Jobs
                 tryFindData.LastUpdated = DateTime.UtcNow;
                 tryFindData.Value = _valueToLookFor;
                 tryFindData.Metadata = "Updated";
-                await _dbContext.SaveChangesAsync();
+                await TrySave(true);
             }
             catch (Exception ex)
             {
@@ -171,7 +157,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure purging cache, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
-                throw new InvalidOperationException(
+                throw new CustomAPIError(
                     $"Failure purging cache, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
@@ -183,10 +169,13 @@ namespace Action_Delay_API_Core.Jobs
         {
             var newRequest = new NATSHttpRequest()
             {
-                Headers = new Dictionary<string, string>(),
+                Headers = new Dictionary<string, string>()
+                {
+                    { "User-Agent", $"Action-Delay-API {Name}"}
+                }, 
                 URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}", // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
                 NetType = location.NetType ?? NetType.Either,
-                TimeoutMs = 5000
+                TimeoutMs = 10_000
             };
             if (String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false &&
                 String.IsNullOrEmpty(_config.CacheJob.ProxyAPIKey) == false)
@@ -222,6 +211,11 @@ namespace Action_Delay_API_Core.Jobs
             else
             {
                 _logger.LogInformation($"{location.Name} sees {getResponse.Body} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of 200 / OK! Let's try again...");
+                if (getResponse is { WasSuccess: false, StatusCode: HttpStatusCode.BadGateway })
+                {
+                    _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
+                    return new RunLocationResult("Proxy Error");
+                }
                 return new RunLocationResult(false, "Undeployed");
             }
         }

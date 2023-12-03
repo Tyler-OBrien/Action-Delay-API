@@ -20,8 +20,7 @@ namespace Action_Delay_API_Core.Broker
                 $"{BasePath}/zones/{zoneId}/purge_cache/");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             request.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(newUpdateRequest));
-            var response = await _httpClient.SendAsync(request, token);
-            var tryPut = await response.ProcessHttpResponseAsync<PurgeCacheByURLResponse, object>($"Purging Cache By URL",
+            var tryPut = await _httpClient.ProcessHttpRequestAsync<PurgeCacheByURLResponse>(request, $"Purging Cache By URL",
                 _logger);
             if (tryPut.IsFailed) return Result.Fail(tryPut.Errors);
             return tryPut.Value!;

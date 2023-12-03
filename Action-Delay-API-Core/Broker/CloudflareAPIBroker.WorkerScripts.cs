@@ -34,8 +34,7 @@ namespace Action_Delay_API_Core.Broker
                 $"{BasePath}/accounts/{accountId}/workers/services/{scriptName}/environments/production");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             request.Content = formData;
-            var response = await _httpClient.SendAsync(request, token);
-            var tryPut =  await response.ProcessHttpResponseAsync<UploadWorkerScript, object>($"Uploading Worker Script",
+            var tryPut =  await _httpClient.ProcessHttpRequestAsync<UploadWorkerScript>(request, $"Uploading Worker Script",
                 _logger);
             if (tryPut.IsFailed) return Result.Fail(tryPut.Errors);
             return tryPut.Value!;

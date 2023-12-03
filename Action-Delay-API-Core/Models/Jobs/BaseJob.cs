@@ -13,6 +13,10 @@ using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
 using System.Threading;
+using Action_Delay_API_Core.Models.Errors;
+using Sentry;
+using Serilog.Context;
+using Exception = System.Exception;
 
 namespace Action_Delay_API_Core.Models.Jobs
 {
@@ -23,6 +27,7 @@ namespace Action_Delay_API_Core.Models.Jobs
         public const string STATUS_DEPLOYED = "Deployed";
         public const string STATUS_PENDING = "Pending";
         public const string STATUS_ERRORED = "Errored";
+        public const string STATUS_API_ERROR = "API_Error";
     }
 
     public abstract class IBaseJob
@@ -61,25 +66,66 @@ namespace Action_Delay_API_Core.Models.Jobs
 
         public virtual TimeSpan CancelAfterIfHalfDone => TimeSpan.FromMinutes(15);
 
+        /* Run the Task (DNS or HTTP) Request to get caches warm and such for more consistent results */
+        public virtual async Task PreWarmAction()
+        {
+            try
+            {
+                Dictionary<Location, Task> preInitWarmTasks = new();
+                foreach (var location in _config.Locations.Where(location => location.Disabled == false))
+                {
+                    preInitWarmTasks.Add(location, PreWarmRunLocation(location));
+                }
+
+                foreach (var preInitTask in preInitWarmTasks)
+                {
+                    try
+                    {
+                        await preInitTask.Value;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogCritical(ex,
+                            $"{Name}: Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}");
+                    }
+                }
+                _logger.LogInformation($"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {String.Join(", ",preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex,
+                    $"Failure running PreWarmAction for {Name}");
+            }
+        }
+
+        public abstract Task PreWarmRunLocation(Location location);
+
+
         public abstract Task RunAction();
         public abstract Task<RunLocationResult> RunLocation(Location location, CancellationToken token);
         public abstract Task HandleCompletion();
 
         public async Task BaseRun()
         {
+            using var scope = _logger.BeginScope(Name);
+            using var sentryScope = SentrySdk.PushScope();
+            SentrySdk.AddBreadcrumb($"Starting Job {Name}");
             try
             {
                 var cancellationTokenSource = new CancellationTokenSource();
                 // Pre-init job and locations in database
                 _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
-                JobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.JobName == Name);
+                // We always want NonTracking Here because we'll manually push back the changes we make in a semaphore, preventing issues with the ChangeTracker Dict being modified mid-save
+                JobData = await _dbContext.JobData.AsNoTracking().FirstOrDefaultAsync(job => job.JobName == Name);
                 if (JobData == null)
                 {
-                    JobData = new JobData()
+                    var newJobData = new JobData()
                     {
                         JobName = Name
                     };
-                    JobData = _dbContext.JobData.Add(JobData).Entity;
+                     _dbContext.JobData.Add(newJobData);
+                     await TrySave(true);
+                     JobData = await _dbContext.JobData.AsNoTracking().FirstAsync(job => job.JobName == Name);
                 }
                 else
                 {
@@ -88,32 +134,57 @@ namespace Action_Delay_API_Core.Models.Jobs
                     JobData.LastRunTime = JobData.CurrentRunTime;
                 }
 
-                JobData.CurrentRunStatus = Status.STATUS_UNDEPLOYED;
+                JobData.CurrentRunStatus = Status.STATUS_PENDING;
                 JobData.CurrentRunLengthMs = null;
                 JobData.CurrentRunTime = DateTime.UtcNow;
-
+                SentrySdk.AddBreadcrumb($"Got Job Data: {JobData.CurrentRunStatus}");
                 foreach (var location in _config.Locations.Where(location => location.Disabled == false))
                 {
-                    var tryFindLocation = await _dbContext.JobLocations.FirstOrDefaultAsync(dbLocation =>
+                    var tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstOrDefaultAsync(dbLocation =>
                         dbLocation.JobName == Name && dbLocation.LocationName == location.Name);
                     if (tryFindLocation == null)
                     {
-                        tryFindLocation = new JobDataLocation()
+                        var newLocation = new JobDataLocation()
                         {
                             JobName = Name,
                             LocationName = location.Name,
                         };
-                        tryFindLocation = _dbContext.JobLocations.Add(tryFindLocation).Entity;
+                       _dbContext.JobLocations.Add(newLocation);
+                       tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
+                           dbLocation.JobName == Name && dbLocation.LocationName == location.Name);
                     }
 
                     this.RunningLocationsData[location] = tryFindLocation;
                     tryFindLocation.CurrentRunTime = DateTime.UtcNow;
                 }
+                SentrySdk.AddBreadcrumb($"Set/Got Location Data");
 
                 await TrySave(true);
 
+                // PreWarm
+                await PreWarmAction();
+
                 // Execute the action for this Job
-                await RunAction();
+                try
+                {
+                    await RunAction();
+                    JobData.CurrentRunStatus = Status.STATUS_UNDEPLOYED;
+                }
+                catch (CustomAPIError ex)
+                {
+                    _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", this.Name, ex.Message);
+                    this.JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
+                    await InsertRunFailure(Status.STATUS_API_ERROR);
+                    throw;
+                }
+                catch (Exception)
+                {
+                    this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                    await InsertRunFailure(Status.STATUS_ERRORED);
+                    throw;
+                }
+                SentrySdk.AddBreadcrumb($"Ran Action for {Name}");
+
                 ConfirmedUpdateUtc = DateTime.UtcNow;
 
                 // Start monitoring on each Location
@@ -123,90 +194,171 @@ namespace Action_Delay_API_Core.Models.Jobs
                     RunningLocations[location] = task;
                 }
 
-                // Check the status of tasks continuously
-                while (RunningLocations.Count > 0 || cancellationTokenSource.Token.IsCancellationRequested)
+                SentrySdk.AddBreadcrumb($"Started Locations for {Name}");
+
+                try
                 {
-                    try
+                    // Check the status of tasks continuously
+                    while (RunningLocations.Count > 0 || cancellationTokenSource.Token.IsCancellationRequested)
                     {
-                        // Get the task that finishes first
-                        var completedTask = await Task.WhenAny(RunningLocations.Values);
-                        var taskResult = await completedTask;
-                        var endTime = DateTime.UtcNow;
-                        var completedLocation = RunningLocations.First(x => x.Value == completedTask).Key;
-
-                        // Remove the completed task from the running tasks
-                        RunningLocations.Remove(completedLocation);
-
-                        FinishedLocationStatus.Add(completedLocation, taskResult);
-
-                        //  if more then half are done, we just say the entire job is.
-
-                        if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                            (_config.Locations.Count(location => location.Disabled == false) / 2) ||
-                            RunningLocations.Count <= 0)
+                        try
                         {
-                            if (this.JobData.CurrentRunStatus.Equals(Status.STATUS_UNDEPLOYED, StringComparison.OrdinalIgnoreCase))
+                            // Get the task that finishes first
+                            var completedTask = await Task.WhenAny(RunningLocations.Values);
+                            var completedLocation = RunningLocations.First(x => x.Value == completedTask).Key;
+                            bool taskResult = false;
+                            try
                             {
-                                // Success, at least half are success
-                                if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                    (_config.Locations.Count(location => location.Disabled == false) / 2))
+                                taskResult = await completedTask;
+                            }
+                            catch (OperationCanceledException ex)
+                            {
+                                _logger.LogWarning(ex, 
+                                    $"{JobData.JobName} had {completedLocation} time out.");
+                                taskResult = false;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, 
+                                    $"{JobData.JobName} had {completedLocation} error out.");
+                                taskResult = false;
+                            }
+
+                            var endTime = DateTime.UtcNow;
+                         
+
+                            // Remove the completed task from the running tasks
+                            RunningLocations.Remove(completedLocation);
+
+                            FinishedLocationStatus.Add(completedLocation, taskResult);
+
+                            //  if more then half are done, we just say the entire job is.
+
+                            if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
+                                (_config.Locations.Count(location => location.Disabled == false) / 2) ||
+                                RunningLocations.Count <= 0)
+                            {
+                                if (this.JobData.CurrentRunStatus.Equals(Status.STATUS_UNDEPLOYED,
+                                        StringComparison.OrdinalIgnoreCase))
                                 {
-                                    _logger.LogInformation($"Current Run Status: {this.JobData.CurrentRunStatus}");
-                                    _logger.LogInformation(
-                                        $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
-                                    cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
-                                    this.JobData.CurrentRunStatus = Status.STATUS_PENDING;
-                                    _logger.LogInformation($"Current Run Status: {this.JobData.CurrentRunStatus}, dbContext has changed? {_dbContext.ChangeTracker.HasChanges()}, {_dbContext.Entry(this.JobData)?.State}, context id: {_dbContext.ContextId}, {_dbContext.Entry(this.JobData).Property(x => x.CurrentRunStatus).IsModified}, Original: {_dbContext.Entry(this.JobData).Property(x => x.CurrentRunStatus).OriginalValue}, Current: {_dbContext.Entry(this.JobData).Property(x => x.CurrentRunStatus).CurrentValue}");
-                                    _dbContext.Entry(this.JobData).Property(x => x.CurrentRunStatus).IsModified = true;
-                                    _dbContext.Entry(this.JobData).Property(x => x.CurrentRunStatus).EntityEntry
-                                        .Entity.CurrentRunStatus = Status.STATUS_PENDING;
-                                    this.JobData.CurrentRunLengthMs =
-                                        (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                  
-                                    await TrySave(true);
-                                    this.JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
-                                }
-                                else
-                                {
-                                    _logger.LogInformation(
-                                        $"FAILURE: {JobData.JobName} is considered failed, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
-                                    cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
-                                    this.JobData.CurrentRunLengthMs =
-                                        (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                                    this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
-                                    await TrySave(true);
+                                    // Success, at least half are success
+                                    if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
+                                        (_config.Locations.Count(location => location.Disabled == false) / 2))
+                                    {
+                                        _logger.LogInformation($"Current Run Status: {this.JobData.CurrentRunStatus}");
+                                        _logger.LogInformation(
+                                            $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
+                                        cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
+                                        this.JobData.CurrentRunStatus = Status.STATUS_PENDING;
+                                        this.JobData.CurrentRunLengthMs =
+                                            (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
+
+                                        await TrySave(true);
+                                        this.JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
+                                    }
+                                    else
+                                    {
+                                        _logger.LogInformation(
+                                            $"FAILURE: {JobData.JobName} is considered failed, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
+                                        cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
+                                        this.JobData.CurrentRunLengthMs =
+                                            (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
+                                        this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                                        await TrySave(true);
+                                    }
                                 }
                             }
                         }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        _logger.LogInformation(
-                            $"{JobData.JobName} had {RunningLocations.Count} locations, namely: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))} timed out.");
-                        /* NOM NOM */
+                        catch (OperationCanceledException)
+                        {
+                            _logger.LogInformation(
+                                $"{JobData.JobName} had {RunningLocations.Count} locations, namely: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))} timed out.");
+                            /* NOM NOM */
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error handling location runs for job {name}, aborting... Locations not finished yet: {locations}", Name, String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name)));
+                }
+                finally
+                {
+                    await cancellationTokenSource.CancelAsync();
+                }
+                SentrySdk.AddBreadcrumb($"Finished Locations for {Name}");
 
-                await HandleCompletion();
-                await TrySave(true);
+                try
+                {
+                    await HandleCompletion();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error handling Completion for job {name}", Name);
+                }
+
+                try
+                {
+                    await _clickHouseService.InsertRun(
+                        new ClickhouseJobRun()
+                        {
+                            JobName = JobData.JobName, RunStatus = JobData.CurrentRunStatus!,
+                            RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value
+                        }, this.RunningLocationsData.ToList()
+                            .Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null).Select(
+                                locationDataKv => new ClickhouseJobLocationRun()
+                                {
+                                    JobName = locationDataKv.Value.JobName,
+                                    RunStatus = locationDataKv.Value.CurrentRunStatus!,
+                                    LocationName = locationDataKv.Value.LocationName,
+                                    RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
+                                    RunTime = locationDataKv.Value.CurrentRunTime!.Value!
+                                }).ToList());
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error inserting run statistics into Clickhouse");
+                }
+
+                try
+                {
+                    await TrySave(true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error saving run status");
+                }
+
+            }
+            finally
+            { 
+               await _queue.DisposeAsync();
+            }
+        }
+
+        public async Task InsertRunFailure(string errorCause)
+        {
+            try
+            {
                 await _clickHouseService.InsertRun(
                     new ClickhouseJobRun()
                     {
-                        JobName = JobData.JobName, RunStatus = JobData.CurrentRunStatus!,
-                        RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value
-                    }, this.RunningLocationsData.Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null).Select(
-                        locationDataKv => new ClickhouseJobLocationRun()
-                        {
-                            JobName = locationDataKv.Value.JobName,
-                            RunStatus = locationDataKv.Value.CurrentRunStatus!,
-                            LocationName = locationDataKv.Value.LocationName,
-                            RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
-                            RunTime = locationDataKv.Value.CurrentRunTime!.Value!
-                        }).ToList());
+                        JobName = JobData.JobName,
+                        RunStatus = JobData.CurrentRunStatus ?? errorCause,
+                        RunLength = JobData.CurrentRunLengthMs ?? 0,
+                        RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow
+                    }, new List<ClickhouseJobLocationRun>());
             }
-            finally
+            catch (Exception ex)
             {
-               await _queue.DisposeAsync();
+                _logger.LogError(ex, "{jobName}: Error inserting run failure for error cause: {errorCause}", Name,  errorCause);
+            }
+            try
+            {
+                await TrySave(true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "{jobName}: Error saving run status, failure for error cause: {errorCause}", Name, errorCause);
             }
         }
 
@@ -222,6 +374,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     if (token.IsCancellationRequested) throw new OperationCanceledException();
                     // Send a request and get a response
                     var response = await RunLocation(location, token);
+                    if (token.IsCancellationRequested) throw new OperationCanceledException();
 
                     if (response.Errored)
                     {
@@ -230,6 +383,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                         TrySave();
                         return false;
                     }
+
 
                     var endTime = DateTime.UtcNow;
 
@@ -241,6 +395,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     {
                         this.JobData.CurrentRunLengthMs =
                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
+                        _logger.LogInformation($"{Name} Run Still {this.JobData.CurrentRunStatus}, updating time, new time: {this.JobData.CurrentRunLengthMs}");
                     }
 
                     if (response.Done == false)
@@ -273,24 +428,40 @@ namespace Action_Delay_API_Core.Models.Jobs
             }
         }
 
-        private int _saving = 0;
 
         private SemaphoreSlim _semaphore = new SemaphoreSlim(1);
 
-        public async Task TrySave(bool wait = false)
+        public async Task TrySave(bool force = false)
         {
-            if (wait)
-                await _semaphore.WaitAsync();
+            bool hasLock = false;
 
-            if (_saving == 0)
+            if (force)
+            {
+                await _semaphore.WaitAsync();
+                hasLock = true;
+            }
+            else
+            {
+                // Try to get the Lock without waiting
+                hasLock = _semaphore.Wait(0);
+            }
+
+            if (hasLock)
             {
                 try
                 {
-                    if (wait == false)
-                        await _semaphore.WaitAsync();
-                    Interlocked.Exchange(ref _saving, 1);
-                    await _dbContext.SaveChangesAsync();
+                    // Take Changes from Non-Tracked local objects and commit them to tracked versions
+                    // This is done to avoid issues where Tracked objects were being modified mid-save.
+                    var getTrackedJobData = await _dbContext.JobData.AsTracking().FirstAsync(job => job.JobName == Name);
+                    getTrackedJobData.Update(JobData);
+                    foreach (var dataKvp in this.RunningLocationsData)
+                    {
+                        var getTrackedLocation = await _dbContext.JobLocations.AsTracking().FirstAsync(dbLocation =>
+                            dbLocation.JobName == Name && dbLocation.LocationName == dataKvp.Value.LocationName);
+                        getTrackedLocation.Update(dataKvp.Value);
+                    }
 
+                    await _dbContext.SaveChangesAsync();
                 }
                 catch (Exception ex)
                 {
@@ -298,9 +469,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 }
                 finally
                 {
-                    Interlocked.Exchange(ref _saving, 0);
                     _semaphore.Release();
-
                 }
             }
         }
@@ -309,38 +478,17 @@ namespace Action_Delay_API_Core.Models.Jobs
 
         public virtual TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
         {
-            var secondsUntilNextAlarm = 0.5;
-            var deployLagSeconds = totalWaitTimeInSeconds / 1000;
-            if (deployLagSeconds > 5)
+            double secondsUntilNextAlarm = totalWaitTimeInSeconds switch
             {
-                secondsUntilNextAlarm = 1;
-            }
-
-            if (deployLagSeconds > 30)
-            {
-                secondsUntilNextAlarm = 2;
-            }
-
-            if (deployLagSeconds > 60)
-            {
-                secondsUntilNextAlarm = 4;
-            }
-
-            if (deployLagSeconds > 120)
-            {
-                secondsUntilNextAlarm = 10;
-            }
-
-            if (deployLagSeconds > 600)
-            {
-                secondsUntilNextAlarm = 15;
-            }
-
-            if (deployLagSeconds > 1800)
-            {
-                secondsUntilNextAlarm = 30;
-            }
-
+                > 1800 => 30,
+                > 600 => 15,
+                > 120 => 10,
+                > 60 => 4,
+                > 30 => 2,
+                > 5 => 1,
+                > 2 => 0.5,
+                _ => 0.1,
+            };
             return TimeSpan.FromSeconds(secondsUntilNextAlarm);
         }
 

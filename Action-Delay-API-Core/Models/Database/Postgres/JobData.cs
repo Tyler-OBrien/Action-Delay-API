@@ -26,11 +26,20 @@ public class JobData
 
     public string? CurrentRunStatus { get; set; }
 
+    public void Update(JobData data)
+    {
+        this.LastRunTime = data.LastRunTime;
+        this.LastRunLengthMs = data.LastRunLengthMs;
+        this.LastRunStatus = data.LastRunStatus;
+        this.CurrentRunTime = data.CurrentRunTime;
+        this.CurrentRunLengthMs = data.CurrentRunLengthMs;
+        this.CurrentRunStatus = data.CurrentRunStatus;
+    }
+
 }
 
 public class JobDataLocation
 {
-
     public string JobName { get; set; }
 
     public string LocationName { get; set; }
@@ -47,5 +56,15 @@ public class JobDataLocation
     public UInt64? CurrentRunLengthMs { get; set; }
 
     public string? CurrentRunStatus { get; set; }
+
+    public void Update(JobDataLocation data)
+    {
+        this.LastRunTime = data.LastRunTime;
+        this.LastRunLengthMs = data.LastRunLengthMs;
+        this.LastRunStatus = data.LastRunStatus;
+        this.CurrentRunTime = data.CurrentRunTime;
+        this.CurrentRunLengthMs = data.CurrentRunLengthMs;
+        this.CurrentRunStatus = data.CurrentRunStatus;
+    }
 
 }

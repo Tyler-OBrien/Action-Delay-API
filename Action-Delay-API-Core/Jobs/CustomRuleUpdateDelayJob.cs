@@ -8,12 +8,16 @@ using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.DNS;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
 using Action_Delay_API_Core.Models.Database.Postgres;
+using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Requests;
+using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Models.Services;
+using FluentResults;
 using Microsoft.Extensions.Options;
+using NATS.Client.Internals;
 
 namespace Action_Delay_API_Core.Jobs
 {
@@ -48,6 +52,11 @@ namespace Action_Delay_API_Core.Jobs
             _logger.LogInformation($"Completed {Name}..");
         }
 
+        public override async Task PreWarmRunLocation(Location location)
+        {
+            await SendRequest(location, CancellationToken.None);
+        }
+
         public override async Task RunAction()
         {
             _valueToLookFor = $"You've been blocked - Last Updated: {DateTime.UtcNow:R}";
@@ -74,22 +83,31 @@ namespace Action_Delay_API_Core.Jobs
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating custom rule, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
-                throw new InvalidOperationException(
+                throw new CustomAPIError(
                     $"Failure updating custom rule, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
         }
 
-        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
+
+        private async Task<Result<SerializableHttpResponse>> SendRequest(Location location, CancellationToken token)
         {
             var newRequest = new NATSHttpRequest()
             {
-                Headers = new Dictionary<string, string>(),
+                Headers = new Dictionary<string, string>()
+                {
+                    { "User-Agent", $"Action-Delay-API {Name}"}
+                },
                 URL = "https://" + _config.WAFJob.HostName + $"/{_specialPath}",
                 NetType = location.NetType ?? NetType.Either,
-                TimeoutMs = 5000
-            };
-            var tryGetResult = await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+                TimeoutMs = 10_000
+            }; 
+            return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+        }
+
+        public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
+        {
+            var tryGetResult = await SendRequest(location, token);
 
             if (tryGetResult.IsFailed)
             {
@@ -109,6 +127,11 @@ namespace Action_Delay_API_Core.Jobs
             else
             {
                 _logger.LogInformation($"{location.Name} sees {getResponse.Body} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of {HttpStatusCode.UnsupportedMediaType.ToString()}! Let's try again...");
+                if (getResponse is { WasSuccess: false, StatusCode: HttpStatusCode.BadGateway })
+                {
+                    _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
+                    return new RunLocationResult("Proxy Error");
+                }
                 return new RunLocationResult(false, "Undeployed");
             }
         }

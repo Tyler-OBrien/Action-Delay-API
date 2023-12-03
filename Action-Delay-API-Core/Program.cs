@@ -68,6 +68,7 @@ public class Program
                            options.AutoSessionTracking = true;
                            options.IsGlobalModeEnabled = true;
                            options.EnableTracing = true;
+
                        }))
                 {
                     await host.RunAsync();
