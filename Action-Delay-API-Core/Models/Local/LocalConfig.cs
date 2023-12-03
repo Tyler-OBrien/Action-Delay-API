@@ -32,6 +32,7 @@ namespace Action_Delay_API_Core.Models.Local
         public WorkerDelayJobConfig DelayJob { get; set; }
 
         public DNSDelayJobConfig DNSJob { get; set; }
+        public DNSDelayJobConfig DNSJobFree { get; set; }
 
         public CustomRuleUpdateConfig WAFJob { get; set; }
         public CacheDelayJobConfig CacheJob { get; set; }
