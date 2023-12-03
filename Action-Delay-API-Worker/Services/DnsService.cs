@@ -136,6 +136,7 @@ namespace Action_Deplay_API_Worker.Services
                 }
 
                 var lookupClientOptions = new LookupClientOptions(dnsServerAddresses);
+                lookupClientOptions.UseCache = false;
                 var lookupClient = new LookupClient(lookupClientOptions);
 
                 var response =
@@ -201,8 +202,8 @@ namespace Action_Deplay_API_Worker.Services
                 }
 
                 _logger.LogInformation(
-                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers",
-                    queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count);
+                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers, first Answer: {firstAnswer}, error message: {error}",
+                    queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count, response.Answers.Any() ? response.Answers.FirstOrDefault() : "", response.ErrorMessage);
                 return dnsResponse;
             }
             catch (DnsClient.DnsResponseException dnsResponseException)

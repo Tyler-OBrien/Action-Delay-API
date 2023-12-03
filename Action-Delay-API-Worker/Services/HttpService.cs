@@ -31,11 +31,9 @@ namespace Action_Deplay_API_Worker.Services
         {
             var handler = new SocketsHttpHandler
             {
-                PooledConnectionLifetime = TimeSpan.FromMilliseconds(1),
+                PooledConnectionLifetime = TimeSpan.FromTicks(1),
                 ConnectCallback = async (context, cancellationToken) =>
                 {
-                    context.InitialRequestMessage.Options.TryGetValue(
-                        new HttpRequestOptionsKey<NetType>("IPVersion"), out var tryGetNetType);
                     IPHostEntry entry = null;
                     if (context.InitialRequestMessage.Options.TryGetValue(new HttpRequestOptionsKey<NetType>("IPVersion"), out var version) &&
                         version != NetType.Either)
@@ -60,7 +58,7 @@ namespace Action_Deplay_API_Worker.Services
                         throw;
                     }
                 },
-                EnableMultipleHttp2Connections = true
+                EnableMultipleHttp2Connections = true,
             };
 
             // Here you manually create a client with dedicated settings for each request

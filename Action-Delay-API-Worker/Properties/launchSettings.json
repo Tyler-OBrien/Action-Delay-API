@@ -1,7 +1,7 @@
 ﻿{
   "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "Action_Deplay_API_Worker": {
+    "Action_Delay_API_Worker": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "environmentVariables": {
