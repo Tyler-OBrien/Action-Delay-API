@@ -1,18 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Action_Deplay_API_Worker.Models.API.Response
+﻿namespace Action_Deplay_API_Worker.Models.API.Response
 {
     public class SerializableDNSResponse
     {
+        public SerializableDNSResponse()
+        {
+            ResponseUTC = DateTime.UtcNow;
+        }
+
         public string QueryName { get; set; }
         public string QueryType { get; set; }
         public string ResponseCode { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
         public string? Info { get; set; }
+        public DateTime? ResponseUTC { get; set; }
 
     }
     public class SerializableDnsAnswer

@@ -1,18 +1,12 @@
 ﻿using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using FluentResults;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.DNS;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
-using System.Net;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.Errors;
@@ -112,12 +106,12 @@ namespace Action_Delay_API_Core.Jobs
             {
                 // We got the right value!
                 _logger.LogInformation($"{Name}: {location.Name} sees the change! Let's remove this and move on..");
-                return new RunLocationResult(true, "Deployed");
+                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC);
             }
             else
             {
                 _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}! Let's try again...");
-                return new RunLocationResult(false, "Undeployed");
+                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC);
             }
         }
     }

@@ -1,18 +1,11 @@
 ﻿using Action_Delay_API_Core.Broker;
-using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Runtime.InteropServices.JavaScript;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.CloudflareAPI.PurgeCache;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Responses;
@@ -83,19 +76,24 @@ namespace Action_Delay_API_Core.Jobs
 
                         var result = tryGetResult.Value;
 
-                        if (result.Headers.TryGetValue(
-                                String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
-                                    ? "Proxy-CF-Cache-Status"
-                                    : "CF-Cache-Status", out var cacheStatus))
+                        var tryGetCacheStatusHeader = result.Headers.FirstOrDefault(header => header.Key.Equals(
+                            String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
+                                ? "Proxy-CF-Cache-Status"
+                                : "CF-Cache-Status", StringComparison.OrdinalIgnoreCase));
+
+                        if (String.IsNullOrWhiteSpace(tryGetCacheStatusHeader.Key) == false)
                         {
-                            tryGetCacheStatus = cacheStatus;
+                            tryGetCacheStatus = tryGetCacheStatusHeader.Value;
                         }
 
-                        if (result.Headers.TryGetValue(
-                                String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
-                                    ? "Proxy-Age"
-                                    : "Age", out var cacheAge))
+                        var tryGetCacheAgeHeader = result.Headers.FirstOrDefault(header => header.Key.Equals(
+                            String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
+                                ? "Proxy-Age"
+                                : "Age", StringComparison.OrdinalIgnoreCase));
+
+                        if (String.IsNullOrWhiteSpace(tryGetCacheAgeHeader.Key) == false)
                         {
+                            var cacheAge = tryGetCacheAgeHeader.Value;
                             if (String.IsNullOrEmpty(cacheAge) || int.TryParse(cacheAge, out var cacheAgeInt) == false || cacheAgeInt < 10)
                             {
                                 _logger.LogInformation($"Error, cache is too new or missing, cache value {cacheAge}, Cache Status: {tryGetCacheStatus}, location: {location.Name}");
@@ -109,7 +107,7 @@ namespace Action_Delay_API_Core.Jobs
                         }
                         else
                         {
-                            _logger.LogInformation($"Error, cache is missing, Cache Status: {tryGetCacheStatus}, location: {location.Name}");
+                            _logger.LogInformation($"Error, cache is missing, Cache Status: {tryGetCacheStatus}, location: {location.Name}, http status: {result.StatusCode}, other headers: {result.Headers.Select(kvp => $"{kvp.Key}: {kvp.Value}")}");
                             continue;
                         }
                     }
@@ -206,7 +204,7 @@ namespace Action_Delay_API_Core.Jobs
             {
                 // We got the right value!
                 _logger.LogInformation($"{location.Name} sees the change! Let's remove this and move on..");
-                return new RunLocationResult(true, "Deployed");
+                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC);
             }
             else
             {
@@ -216,7 +214,7 @@ namespace Action_Delay_API_Core.Jobs
                     _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
                     return new RunLocationResult("Proxy Error");
                 }
-                return new RunLocationResult(false, "Undeployed");
+                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC);
             }
         }
     }

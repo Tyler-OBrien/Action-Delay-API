@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Action_Delay_API_Core.Models.NATS.Responses
+﻿namespace Action_Delay_API_Core.Models.NATS.Responses
 {
     public class SerializableDNSResponse
     {
@@ -13,6 +7,8 @@ namespace Action_Delay_API_Core.Models.NATS.Responses
         public string ResponseCode { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
         public string? Info { get; set; }
+
+        public DateTime? ResponseUTC { get; set; }
 
     }
     public class SerializableDnsAnswer

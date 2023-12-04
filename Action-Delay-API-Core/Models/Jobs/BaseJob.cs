@@ -1,21 +1,12 @@
 ﻿using Action_Delay_API_Core.Broker;
-using Action_Delay_API_Core.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
-using Sentry.Protocol;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
-using System.Threading;
 using Action_Delay_API_Core.Models.Errors;
 using Sentry;
-using Serilog.Context;
 using Exception = System.Exception;
 
 namespace Action_Delay_API_Core.Models.Jobs
@@ -367,7 +358,7 @@ namespace Action_Delay_API_Core.Models.Jobs
             try
             {
                 DateTime utcStart = DateTime.UtcNow;
-
+                bool ignoreBadTimeSync = false; // sanity check just in case
                 // Perform the action to send the request at the Location
                 while (true)
                 {
@@ -383,9 +374,28 @@ namespace Action_Delay_API_Core.Models.Jobs
                         TrySave();
                         return false;
                     }
-
+                    
 
                     var endTime = DateTime.UtcNow;
+
+                    if (ignoreBadTimeSync == false && response.ResultUtc != null)
+                    {
+                        if (response.ResultUtc < utcStart)
+                        {
+                            _logger.LogError($"Warning: {location.DisplayName ?? location.Name} told us the result of the request performed at {response.ResultUtc}, before the start of the op at {utcStart}. Time Sync Issue. Ignoring time from this location from now on");
+                            ignoreBadTimeSync = true;
+                        }
+                        else if (response.ResultUtc > DateTime.UtcNow)
+                        {
+                            _logger.LogError($"Warning: {location.DisplayName ?? location.Name} told us the result of the request performed at {response.ResultUtc}, which is after the current time {DateTime.UtcNow}. Time Sync Issue. Ignoring time from this location from now on");
+                            ignoreBadTimeSync = true;
+                        }
+                        else
+                        {
+                            // Ok to use this..
+                            endTime = response.ResultUtc.Value;
+                        }
+                    }
 
                     // modifying inmemory jobdata
                     this.RunningLocationsData[location].CurrentRunLengthMs =

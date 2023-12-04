@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -101,13 +96,13 @@ namespace Action_Delay_API_Core.Jobs
             }
             var getResponse = tryGetResult.Value;
 
-            _logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
+            _logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess} - Response UTC: {getResponse.ResponseUTC}");
 
             if (getResponse.Body.Equals(_generatedValue, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
                 _logger.LogInformation($"{location.Name} sees the change! Let's remove this and move on..");
-                return new RunLocationResult(true, "Deployed");
+                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC);
             }
             else
             {
@@ -117,7 +112,7 @@ namespace Action_Delay_API_Core.Jobs
                     _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
                     return new RunLocationResult("Proxy Error");
                 }
-                return new RunLocationResult(false, "Undeployed");
+                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC);
             }
         }
 
