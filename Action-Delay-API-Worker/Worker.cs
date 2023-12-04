@@ -1,20 +1,17 @@
-using System.Buffers;
 using System.Net;
-using System.Text;
+using Action_Delay_API_Worker.Models.API;
+using Action_Deplay_API_Worker.Extensions;
 using Action_Deplay_API_Worker.Models.API.Response;
 using Action_Deplay_API_Worker.Models.Config;
 using Action_Deplay_API_Worker.Models.Services;
-using Polly.Extensions.Http;
-using Polly;
 using Microsoft.Extensions.Options;
 using Serilog;
-using System.Text.Json;
-using Action_Deplay_API_Worker.Extensions;
 using Action_Deplay_API_Worker.Models.API.Request;
-using Microsoft.Extensions.Configuration;
-using NATS.Client;
-using Options = NATS.Client.Options;
 using DnsClient;
+using NATS.Client.Core;
+using Sentry.Extensibility;
+using System.Text.Json;
+using System.Text;
 
 namespace Action_Deplay_API_Worker
 {
@@ -28,9 +25,6 @@ namespace Action_Deplay_API_Worker
 
 
 
-        private IConnection _natsConnection;
-
-        private readonly ConnectionFactory _connectionFactory;
 
 
         public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IOptions<LocalConfig> probeConfiguration, IHttpService httpService, IDnsService dnsService)
@@ -40,8 +34,6 @@ namespace Action_Deplay_API_Worker
             _localConfig = probeConfiguration.Value;
             _httpService = httpService;
             _dnsService = dnsService;
-            _connectionFactory = new ConnectionFactory();
-            _natsConnection = _connectionFactory.CreateConnection(GetOpts());
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -54,101 +46,141 @@ namespace Action_Deplay_API_Worker
                 return;
             }
 
+            var myRegistry = new NatsJsonContextSerializerRegistry(SerializableRequestJsonContext.Default);
 
-            _natsConnection.SubscribeAsync($"HTTP-{_localConfig.Location}", async (sender, args) =>
+            var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL, MaxReconnectRetry = -1, SerializerRegistry = myRegistry};
+            await using var natsConnection = new NatsConnection(options);
+
+            await natsConnection.ConnectAsync();
+
+            var tryHttp = Task.Run(async () =>
             {
-                try
+                await foreach (var httpRequest in natsConnection
+                                   .SubscribeAsync<byte[]>($"HTTP-{_localConfig.Location}",
+                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
                 {
-                    var httpRequest = args.Message.Data.Deserialize<SerializableHttpRequest>();
-                    if (httpRequest == null)
-                    {
-                        args.Message.Respond(new SerializableHttpResponse
-                        {
-                            Body = string.Empty,
-                            WasSuccess = false,
-                            Headers = new Dictionary<string, string>(),
-                            StatusCode = HttpStatusCode.BadGateway,
-                            Info = "Failed due to Null Request/unparsable"
-                        }.Serialize());
-                        return;
-                    }
-                    var reply = await _httpService.PerformRequestAsync(httpRequest);
-
-                    // old
-                    //To expand a bit on @sixlettervariables, there is a Request API that essentially publishes and waits for a response on a unique subject. The responder subscribes to a subject, and when it receives a message, it can either publish on the reply subject, or use a convenience method to reply with msg.Respond()
-                    //https://github.com/nats-io/nats.net/issues/467
-
-                    args.Message.Respond(reply.Serialize());
+                    _ = ExecuteHttpRequest(httpRequest, stoppingToken);
                 }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Error with HTTP Hook");
-                    args.Message.Respond(new SerializableHttpResponse
-                    {
-                        Body = string.Empty,
-                        Headers = new Dictionary<string, string>(),
-                        Info = "An Error occured",
-                        StatusCode = HttpStatusCode.BadGateway,
-                        WasSuccess = false
-                    }.Serialize());
-                }
-            });
+            }, stoppingToken);
 
 
 
-
-
-            _natsConnection.SubscribeAsync($"DNS-{_localConfig.Location}", async (sender, args) =>
+            var tryDNS = Task.Run(async () =>
             {
-                try
+                await foreach (var dnsRequest in natsConnection
+                                   .SubscribeAsync<byte[]>($"DNS-{_localConfig.Location}",
+                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
                 {
-                    var dnsRequest = args.Message.Data.Deserialize<SerializableDNSRequest>();
-                    if (dnsRequest == null)
-                    {
-                        args.Message.Respond(new SerializableDNSResponse()
-                        {
-                            Answers = new List<SerializableDnsAnswer>(),
-                            QueryType = "Unknown",
-                            QueryName = "Unknown",
-                            ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
-                            Info = "Failed due to Null Request"
-                        }.Serialize());
-                        return;
-                    }
-                    var reply = await _dnsService.PerformDnsLookupAsync(dnsRequest);
-
-                    //To expand a bit on @sixlettervariables, there is a Request API that essentially publishes and waits for a response on a unique subject. The responder subscribes to a subject, and when it receives a message, it can either publish on the reply subject, or use a convenience method to reply with msg.Respond()
-                    //https://github.com/nats-io/nats.net/issues/467
-                    args.Message.Respond(reply.Serialize());
+                    _ = ExecuteDNSRequest(dnsRequest, stoppingToken);
                 }
-                catch (Exception e)
+
+            }, stoppingToken);
+
+            _logger.LogInformation($"NATS Enabled, Connection State: {natsConnection.ConnectionState}");
+            await Task.WhenAll(tryDNS, tryHttp);
+            _logger.LogInformation($"NATS Done..");
+        }
+
+        public async Task ExecuteDNSRequest(NatsMsg<byte[]> dnsRequest, CancellationToken stoppingToken)
+        {
+            try
+            {
+                if (dnsRequest.Data == null)
                 {
-                    Log.Error(e, "Error with DNS Hook");
-                    args.Message.Respond(new SerializableDNSResponse()
+                    await dnsRequest.ReplyAsync(new SerializableDNSResponse()
                     {
                         Answers = new List<SerializableDnsAnswer>(),
                         QueryType = "Unknown",
                         QueryName = "Unknown",
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
-                        Info = "An error occured"
-                    }.Serialize());
+                        Info = "Failed due to Null Request"
+                    }, cancellationToken: stoppingToken);
+                    return;
                 }
-            });
+                var DATA = Encoding.UTF8.GetString(dnsRequest.Data);
+                var dnsRequestData = JsonSerializer.Deserialize<SerializableDNSRequest>(DATA);
 
-            _logger.LogInformation($"NATS Enabled, Connection State: {_natsConnection.State}");
-            await Task.Delay(Timeout.Infinite, stoppingToken);
-            _logger.LogInformation($"NATS Done..");
+                if (dnsRequestData == null)
+                {
+                    await dnsRequest.ReplyAsync(new SerializableDNSResponse()
+                    {
+                        Answers = new List<SerializableDnsAnswer>(),
+                        QueryType = "Unknown",
+                        QueryName = "Unknown",
+                        ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                        Info = "Failed due to Null/unparsable Request"
+                    }, cancellationToken: stoppingToken);
+                    return;
+                }
 
+
+                var reply = await _dnsService.PerformDnsLookupAsync(dnsRequestData);
+                await dnsRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Error with DNS Hook");
+                await dnsRequest.ReplyAsync(new SerializableDNSResponse()
+                {
+                    Answers = new List<SerializableDnsAnswer>(),
+                    QueryType = "Unknown",
+                    QueryName = "Unknown",
+                    ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                    Info = "An error occured"
+                }, cancellationToken: stoppingToken);
+            }
         }
 
-        private Options GetOpts()
+        public async Task ExecuteHttpRequest(NatsMsg<byte[]> httpRequest, CancellationToken stoppingToken)
         {
-            var opts = ConnectionFactory.GetDefaultOptions();
-            opts.Url = _localConfig.NATSConnectionURL;
-            opts.AllowReconnect = true;
-            opts.MaxReconnect = Options.ReconnectForever;
-            return opts;
-        }
+            try
+            {
 
+                if (httpRequest.Data == null || httpRequest.Data.Length == 0)
+                {
+                    await httpRequest.ReplyAsync(new SerializableHttpResponse
+                    {
+                        Body = string.Empty,
+                        WasSuccess = false,
+                        Headers = new Dictionary<string, string>(),
+                        StatusCode = HttpStatusCode.BadGateway,
+                        Info = "Failed due to Null Request/unparsable"
+                    }, cancellationToken: stoppingToken);
+                    return;
+                }
+
+                var DATA = Encoding.UTF8.GetString(httpRequest.Data);
+                var httpRequestData = JsonSerializer.Deserialize<SerializableHttpRequest>(DATA);
+
+                if (httpRequestData == null)
+                {
+                    await httpRequest.ReplyAsync(new SerializableHttpResponse
+                    {
+                        Body = string.Empty,
+                        WasSuccess = false,
+                        Headers = new Dictionary<string, string>(),
+                        StatusCode = HttpStatusCode.BadGateway,
+                        Info = "Failed due to Null Request/unparsable"
+                    }, cancellationToken: stoppingToken);
+                    return;
+                }
+
+                var reply = await _httpService.PerformRequestAsync(httpRequestData);
+                await httpRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Error with HTTP Hook");
+                await httpRequest.ReplyAsync(new SerializableHttpResponse
+                {
+                    Body = string.Empty,
+                    Headers = new Dictionary<string, string>(),
+                    Info = "An Error occured",
+                    StatusCode = HttpStatusCode.BadGateway,
+                    WasSuccess = false
+                }, cancellationToken: stoppingToken);
+            }
+        }
     }
 }
