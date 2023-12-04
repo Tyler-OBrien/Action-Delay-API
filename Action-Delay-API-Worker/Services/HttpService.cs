@@ -1,19 +1,11 @@
 ﻿using Action_Deplay_API_Worker.Models.API.Response;
 using Polly.Extensions.Http;
 using Polly;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Deplay_API_Worker.Models.Services;
-using DnsClient;
 using Action_Deplay_API_Worker.Models.API.Request;
 using Action_Deplay_API_Worker.Models;
-using Sentry;
-using Serilog;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace Action_Deplay_API_Worker.Services
@@ -79,13 +71,24 @@ namespace Action_Deplay_API_Worker.Services
                 var url = incomingRequest.URL;
                 var headers = incomingRequest.Headers;
 
+                var httpVersion = HttpVersion.Version20;
+                if (incomingRequest.HttpType.HasValue)
+                {
+                    if (incomingRequest.HttpType.Value == 1)
+                        httpVersion = HttpVersion.Version11;
+                    else if (incomingRequest.HttpType.Value == 2)
+                        httpVersion = HttpVersion.Version20;
+                    else if (incomingRequest.HttpType.Value == 3)
+                        httpVersion = HttpVersion.Version30;
+                }
 
 
                 var response =
                     await httpRetryPolicy.ExecuteAsync(() =>
                     {
                         var request = new HttpRequestMessage(HttpMethod.Get, url);
-
+                        request.Version = httpVersion;
+                        request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
                         request.Headers.ConnectionClose = true;
                         foreach (var header in headers)
                         {
@@ -100,9 +103,9 @@ namespace Action_Deplay_API_Worker.Services
                     });
 
                 _logger.LogInformation(
-                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, we got back {StatusCode}",
+                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, we got back {StatusCode}, httpVersion: {httpVersion}",
                     url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType,
-                    response.StatusCode);
+                    response.StatusCode, response.Version);
 
                 return new SerializableHttpResponse
                 {

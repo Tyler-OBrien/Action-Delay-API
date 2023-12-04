@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.PortableExecutable;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Text.Json.Serialization;
+using System.Xml.Linq;
 
 namespace Action_Deplay_API_Worker.Models.API.Request
 {
@@ -19,7 +15,9 @@ namespace Action_Deplay_API_Worker.Models.API.Request
         public int? TimeoutMs { get; set; }
 
         public NetType? NetType { get; set; }
-    }
 
+        public int? HttpType { get; set; }
+
+    }
 
 }
