@@ -68,6 +68,15 @@ public class Program
                            options.AutoSessionTracking = true;
                            options.IsGlobalModeEnabled = true;
                            options.EnableTracing = true;
+                           options.SetBeforeSend((sentryEvent, hint) =>
+                           {
+                               if (sentryEvent.Level == SentryLevel.Warning &&  sentryEvent.EventId.ToString().Contains("InboxSubscription", StringComparison.OrdinalIgnoreCase) && (sentryEvent?.Message?.Message?.Contains("Unregistered message inbox received", StringComparison.OrdinalIgnoreCase) ?? false))
+                               {
+                                   return null; // Don't send this event to Sentry
+                               }
+
+                               return sentryEvent;
+                           });
 
                        }))
                 {
