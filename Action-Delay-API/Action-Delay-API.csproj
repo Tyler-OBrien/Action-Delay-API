@@ -30,13 +30,13 @@
 	  </PackageReference>
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.0" />
 	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
-	  <PackageReference Include="prometheus-net.AspNetCore" Version="8.1.0" />
-	  <PackageReference Include="Sentry" Version="3.41.0" />
-	  <PackageReference Include="Sentry.AspNetCore" Version="3.41.0" />
-	  <PackageReference Include="Sentry.Serilog" Version="3.41.0" />
+	  <PackageReference Include="prometheus-net.AspNetCore" Version="8.1.1" />
+	  <PackageReference Include="Sentry" Version="3.41.3" />
+	  <PackageReference Include="Sentry.AspNetCore" Version="3.41.3" />
+	  <PackageReference Include="Sentry.Serilog" Version="3.41.3" />
 	  <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
 	  <PackageReference Include="Serilog.Sinks.Async" Version="1.5.0" />
-	  <PackageReference Include="Serilog.Sinks.Console" Version="5.0.0" />
+	  <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
 	  <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
 	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
 	  <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.5.0" />
