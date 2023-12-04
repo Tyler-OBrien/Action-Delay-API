@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Action_Delay_API_Core.Models.NATS.Requests
+﻿namespace Action_Delay_API_Core.Models.NATS.Requests
 {
     public class NATSHttpRequest
     {
@@ -19,5 +13,7 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
         public int? TimeoutMs { get; set; }
 
         public NetType? NetType { get; set; }
+
+        public int? HttpType { get; set; }
     }
 }
