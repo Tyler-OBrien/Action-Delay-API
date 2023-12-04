@@ -1,16 +1,10 @@
-using System.Diagnostics.Eventing.Reader;
 using Action_Deplay_API_Worker.Models.Config;
 using Action_Deplay_API_Worker.Models.Services;
 using Action_Deplay_API_Worker.Services;
-using Polly.Extensions.Http;
-using Polly;
 using Sentry.Extensions.Logging;
 using Sentry.Extensions.Logging.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Events;
-using System.Net.Sockets;
-using System.Net;
-using Action_Deplay_API_Worker.Models;
 
 namespace Action_Deplay_API_Worker
 {

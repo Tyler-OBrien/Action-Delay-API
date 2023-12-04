@@ -1,15 +1,11 @@
-﻿using Action_Deplay_API_Worker.Models.API.Request;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace Action_Deplay_API_Worker.Extensions
 {
     public static class SerializableExtension
     {
+        /*
         public static byte[] Serialize<T>(this T obj) where T : class
         {
             return (Encoding.UTF8.GetBytes(JsonSerializer.Serialize(obj)));
@@ -22,5 +18,6 @@ namespace Action_Deplay_API_Worker.Extensions
             if (string.IsNullOrWhiteSpace(DATA)) return null;
             return JsonSerializer.Deserialize<T>(DATA);
         }
+        */
     }
 }

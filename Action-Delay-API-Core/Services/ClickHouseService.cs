@@ -1,20 +1,10 @@
-﻿using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
-using Action_Delay_API_Core.Models.API.CompatAPI;
+﻿using Action_Delay_API_Core.Models.API.CompatAPI;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using ClickHouse.Client.ADO;
 using ClickHouse.Client.Copy;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
-using ClickHouse.Client.Utility;
 using System.Data.Common;
-using System.Data;
 
 namespace Action_Delay_API_Core.Services
 {

@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
-using Sentry.Extensibility;
 using Serilog;
 using Serilog.Events;
 using Action_Delay_API.Middleware;

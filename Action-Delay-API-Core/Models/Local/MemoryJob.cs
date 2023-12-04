@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Action_Delay_API_Core.Models.Jobs;
-
-namespace Action_Delay_API_Core.Models.Local
+﻿namespace Action_Delay_API_Core.Models.Local
 {
     public class MemoryJob
     {
