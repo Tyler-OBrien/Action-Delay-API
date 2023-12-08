@@ -13,5 +13,6 @@ public partial class CloudflareAPIBroker : ICloudflareAPIBroker
             _logger = logger;
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri("https://api.cloudflare.com");
+            _httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
         }
     }
