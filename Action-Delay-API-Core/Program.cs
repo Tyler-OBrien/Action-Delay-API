@@ -126,7 +126,7 @@ public class Program
 
                 services.AddTransient<ICloudflareAPIBroker, CloudflareAPIBroker>();
 
-                services.AddTransient<IQueue, NATSQueue>();
+                services.AddSingleton<IQueue, NATSQueue>();
 
 
                 var jobs =
