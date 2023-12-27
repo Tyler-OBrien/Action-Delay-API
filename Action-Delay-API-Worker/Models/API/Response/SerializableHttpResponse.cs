@@ -15,6 +15,7 @@ namespace Action_Deplay_API_Worker.Models.API.Response
         public string Body { get; set; }
         public string? Info { get; set; }
         public DateTime? ResponseUTC { get; set; }
+        public double? ResponseTimeMs { get; set; }
 
     }
 }

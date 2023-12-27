@@ -13,6 +13,8 @@
         public List<SerializableDnsAnswer> Answers { get; set; }
         public string? Info { get; set; }
         public DateTime? ResponseUTC { get; set; }
+        public double? ResponseTimeMs { get; set; }
+
 
     }
     public class SerializableDnsAnswer

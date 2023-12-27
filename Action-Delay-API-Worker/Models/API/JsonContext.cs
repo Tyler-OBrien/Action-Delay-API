@@ -1,10 +1,7 @@
 ﻿using Action_Deplay_API_Worker.Models.API.Request;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+using Action_Delay_API_Worker.Models.API.Request.Jobs;
+using Action_Delay_API_Worker.Models.API.Response.Jobs;
 using Action_Deplay_API_Worker.Models.API.Response;
 
 namespace Action_Delay_API_Worker.Models.API
@@ -15,6 +12,15 @@ namespace Action_Delay_API_Worker.Models.API
     [JsonSerializable(typeof(SerializableDNSResponse))]
     [JsonSerializable(typeof(byte[]))]
     [JsonSerializable(typeof(string))]
+
+    [JsonSerializable(typeof(JobStartRequest))]
+    [JsonSerializable(typeof(JobStatusRequest))]
+    [JsonSerializable(typeof(JobEndRequest))]
+
+    [JsonSerializable(typeof(JobStartRequestResponse))]
+    [JsonSerializable(typeof(JobStatusRequestResponse))]
+    [JsonSerializable(typeof(JobEndRequestResponse))]
+
     internal partial class SerializableRequestJsonContext : JsonSerializerContext
     {
     }

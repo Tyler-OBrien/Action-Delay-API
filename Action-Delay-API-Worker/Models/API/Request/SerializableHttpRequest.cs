@@ -18,6 +18,8 @@ namespace Action_Deplay_API_Worker.Models.API.Request
 
         public int? HttpType { get; set; }
 
+        public bool? EnableConnectionReuse { get; set; }
+
     }
 
 }

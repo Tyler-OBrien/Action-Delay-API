@@ -1,10 +1,17 @@
+using System.Net;
+using System.Net.Sockets;
 using Action_Deplay_API_Worker.Models.Config;
 using Action_Deplay_API_Worker.Models.Services;
 using Action_Deplay_API_Worker.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Polly;
 using Sentry.Extensions.Logging;
 using Sentry.Extensions.Logging.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Events;
+using System.Threading;
+using Action_Delay_API_Worker.Services;
+using Action_Deplay_API_Worker.Models;
 
 namespace Action_Deplay_API_Worker
 {
@@ -48,31 +55,105 @@ namespace Action_Deplay_API_Worker
                     var baseConfiguration = configuration.Get<LocalConfig>();
                     services.Configure<LocalConfig>(configuration);
 
-                    services.Configure<SentryLoggingOptions>(options =>
+                    if (String.IsNullOrWhiteSpace(baseConfiguration.SENTRY_DSN) == false)
                     {
-                        options.Dsn = baseConfiguration.SENTRY_DSN;
-                        options.SendDefaultPii = true;
-                        options.AttachStacktrace = true;
-                        options.MinimumBreadcrumbLevel = LogLevel.Debug;
-                        options.MinimumEventLevel = LogLevel.Warning;
-                        options.TracesSampleRate = 1.0;
-                    });
-                    services.AddSentry<SentryLoggingOptions>();
+                        services.Configure<SentryLoggingOptions>(options =>
+                        {
+                            options.Dsn = baseConfiguration.SENTRY_DSN;
+                            options.SendDefaultPii = true;
+                            options.AttachStacktrace = true;
+                            options.MinimumBreadcrumbLevel = LogLevel.Debug;
+                            options.MinimumEventLevel = LogLevel.Error;
+                            options.TracesSampleRate = 1.0;
+                        });
+                        services.AddSentry<SentryLoggingOptions>();
+                    }
+
                     services.AddLogging();
 
-                    
+
+                    services.AddHttpClient("ReuseClient")
+                        .ConfigureHttpClient(httpClient =>
+                        {
+                            httpClient.DefaultRequestVersion = HttpVersion.Version20;
+                            httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+                            httpClient.DefaultRequestHeaders.ConnectionClose = false;
+                        })
+                        .ConfigurePrimaryHttpMessageHandler((sp) =>
+                        {
+                            return new SocketsHttpHandler
+                            {
+                                PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+                                ConnectCallback = ConnectCallBackTask,
+                                EnableMultipleHttp2Connections = true
+                            };
+                        });
+
+                    services.AddHttpClient("NonReuseClient")
+                        .ConfigureHttpClient(httpClient =>
+                        {
+                            httpClient.DefaultRequestVersion = HttpVersion.Version20;
+                            httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+                            httpClient.DefaultRequestHeaders.ConnectionClose = true;
+                        })
+                        .ConfigurePrimaryHttpMessageHandler((sp) =>
+                        {
+                            return new SocketsHttpHandler
+                            {
+                                PooledConnectionLifetime = TimeSpan.FromTicks(1),
+                                ConnectCallback = ConnectCallBackTask,
+                                EnableMultipleHttp2Connections = true
+                            };
+                        });
+
+
                     services.AddTransient<IHttpService, HttpService>();
                     services.AddTransient<IDnsService, DnsService>();
+                    services.AddSingleton<JobService>();
 
                     services.AddHostedService<Worker>();
 
               
                 })
                 .UseSerilog()
-                .Build();
+            .Build();
         }
 
- 
+        public static async ValueTask<Stream> ConnectCallBackTask(SocketsHttpConnectionContext context,
+            CancellationToken cancellationToken)
+        {
+
+            IPHostEntry entry = null;
+            if (context.InitialRequestMessage.Options.TryGetValue(new HttpRequestOptionsKey<NetType>("IPVersion"),
+                    out var version) &&
+                version != NetType.Either)
+            {
+                if (version == NetType.IPv4)
+                    entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, AddressFamily.InterNetwork,
+                        cancellationToken);
+                else if (version == NetType.IPv6)
+                    entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, AddressFamily.InterNetworkV6,
+                        cancellationToken);
+            }
+            else
+                entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, AddressFamily.Unspecified,
+                    cancellationToken);
+
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            socket.NoDelay = true;
+            try
+            {
+                await socket.ConnectAsync(entry.AddressList, context.DnsEndPoint.Port, cancellationToken);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+        }
+
+
 
         private static void TaskSchedulerOnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
