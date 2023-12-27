@@ -190,7 +190,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 try
                 {
                     // Check the status of tasks continuously
-                    while (RunningLocations.Values.Count(task => task != null ) > 0 || cancellationTokenSource.Token.IsCancellationRequested)
+                    while (RunningLocations.Values.Count(task => task != null ) > 0)
                     {
                         try
                         {
