@@ -9,6 +9,8 @@ using Action_Delay_API_Core.Services;
 using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace Action_Delay_API;
 
@@ -80,7 +82,7 @@ public class Program
                 options.AttachStacktrace = true;
                 options.MaxRequestBodySize = RequestSize.Always;
                 options.MinimumBreadcrumbLevel = LogLevel.Debug;
-                options.MinimumEventLevel = LogLevel.Warning;
+                options.MinimumEventLevel = LogLevel.Error;
             });
 #endif
 
@@ -90,12 +92,12 @@ public class Program
             options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         });
 
-        // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+        // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle  
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen();
 
 
-        builder.WebHost.UseKestrel(options => { options.AddServerHeader = false; });
+        builder.WebHost.UseKestrel(options => { options.AddServerHeader = false;  });
 
         builder.Services.AddDbContext<ActionDelayDatabaseContext>(options =>
         {
@@ -114,7 +116,27 @@ public class Program
 
         var app = builder.Build();
 
-       //var serviceProvider = app.Services.GetRequiredService<IServiceProvider>();
+
+        app.Use(next => async context =>
+        {
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
+
+            context.Response.OnStarting(() =>
+            {
+                stopWatch.Stop();
+                context.Response.Headers.Append("X-ResponseTime-Ms", stopWatch.ElapsedMilliseconds.ToString());
+                context.Response.Headers.Append("X-Action-Delay-API-Version", Assembly.GetEntryAssembly().GetName().Version.ToString());
+                return Task.CompletedTask;
+            });
+
+            await next(context);
+        });
+
+
+
+
+        //var serviceProvider = app.Services.GetRequiredService<IServiceProvider>();
 
         /*
         if (apiConfiguration.Prometheus_Metrics_Port != default)
