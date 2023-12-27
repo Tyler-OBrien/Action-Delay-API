@@ -17,5 +17,10 @@ namespace Action_Delay_API_Core.Extensions
             if (string.IsNullOrWhiteSpace(DATA)) return null;
             return JsonSerializer.Deserialize<T>(DATA);
         }
+        public static string Truncate(this string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
+        }
     }
 }

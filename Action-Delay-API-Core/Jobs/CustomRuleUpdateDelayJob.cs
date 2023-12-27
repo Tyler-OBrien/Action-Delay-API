@@ -76,6 +76,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating custom rule, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
+                if (tryPutAPI.Errors?.FirstOrDefault() is CustomAPIError apiError) throw apiError;
                 throw new CustomAPIError(
                     $"Failure updating custom rule, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;

@@ -165,13 +165,13 @@ namespace Action_Delay_API_Core.Models.Jobs
                 {
                     _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", this.Name, ex.Message);
                     this.JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
-                    await InsertRunFailure(Status.STATUS_API_ERROR);
+                    await InsertRunFailure(Status.STATUS_API_ERROR, ex);
                     throw;
                 }
                 catch (Exception)
                 {
                     this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
-                    await InsertRunFailure(Status.STATUS_ERRORED);
+                    await InsertRunFailure(Status.STATUS_ERRORED, null);
                     throw;
                 }
                 SentrySdk.AddBreadcrumb($"Ran Action for {Name}");
@@ -190,11 +190,12 @@ namespace Action_Delay_API_Core.Models.Jobs
                 try
                 {
                     // Check the status of tasks continuously
-                    while (RunningLocations.Count > 0 || cancellationTokenSource.Token.IsCancellationRequested)
+                    while (RunningLocations.Values.Count(task => task != null ) > 0 || cancellationTokenSource.Token.IsCancellationRequested)
                     {
                         try
                         {
                             // Get the task that finishes first
+
                             var completedTask = await Task.WhenAny(RunningLocations.Values);
                             var completedLocation = RunningLocations.First(x => x.Value == completedTask).Key;
                             bool taskResult = false;
@@ -303,7 +304,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                                     LocationName = locationDataKv.Value.LocationName,
                                     RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
                                     RunTime = locationDataKv.Value.CurrentRunTime!.Value!
-                                }).ToList());
+                                }).ToList(), null);
                 }
                 catch (Exception ex)
                 {
@@ -322,11 +323,11 @@ namespace Action_Delay_API_Core.Models.Jobs
             }
             finally
             { 
-               await _queue.DisposeAsync();
+              // await _queue.DisposeAsync();
             }
         }
 
-        public async Task InsertRunFailure(string errorCause)
+        public async Task InsertRunFailure(string errorCause, CustomAPIError? customApiError)
         {
             try
             {
@@ -337,7 +338,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                         RunStatus = JobData.CurrentRunStatus ?? errorCause,
                         RunLength = JobData.CurrentRunLengthMs ?? 0,
                         RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow
-                    }, new List<ClickhouseJobLocationRun>());
+                    }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.Name, customApiError));
             }
             catch (Exception ex)
             {
@@ -371,7 +372,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     {
                         this.RunningLocationsData[location].CurrentRunLengthMs = 0;
                         this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
-                        TrySave();
+                        _ = TrySave();
                         return false;
                     }
                     
@@ -411,7 +412,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     if (response.Done == false)
                     {
                         this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_UNDEPLOYED;
-                        TrySave();
+                        _ = TrySave();
                         // Use a backoff strategy for the delay between retries
                         var delay = CalculateBackoff((DateTime.UtcNow - utcStart).TotalSeconds);
                         await Task.Delay(delay, token);
@@ -419,7 +420,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     else
                     {
                         this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_DEPLOYED;
-                        TrySave();
+                        _ = TrySave();
                         return true;
                     }
                 }

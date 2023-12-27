@@ -32,7 +32,6 @@ namespace Action_Delay_API_Core.Services
             _natsConnection = new NatsConnection(options);
 
 
-
             _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.ConnectionState}");
         }
 

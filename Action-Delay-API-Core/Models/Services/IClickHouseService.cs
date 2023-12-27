@@ -5,7 +5,7 @@ namespace Action_Delay_API_Core.Models.Services
 {
     public interface IClickHouseService
     {
-        Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations,
+        Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, ClickhouseAPIError? apiError,
             CancellationToken token = default);
 
         Task<List<DeploymentStatistic>> GetCompatibleDeploymentStatistics(CancellationToken token = default);

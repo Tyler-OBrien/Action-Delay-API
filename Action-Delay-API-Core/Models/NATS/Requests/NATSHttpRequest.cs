@@ -15,5 +15,8 @@
         public NetType? NetType { get; set; }
 
         public int? HttpType { get; set; }
+
+        public bool? EnableConnectionReuse { get; set; }
+
     }
 }

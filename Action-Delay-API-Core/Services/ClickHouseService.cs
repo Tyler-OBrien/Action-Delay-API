@@ -5,6 +5,7 @@ using Action_Delay_API_Core.Models.Services;
 using ClickHouse.Client.ADO;
 using ClickHouse.Client.Copy;
 using System.Data.Common;
+using NATS.Client.JetStream.Models;
 
 namespace Action_Delay_API_Core.Services
 {
@@ -30,7 +31,7 @@ namespace Action_Delay_API_Core.Services
             return new(_config.ClickhouseConnectionString);
         }
 
-        public async Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, CancellationToken token = default)
+        public async Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, ClickhouseAPIError? apiError = null, CancellationToken token = default)
         {
             try
             {
@@ -58,7 +59,19 @@ namespace Action_Delay_API_Core.Services
                 };
 
                 await bulkCopyRun.WriteToServerAsync(
-                    new[] { new object[] { run.JobName, run.RunTime, run.RunLength, run.RunStatus } }, token);
+                    new[] { new object[] { run.JobName, run.RunTime, run.RunLength, run.RunStatus, apiError?.ErrorDescription ?? string.Empty } }, token);
+
+                if (apiError != null)
+                {
+                    using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
+                    {
+                        DestinationTableName = "api_errors",
+                        BatchSize = 100000
+                    };
+
+                    await bulkCopyApiError.WriteToServerAsync(
+                        new[] { new object[] { apiError.JobName, apiError.RunTime, apiError.ErrorType, apiError.ErrorDescription, apiError.ErrorHash } }, token);
+                }
             }
             catch (Exception ex)
             {

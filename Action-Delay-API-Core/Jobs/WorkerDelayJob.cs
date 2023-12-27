@@ -50,7 +50,7 @@ namespace Action_Delay_API_Core.Jobs
 
             var metadataContent = System.Text.Json.JsonSerializer.Serialize(new
             {
-                compatibility_date = "2023-07-26",
+                compatibility_date = "2023-12-17",
                 main_module = "worker.js"
             });
 
@@ -62,6 +62,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
+                if (tryPutAPI.Errors?.FirstOrDefault() is CustomAPIError apiError) throw apiError;
                 throw new CustomAPIError(
                     $"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
@@ -79,7 +80,8 @@ namespace Action_Delay_API_Core.Jobs
                 },
                 URL = _config.DelayJob.ScriptUrl,
                 NetType = location.NetType ?? NetType.Either,
-                TimeoutMs = 10_000
+                TimeoutMs = 10_000,
+                EnableConnectionReuse = false
             };
             return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
         }
