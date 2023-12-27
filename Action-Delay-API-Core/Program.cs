@@ -49,7 +49,7 @@ public class Program
                     // Debug and higher are stored as breadcrumbs (default is Information)
                     o.MinimumBreadcrumbLevel = LogEventLevel.Debug;
                     // Warning and higher is sent as event (default is Error)
-                    o.MinimumEventLevel = LogEventLevel.Warning;
+                    o.MinimumEventLevel = LogEventLevel.Error;
                 }).CreateLogger();
         Log.Logger.Information("Loaded SeriLog Logger");
         TaskScheduler.UnobservedTaskException += TaskSchedulerOnUnobservedTaskException;
