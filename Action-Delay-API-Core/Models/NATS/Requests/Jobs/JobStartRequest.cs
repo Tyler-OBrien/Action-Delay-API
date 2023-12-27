@@ -15,8 +15,8 @@ namespace Action_Delay_API_Core.Models.NATS.Requests.Jobs
 
         public List<Validator> Validators { get; set; }
 
-        public SerializableHttpRequest? HttpRequest { get; set; }
-        public SerializableDNSRequest? DnsRequest { get; set; }
+        public NATSHttpRequest? HttpRequest { get; set; }
+        public NATSDNSRequest? DnsRequest { get; set; }
 
     }
 
