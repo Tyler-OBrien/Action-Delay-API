@@ -2,18 +2,20 @@
 {
     public class RunLocationResult
     {
-        public RunLocationResult(bool done, string reason, DateTime? resultUtc)
+        public RunLocationResult(bool done, string reason, DateTime? resultUtc, double? responseTimeMs)
         {
             Done = done;
             Reason = reason;
             ResultUtc = resultUtc;
+            ResponseTimeMs = responseTimeMs;
         }
 
-        public RunLocationResult(string exception)
+        public RunLocationResult(string exception, double? responseTimeMs)
         {
             Errored = true;
             Done = false;
             Reason = exception;
+            ResponseTimeMs = responseTimeMs;
         }
 
         public bool Done { get; set; }
@@ -23,5 +25,7 @@
         public bool Errored { get; set; }
 
         public DateTime? ResultUtc { get; set; }
+
+        public double? ResponseTimeMs { get; set; }
     }
 }

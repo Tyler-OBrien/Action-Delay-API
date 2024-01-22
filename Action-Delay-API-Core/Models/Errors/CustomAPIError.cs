@@ -13,12 +13,13 @@ namespace Action_Delay_API_Core.Models.Errors
         {
         }
 
-        public CustomAPIError(string message, int statusCode, string simpleErrorMessage, string workerStatusCode)
+        public CustomAPIError(string message, int statusCode, string simpleErrorMessage, string workerStatusCode, double? responseTimeMs)
             : base(message)
         {
             StatusCode = statusCode;
             SimpleErrorMessage = simpleErrorMessage;
             WorkerStatusCode = workerStatusCode;
+            ResponseTimeMs = responseTimeMs;
         }
 
         public CustomAPIError(string message, Exception inner)
@@ -31,6 +32,8 @@ namespace Action_Delay_API_Core.Models.Errors
         public string WorkerStatusCode { get; set; }
 
         public string SimpleErrorMessage { get; set; }
+
+        public double? ResponseTimeMs { get; set; }
         public Dictionary<string, object> Metadata { get; }
         public List<IError> Reasons { get; }
     }

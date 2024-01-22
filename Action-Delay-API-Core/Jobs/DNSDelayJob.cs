@@ -74,6 +74,8 @@ namespace Action_Delay_API_Core.Jobs
                     $"Failure updating DNS Record, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
+            this.JobData.APIResponseTimeUtc = tryPutAPI.Value.ResponseTimeMs;
+
         }
 
         public async Task<Result<SerializableDNSResponse>> SendRequest(Location location, CancellationToken token)
@@ -95,7 +97,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
-                return new RunLocationResult("Queue Error");
+                return new RunLocationResult("Queue Error", null);
             }
 
             var getResponse = tryGetResult.Value;
@@ -108,12 +110,12 @@ namespace Action_Delay_API_Core.Jobs
             {
                 // We got the right value!
                 _logger.LogInformation($"{Name}: {location.Name} sees the change! Let's remove this and move on..");
-                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC);
+                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs);
             }
             else
             {
                 _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}! Let's try again...");
-                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC);
+                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs);
             }
         }
     }

@@ -10,6 +10,8 @@ public interface ApiResponseBase
     [JsonPropertyName("errors")] public APIMessage[] Errors { get; set; }
 
     [JsonPropertyName("messages")] public APIMessage[] Messages { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)] public double? ResponseTimeMs { get; set; }
 }
 
 public class ApiResponse<TResult> : ApiResponseBase
@@ -25,6 +27,10 @@ public class ApiResponse<TResult> : ApiResponseBase
     [JsonPropertyName("errors")] public APIMessage[] Errors { get; set; }
 
     [JsonPropertyName("messages")] public APIMessage[] Messages { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)] public double? ResponseTimeMs { get; set; }
+
+
 }
 
 public partial class APIMessage

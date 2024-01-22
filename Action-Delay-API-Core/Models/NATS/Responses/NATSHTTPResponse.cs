@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 
 namespace Action_Delay_API_Core.Models.NATS.Responses
 {
@@ -11,6 +11,6 @@ namespace Action_Delay_API_Core.Models.NATS.Responses
         public string Body { get; set; }
         public string? Info { get; set; }
         public DateTime? ResponseUTC { get; set; }
-
+        public double? ResponseTimeMs { get; set; }
     }
 }

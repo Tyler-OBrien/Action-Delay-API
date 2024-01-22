@@ -6,6 +6,7 @@ CREATE TABLE job_runs
  `run_length` UInt64, 
  `run_status` String,
  `run_info` String,
+ 'response_latency' UInt32,
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name)
@@ -19,6 +20,7 @@ CREATE TABLE api_errors
  `error_type` String,
  `error_description` String,
  `error_hash` String, 
+ 'response_latency' UInt32,
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, error_hash)
@@ -33,10 +35,10 @@ CREATE TABLE job_runs_locations
  `location_name` String,
  `run_time` DateTime,
  `run_length` UInt64, 
- `run_status` String
+ `run_status` String,
+ 'response_latency' UInt32,
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name, location_name)
 PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
-.

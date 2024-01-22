@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
@@ -160,6 +160,7 @@ namespace Action_Delay_API_Core.Jobs
                     $"Failure purging cache, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
+            this.JobData.APIResponseTimeUtc = tryPutAPI.Value.ResponseTimeMs;
 
 
         }
@@ -194,7 +195,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, aborting location..");
-                return new RunLocationResult("Queue Error");
+                return new RunLocationResult("Queue Error", null);
             }
             var getResponse = tryGetResult.Value;
 
@@ -206,7 +207,7 @@ namespace Action_Delay_API_Core.Jobs
             {
                 // We got the right value!
                 _logger.LogInformation($"{location.Name} sees the change! Let's remove this and move on..");
-                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC);
+                return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs);
             }
             else
             {
@@ -214,9 +215,9 @@ namespace Action_Delay_API_Core.Jobs
                 if (getResponse is { WasSuccess: false, ProxyFailure: true})
                 {
                     _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
-                    return new RunLocationResult("Proxy Error");
+                    return new RunLocationResult("Proxy Error", null);
                 }
-                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC);
+                return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs);
             }
         }
     }

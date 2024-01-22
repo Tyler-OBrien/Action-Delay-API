@@ -294,7 +294,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                         new ClickhouseJobRun()
                         {
                             JobName = JobData.JobName, RunStatus = JobData.CurrentRunStatus!,
-                            RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value
+                            RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value, ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
                         }, this.RunningLocationsData.ToList()
                             .Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null).Select(
                                 locationDataKv => new ClickhouseJobLocationRun()
@@ -303,7 +303,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                                     RunStatus = locationDataKv.Value.CurrentRunStatus!,
                                     LocationName = locationDataKv.Value.LocationName,
                                     RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
-                                    RunTime = locationDataKv.Value.CurrentRunTime!.Value!
+                                    RunTime = locationDataKv.Value.CurrentRunTime!.Value!,
+                                    ResponseLatency = (uint)(locationDataKv.Value.ResponseTimeUtc ?? 0)
                                 }).ToList(), null);
                 }
                 catch (Exception ex)
@@ -337,7 +338,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                         JobName = JobData.JobName,
                         RunStatus = JobData.CurrentRunStatus ?? errorCause,
                         RunLength = JobData.CurrentRunLengthMs ?? 0,
-                        RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow
+                        RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
+                        ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
                     }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.Name, customApiError));
             }
             catch (Exception ex)
@@ -367,6 +369,9 @@ namespace Action_Delay_API_Core.Models.Jobs
                     // Send a request and get a response
                     var response = await RunLocation(location, token);
                     if (token.IsCancellationRequested) throw new OperationCanceledException();
+
+                    this.RunningLocationsData[location].ResponseTimeUtc = response.ResponseTimeMs;
+
 
                     if (response.Errored)
                     {

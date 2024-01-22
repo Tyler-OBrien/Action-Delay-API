@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
 
 namespace Action_Delay_API_Core.Models.Database.Clickhouse
@@ -22,6 +23,7 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
                 ErrorType = String.IsNullOrWhiteSpace(error.WorkerStatusCode)
                     ? error.StatusCode.ToString()
                     : error.WorkerStatusCode,
+                ResponseLatency = (uint)(error.ResponseTimeMs ?? 0)
             };
             newClickhouseError.ErrorHash =
                 Sha256Hash(newClickhouseError.ErrorDescription, newClickhouseError.ErrorType);
@@ -55,6 +57,8 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
         public string ErrorDescription { get; set; }
 
         public string ErrorHash { get; set; }
+
+        public UInt64 ResponseLatency { get; set; }
 
     }
 }

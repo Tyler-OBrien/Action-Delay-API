@@ -9,5 +9,7 @@
         public DateTime RunTime { get; set; }
         public UInt64 RunLength { get; set; }
         public string RunStatus { get; set; }
+
+        public UInt64 ResponseLatency { get; set; }
     }
 }

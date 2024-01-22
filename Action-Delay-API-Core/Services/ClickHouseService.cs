@@ -36,41 +36,81 @@ namespace Action_Delay_API_Core.Services
             try
             {
                 await using var connection = CreateConnection();
-                if (locations != null && locations.Any())
+                try
                 {
-                    using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
+                    if (locations != null && locations.Any())
                     {
-                        DestinationTableName = "job_runs_locations",
-                        BatchSize = 100000
-                    };
-
-                    await bulkCopyInterface.WriteToServerAsync(
-                        locations.Select(server => new object[]
-                            {
-                                server.JobName, server.LocationName, server.RunTime, server.RunLength, server.RunStatus
-                            })
-                            .ToArray(), token);
+                        using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
+                        {
+                            DestinationTableName = "job_runs_locations",
+                            BatchSize = 100000
+                        };
+                        await bulkCopyInterface.InitAsync();
+                        await bulkCopyInterface.WriteToServerAsync(
+                            locations.Select(server => new object[]
+                                {
+                                    server.JobName, server.LocationName, server.RunTime, server.RunLength,
+                                    server.RunStatus, server.ResponseLatency
+                                })
+                                .ToArray(), token);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs_locations");
+                    throw;
                 }
 
-                using var bulkCopyRun = new ClickHouseBulkCopy(connection)
+                try
                 {
-                    DestinationTableName = "job_runs",
-                    BatchSize = 100000
-                };
-
-                await bulkCopyRun.WriteToServerAsync(
-                    new[] { new object[] { run.JobName, run.RunTime, run.RunLength, run.RunStatus, apiError?.ErrorDescription ?? string.Empty } }, token);
-
-                if (apiError != null)
-                {
-                    using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
+                    using var bulkCopyRun = new ClickHouseBulkCopy(connection)
                     {
-                        DestinationTableName = "api_errors",
+                        DestinationTableName = "job_runs",
                         BatchSize = 100000
                     };
+                    await bulkCopyRun.InitAsync();
 
-                    await bulkCopyApiError.WriteToServerAsync(
-                        new[] { new object[] { apiError.JobName, apiError.RunTime, apiError.ErrorType, apiError.ErrorDescription, apiError.ErrorHash } }, token);
+                    await bulkCopyRun.WriteToServerAsync(
+                        new[]
+                        {
+                            new object[]
+                            {
+                                run.JobName, run.RunTime, run.RunLength, run.RunStatus,
+                                apiError?.ErrorDescription ?? string.Empty, run.ResponseLatency
+                            }
+                        }, token);
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs");
+                    throw;
+                }
+                try
+                {
+                    if (apiError != null)
+                    {
+                        using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
+                        {
+                            DestinationTableName = "api_errors",
+                            BatchSize = 100000
+                        };
+                        await bulkCopyApiError.InitAsync();
+                        await bulkCopyApiError.WriteToServerAsync(
+                            new[]
+                            {
+                                new object[]
+                                {
+                                    apiError.JobName, apiError.RunTime, apiError.ErrorType, apiError.ErrorDescription,
+                                    apiError.ErrorHash, apiError.ResponseLatency
+                                }
+                            }, token);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Failure to write to Clickhouse api_errors");
+                    throw;
                 }
             }
             catch (Exception ex)

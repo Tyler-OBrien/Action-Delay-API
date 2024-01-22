@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres;
 
@@ -21,6 +23,10 @@ public class JobData
 
     public string? CurrentRunStatus { get; set; }
 
+    [NotMapped]
+    [JsonIgnore]
+    public double? APIResponseTimeUtc { get; set; }
+
     public void Update(JobData data)
     {
         this.LastRunTime = data.LastRunTime;
@@ -29,6 +35,7 @@ public class JobData
         this.CurrentRunTime = data.CurrentRunTime;
         this.CurrentRunLengthMs = data.CurrentRunLengthMs;
         this.CurrentRunStatus = data.CurrentRunStatus;
+        this.APIResponseTimeUtc =  data.APIResponseTimeUtc;
     }
 
 }
@@ -52,6 +59,10 @@ public class JobDataLocation
 
     public string? CurrentRunStatus { get; set; }
 
+    [NotMapped]
+    [JsonIgnore]
+    public double? ResponseTimeUtc { get; set; }
+
     public void Update(JobDataLocation data)
     {
         this.LastRunTime = data.LastRunTime;
@@ -60,6 +71,7 @@ public class JobDataLocation
         this.CurrentRunTime = data.CurrentRunTime;
         this.CurrentRunLengthMs = data.CurrentRunLengthMs;
         this.CurrentRunStatus = data.CurrentRunStatus;
+        this.ResponseTimeUtc = data.ResponseTimeUtc;
     }
 
 }
