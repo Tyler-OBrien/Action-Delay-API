@@ -10,11 +10,11 @@
         public string QueryName { get; set; }
         public string QueryType { get; set; }
         public string ResponseCode { get; set; }
+        public bool ProxyFailure { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
         public string? Info { get; set; }
         public DateTime? ResponseUTC { get; set; }
         public double? ResponseTimeMs { get; set; }
-
 
     }
     public class SerializableDnsAnswer

@@ -262,6 +262,7 @@ namespace Action_Deplay_API_Worker
                         Answers = new List<SerializableDnsAnswer>(),
                         QueryType = "Unknown",
                         QueryName = "Unknown",
+                        ProxyFailure = true,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Info = "Failed due to Null Request"
                     }, cancellationToken: stoppingToken);
@@ -277,6 +278,7 @@ namespace Action_Deplay_API_Worker
                         Answers = new List<SerializableDnsAnswer>(),
                         QueryType = "Unknown",
                         QueryName = "Unknown",
+                        ProxyFailure = true,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Info = "Failed due to Null/unparsable Request"
                     }, cancellationToken: stoppingToken);
@@ -295,6 +297,7 @@ namespace Action_Deplay_API_Worker
                     Answers = new List<SerializableDnsAnswer>(),
                     QueryType = "Unknown",
                     QueryName = "Unknown",
+                    ProxyFailure = true,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
@@ -312,6 +315,7 @@ namespace Action_Deplay_API_Worker
                     {
                         Body = string.Empty,
                         WasSuccess = false,
+                        ProxyFailure = true,
                         Headers = new Dictionary<string, string>(),
                         StatusCode = HttpStatusCode.BadGateway,
                         Info = "Failed due to Null Request/unparsable"
@@ -330,6 +334,7 @@ namespace Action_Deplay_API_Worker
                         WasSuccess = false,
                         Headers = new Dictionary<string, string>(),
                         StatusCode = HttpStatusCode.BadGateway,
+                        ProxyFailure = true,
                         Info = "Failed due to Null Request/unparsable"
                     }, cancellationToken: stoppingToken);
                     return;
@@ -348,6 +353,7 @@ namespace Action_Deplay_API_Worker
                     Headers = new Dictionary<string, string>(),
                     Info = "An Error occured",
                     StatusCode = HttpStatusCode.BadGateway,
+                    ProxyFailure = true,
                     WasSuccess = false
                 }, cancellationToken: stoppingToken);
             }

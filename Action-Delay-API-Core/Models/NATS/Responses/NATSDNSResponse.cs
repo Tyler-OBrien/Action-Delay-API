@@ -1,10 +1,11 @@
-﻿namespace Action_Delay_API_Core.Models.NATS.Responses
+namespace Action_Delay_API_Core.Models.NATS.Responses
 {
     public class SerializableDNSResponse
     {
         public string QueryName { get; set; }
         public string QueryType { get; set; }
         public string ResponseCode { get; set; }
+        public bool ProxyFailure { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
         public string? Info { get; set; }
 

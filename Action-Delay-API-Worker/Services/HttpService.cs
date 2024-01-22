@@ -125,6 +125,7 @@ namespace Action_Deplay_API_Worker.Services;
                 {
                     WasSuccess = false,
                     StatusCode = ex.StatusCode ?? HttpStatusCode.BadGateway,
+                    ProxyFailure = ex.StatusCode == null,
                     Headers = new Dictionary<string, string>(),
                     Body = string.Empty,
                     Info = $"Http Request Error: {ex.HttpRequestError}, {ex.Message}"
@@ -137,6 +138,7 @@ namespace Action_Deplay_API_Worker.Services;
                 {
                     WasSuccess = false,
                     StatusCode = HttpStatusCode.BadGateway,
+                    ProxyFailure = true,
                     Headers = new Dictionary<string, string>(),
                     Body = string.Empty,
                     Info = $"Timeout of {incomingRequest.TimeoutMs} :("
@@ -149,6 +151,7 @@ namespace Action_Deplay_API_Worker.Services;
                 {
                     WasSuccess = false,
                     StatusCode = HttpStatusCode.BadGateway,
+                    ProxyFailure = true,
                     Headers = new Dictionary<string, string>(),
                     Body = string.Empty,
                     Info = "Unhandled Exception :("
@@ -170,8 +173,8 @@ namespace Action_Deplay_API_Worker.Services;
 
 
 
-
-    internal sealed class HttpEventListener : EventListener
+//https://stackoverflow.com/a/74885933
+internal sealed class HttpEventListener : EventListener
     {
         // Constant necessary for attaching ActivityId to the events.
         public const EventKeywords TasksFlowActivityIds = (EventKeywords)0x80;

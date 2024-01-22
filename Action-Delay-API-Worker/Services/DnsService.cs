@@ -54,6 +54,7 @@ namespace Action_Deplay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ResponseCode = DnsHeaderResponseCode.Refused.ToString(),
+                        ProxyFailure = true,
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Invalid QueryType: {queryType}, trying to query {queryName} via {dnsServer}"
                     };
@@ -82,6 +83,7 @@ namespace Action_Deplay_API_Worker.Services
                     {
                         QueryName = queryName,
                         QueryType = queryType,
+                        ProxyFailure = true,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Internal Error when trying to resolve DnsServer into IP: {ex.Message}"
@@ -96,6 +98,7 @@ namespace Action_Deplay_API_Worker.Services
                     {
                         QueryName = queryName,
                         QueryType = queryType,
+                        ProxyFailure = true,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Timeout on resolving DnsServer :("
@@ -110,6 +113,7 @@ namespace Action_Deplay_API_Worker.Services
                     {
                         QueryName = queryName,
                         QueryType = queryType,
+                        ProxyFailure = true,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Unhandled Internal Error when trying to resolve DnsServer into IP :("
@@ -125,6 +129,7 @@ namespace Action_Deplay_API_Worker.Services
                     {
                         QueryName = queryName,
                         QueryType = queryType,
+                        ProxyFailure = true,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Unable to resolve DNS server: {dnsServer}, trying to query {queryType} of {queryName}"
@@ -234,6 +239,7 @@ namespace Action_Deplay_API_Worker.Services
                 {
                     QueryName = queryName,
                     QueryType = queryType,
+                    ProxyFailure = true,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                     Answers = new List<SerializableDnsAnswer>(),
                     Info = $"Timeout :("
@@ -248,6 +254,7 @@ namespace Action_Deplay_API_Worker.Services
                 {
                     QueryName = queryName,
                     QueryType = queryType,
+                    ProxyFailure = true,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                     Answers = new List<SerializableDnsAnswer>(),
                     Info = $"Unhandled Internal Error :("

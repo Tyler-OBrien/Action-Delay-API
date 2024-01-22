@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -121,7 +121,7 @@ namespace Action_Delay_API_Core.Jobs
             else
             {
                 _logger.LogInformation($"{location.Name} sees {getResponse.Body} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of {HttpStatusCode.UnsupportedMediaType.ToString()}! Let's try again...");
-                if (getResponse is { WasSuccess: false, StatusCode: HttpStatusCode.BadGateway })
+                if (getResponse is { WasSuccess: false, ProxyFailure: true })
                 {
                     _logger.LogInformation($"{location.Name} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
                     return new RunLocationResult("Proxy Error");

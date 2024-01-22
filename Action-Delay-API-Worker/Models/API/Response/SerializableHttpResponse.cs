@@ -11,6 +11,7 @@ namespace Action_Deplay_API_Worker.Models.API.Response
 
         public bool WasSuccess { get; set; }
         public HttpStatusCode StatusCode { get; set; }
+        public bool ProxyFailure { get; set; }
         public Dictionary<string, string> Headers { get; set; }
         public string Body { get; set; }
         public string? Info { get; set; }
