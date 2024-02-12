@@ -7,7 +7,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <UserSecretsId>dotnet-Action_Delay_API_Core-d70128d1-fab6-4d42-94cf-7600870d3be1</UserSecretsId>
     <RootNamespace>Action_Delay_API_Core</RootNamespace>
-	  <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
 	  <SelfContained>true</SelfContained>
 	  <GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile>
 	  <Deterministic>true</Deterministic>
@@ -36,9 +35,9 @@
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.1" />
     <PackageReference Include="NATS.Net" Version="2.0.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
-    <PackageReference Include="Sentry" Version="3.41.3" />
-    <PackageReference Include="Sentry.Extensions.Logging" Version="3.41.3" />
-    <PackageReference Include="Sentry.Serilog" Version="3.41.3" />
+    <PackageReference Include="Sentry" Version="4.0.0" />
+    <PackageReference Include="Sentry.Extensions.Logging" Version="4.0.0" />
+    <PackageReference Include="Sentry.Serilog" Version="4.0.0" />
     <PackageReference Include="Serilog" Version="3.1.1" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
