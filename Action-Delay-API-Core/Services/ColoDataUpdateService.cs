@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Action_Delay_API_Core.Broker.ColoData;
@@ -180,7 +181,9 @@ namespace Action_Delay_API_Core.Services
                 var getExistingColoData = getAllCurrentColos.FirstOrDefault(colo => colo.ColoId == coloData.Id);
                 if (getExistingColoData == null)
                 {
-                    _context.ColoData.Add(new ColoData(coloData));
+                    var newInstance = new ColoData(coloData);
+                    newInstance.ColoId = coloData.Id;
+                    _context.ColoData.Add(newInstance);
                 }
                 else
                 {

@@ -28,6 +28,7 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
 
         public void Update(ColoAPIData apiData)
         {
+            this.ColoId = apiData.Id;
             this.IATA = apiData.Iata;
             this.FriendlyName = apiData.NiceName ?? string.Empty;
             this.Country = apiData.Country ?? string.Empty;
