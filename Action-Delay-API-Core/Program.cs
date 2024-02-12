@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
@@ -43,14 +44,7 @@ public class Program
                 restrictedToMinimumLevel: LogEventLevel.Information, retainedFileCountLimit: 10,
                 rollingInterval: RollingInterval.Day).WriteTo
             .Console(outputTemplate: outputFormat, restrictedToMinimumLevel: LogEventLevel.Information).Enrich
-            .FromLogContext().WriteTo.Sentry(
-                o =>
-                {
-                    // Debug and higher are stored as breadcrumbs (default is Information)
-                    o.MinimumBreadcrumbLevel = LogEventLevel.Debug;
-                    // Warning and higher is sent as event (default is Error)
-                    o.MinimumEventLevel = LogEventLevel.Error;
-                }).CreateLogger();
+            .FromLogContext().CreateLogger();
         Log.Logger.Information("Loaded SeriLog Logger");
         TaskScheduler.UnobservedTaskException += TaskSchedulerOnUnobservedTaskException;
 
@@ -126,7 +120,16 @@ public class Program
 
                 services.AddTransient<ICloudflareAPIBroker, CloudflareAPIBroker>();
 
+
+                services.AddHttpClient<IColoDataBroker, ColoDataBroker>()
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler(GetRetryPolicy());
+
+                services.AddTransient<IColoDataBroker, ColoDataBroker>();
+
                 services.AddSingleton<IQueue, NATSQueue>();
+
+                services.AddScoped<IColoDataUpdateService, ColoDataUpdateService>();
 
 
                 var jobs =

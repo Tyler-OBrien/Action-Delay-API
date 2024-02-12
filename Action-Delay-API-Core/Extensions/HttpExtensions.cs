@@ -15,6 +15,7 @@ namespace Action_Delay_API_Core.Extensions
             using var listener = new HttpEventListener();
             try
             {
+                httpRequest.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
                 httpResponse = await client.SendAsync(httpRequest);
                 var rawString = await httpResponse.Content.ReadAsStringAsync();
 

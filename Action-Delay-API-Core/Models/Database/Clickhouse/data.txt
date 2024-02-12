@@ -37,6 +37,7 @@ CREATE TABLE job_runs_locations
  `run_length` UInt64, 
  `run_status` String,
  'response_latency' UInt32,
+ 'colo_id' int
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name, location_name)

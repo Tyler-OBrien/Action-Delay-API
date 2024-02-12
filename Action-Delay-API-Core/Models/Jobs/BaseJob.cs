@@ -141,7 +141,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                             LocationName = location.Name,
                         };
                        _dbContext.JobLocations.Add(newLocation);
-                       tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
+                       await TrySave(true);
+                        tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
                            dbLocation.JobName == Name && dbLocation.LocationName == location.Name);
                     }
 
@@ -304,7 +305,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                                     LocationName = locationDataKv.Value.LocationName,
                                     RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
                                     RunTime = locationDataKv.Value.CurrentRunTime!.Value!,
-                                    ResponseLatency = (uint)(locationDataKv.Value.ResponseTimeUtc ?? 0)
+                                    ResponseLatency = (uint)(locationDataKv.Value.ResponseTimeUtc ?? 0),
+                                    ColoId = locationDataKv.Value.ColoId,
                                 }).ToList(), null);
                 }
                 catch (Exception ex)
@@ -371,6 +373,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     if (token.IsCancellationRequested) throw new OperationCanceledException();
 
                     this.RunningLocationsData[location].ResponseTimeUtc = response.ResponseTimeMs;
+                    this.RunningLocationsData[location].ColoId = response.ColoId;
 
 
                     if (response.Errored)

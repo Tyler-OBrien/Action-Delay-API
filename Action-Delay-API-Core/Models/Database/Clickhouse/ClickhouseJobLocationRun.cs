@@ -11,5 +11,7 @@
         public string RunStatus { get; set; }
 
         public UInt64 ResponseLatency { get; set; }
+        public int ColoId { get; set; }
+
     }
 }

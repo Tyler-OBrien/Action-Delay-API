@@ -50,7 +50,7 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime, server.RunLength,
-                                    server.RunStatus, server.ResponseLatency
+                                    server.RunStatus, server.ResponseLatency, server.ColoId
                                 })
                                 .ToArray(), token);
                     }

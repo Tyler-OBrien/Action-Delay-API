@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres
 {
@@ -18,6 +19,11 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
         public DbSet<JobDataLocation> JobLocations { get; set; }
 
         public DbSet<GenericJobData> GenericJobData { get; set; }
+
+        public DbSet<LocationData> LocationData { get; set; }
+
+        public DbSet<ColoData> ColoData { get; set; }
+
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -44,6 +50,11 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             modelBuilder.Entity<GenericJobData>().ToTable("JobData");
             modelBuilder.Entity<GenericJobData>().HasKey(job => job.JobName);
 
+            modelBuilder.Entity<LocationData>().ToTable("LocationData");
+            modelBuilder.Entity<LocationData>().HasKey(job => job.LocationName);
+
+            modelBuilder.Entity<ColoData>().ToTable("ColoData");
+            modelBuilder.Entity<ColoData>().HasKey(job => job.ColoId);
 
         }
 

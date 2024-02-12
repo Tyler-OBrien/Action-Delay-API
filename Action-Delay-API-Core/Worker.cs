@@ -1,6 +1,7 @@
 using System.Reflection;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.Services;
 
 namespace Action_Delay_API_Core
 {
@@ -36,11 +37,46 @@ namespace Action_Delay_API_Core
         {
             while (!stoppingToken.IsCancellationRequested)
             {
+
                 await Execute();
                 await Task.Delay(1000, stoppingToken);
+                _ = ExecuteColoData();
             }
         }
 
+        public DateTime ColoDataNextExecute = DateTime.UtcNow.AddMinutes(1);
+        public async Task ExecuteColoData()
+        {
+            try
+            {
+                if (DateTime.UtcNow >= ColoDataNextExecute)
+                {
+                    // instantly alter to prevent double execution
+                    ColoDataNextExecute = DateTime.UtcNow.AddMinutes(30);
+                    try
+                    {
+                        using var jobScope = _scopeFactory.CreateScope();
+                        var job = jobScope.ServiceProvider.GetRequiredService<IColoDataUpdateService>();
+                        await job.Run();
+                    
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogCritical(ex, "Error in ExecuteColoData Run");
+                    }
+                    finally
+                    {
+                        _logger.LogInformation(
+                            $"Finished ExecuteColoDate Run, next run in 30 minutes at {ColoDataNextExecute}");
+                        ColoDataNextExecute = DateTime.UtcNow.AddMinutes(30);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Error in ExecuteColoData");
+            }
+        }
 
         public async Task Execute()
         {

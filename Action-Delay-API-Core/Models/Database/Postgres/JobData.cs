@@ -63,6 +63,11 @@ public class JobDataLocation
     [JsonIgnore]
     public double? ResponseTimeUtc { get; set; }
 
+    [NotMapped]
+    [JsonIgnore]
+    public int ColoId { get; set; }
+
+
     public void Update(JobDataLocation data)
     {
         this.LastRunTime = data.LastRunTime;
@@ -72,6 +77,7 @@ public class JobDataLocation
         this.CurrentRunLengthMs = data.CurrentRunLengthMs;
         this.CurrentRunStatus = data.CurrentRunStatus;
         this.ResponseTimeUtc = data.ResponseTimeUtc;
+        this.ColoId = data.ColoId;
     }
 
 }
