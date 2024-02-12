@@ -43,6 +43,31 @@ export default {
 			proxyHeaders.set("Proxy-CF-Cache-Status", response.headers.get("Cf-Cache-Status") || '');
 		}
 
+		if (response.headers.has("colo")) {
+			proxyHeaders.set("proxy-colo", response.headers.get("colo") || '');
+		}
+
+		if (response.headers.has("metal")) {
+			proxyHeaders.set("proxy-metal", response.headers.get("metal") || '');
+		}
+
+		if (response.headers.has("date")) {
+			proxyHeaders.set("proxy-date", response.headers.get("date") || '');
+		}
+
+		if (response.headers.has("content-type")) {
+			proxyHeaders.set("proxy-content-type", response.headers.get("content-type") || '');
+		}
+
+		if (response.headers.has("zone")) {
+			proxyHeaders.set("proxy-zone", response.headers.get("zone") || '');
+		}
+
+		if (response.headers.has("alt-svc")) {
+			proxyHeaders.set("proxy-alt-svc", response.headers.get("alt-svc") || '');
+		}
+
+
 		proxyHeaders.set("Proxy-DO", objectName || '')
 		proxyHeaders.set("Proxy-DO-URL", url.searchParams.get("url") as string || '')
 		proxyHeaders.set("Proxy", "true")
