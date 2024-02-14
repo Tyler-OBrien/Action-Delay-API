@@ -10,6 +10,6 @@ namespace Action_Delay_API_Core.Broker.ColoData
 {
     public interface IColoDataBroker
     {
-        Task<Result<ColoAPIData[]>> GetColoData(CancellationToken token);
+        Task<Result<ColoApiData>> GetColoData(CancellationToken token);
     }
 }

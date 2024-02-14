@@ -16,7 +16,7 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
 
         }
 
-        public ColoData(ColoAPIData apiData)
+        public ColoData(Colo apiData)
         {
             this.ColoId = apiData.Id;
             this.IATA = apiData.Iata;
@@ -26,7 +26,7 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             this.Longitude = apiData.Long ?? 0;
         }
 
-        public void Update(ColoAPIData apiData)
+        public void Update(Colo apiData)
         {
             this.ColoId = apiData.Id;
             this.IATA = apiData.Iata;

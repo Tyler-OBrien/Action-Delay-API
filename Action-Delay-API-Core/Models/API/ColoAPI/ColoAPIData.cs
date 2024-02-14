@@ -7,7 +7,13 @@ using System.Threading.Tasks;
 
 namespace Action_Delay_API_Core.Models.API.ColoAPI
 {
-    public class ColoAPIData
+    public partial class ColoApiData
+    {
+        [JsonPropertyName("results")]
+        public Colo[] Results { get; set; }
+    }
+
+    public partial class Colo
     {
         [JsonPropertyName("ID")]
         public int Id { get; set; }

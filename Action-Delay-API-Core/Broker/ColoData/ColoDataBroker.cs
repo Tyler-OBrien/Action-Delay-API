@@ -26,11 +26,11 @@ namespace Action_Delay_API_Core.Broker.ColoData
         {
             _logger = logger;
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("https://colo.cloudflare.chaika.me/");
+            _httpClient.BaseAddress = new Uri("https://colo.cloudflare.chaika.me/?nometa");
             _httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
         }
 
-        public async Task<Result<ColoAPIData[]>> GetColoData(CancellationToken token)
+        public async Task<Result<ColoApiData>> GetColoData(CancellationToken token)
         {
             HttpResponseMessage httpResponse = null;
             try
@@ -48,10 +48,10 @@ namespace Action_Delay_API_Core.Broker.ColoData
                     return Result.Fail(new CustomAPIError($"Could not get response colos from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null));
                 }
 
-                ColoAPIData[] response = null;
+                ColoApiData response = null;
                 try
                 {
-                    response = JsonSerializer.Deserialize<ColoAPIData[]>(rawString);
+                    response = JsonSerializer.Deserialize<ColoApiData>(rawString);
                 }
                 catch (Exception ex)
                 {
