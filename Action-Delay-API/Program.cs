@@ -11,6 +11,7 @@ using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
 using System.Diagnostics;
 using System.Reflection;
+using Sentry.Extensibility;
 
 namespace Action_Delay_API;
 

@@ -1,4 +1,5 @@
 ﻿using Action_Delay_API_Core.Models.API.CompatAPI;
+using Action_Delay_API_Core.Models.API.Quick;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 
 namespace Action_Delay_API_Core.Models.Services
@@ -9,5 +10,7 @@ namespace Action_Delay_API_Core.Models.Services
             CancellationToken token = default);
 
         Task<List<DeploymentStatistic>> GetCompatibleDeploymentStatistics(CancellationToken token = default);
+
+        Task<List<QuickAnalyticsAPI>> GetQuickAnalytics(string jobName, CancellationToken token = default);
     }
 }

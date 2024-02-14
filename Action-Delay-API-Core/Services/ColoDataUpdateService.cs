@@ -176,7 +176,7 @@ namespace Action_Delay_API_Core.Services
 
             var getAllCurrentColos = await _context.ColoData.ToListAsync();
 
-            foreach (var coloData in getColoData)
+            foreach (var coloData in getColoData.Results)
             {
                 var getExistingColoData = getAllCurrentColos.FirstOrDefault(colo => colo.ColoId == coloData.Id);
                 if (getExistingColoData == null)

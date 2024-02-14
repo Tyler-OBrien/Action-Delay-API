@@ -16,7 +16,6 @@
 	  <AssemblyVersion>2.0.0.1</AssemblyVersion>
 	  <FileVersion>2.0.0.1</FileVersion>
 	  <Version>2.0.0.1</Version>
-	  <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>
@@ -48,6 +47,7 @@
 
   <ItemGroup>
     <Folder Include="Helpers\" />
+    <Folder Include="Models\API\NewFolder\" />
   </ItemGroup>
 
   <ItemGroup>
