@@ -471,12 +471,18 @@ namespace Action_Delay_API_Core.Models.Jobs
                 {
                     // Take Changes from Non-Tracked local objects and commit them to tracked versions
                     // This is done to avoid issues where Tracked objects were being modified mid-save.
-                    var getTrackedJobData = await _dbContext.JobData.AsTracking().FirstAsync(job => job.JobName == Name);
-                    getTrackedJobData.Update(JobData);
+                    var getTrackedJobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.JobName == Name);
+                    if (getTrackedJobData != null)
+                        getTrackedJobData.Update(JobData);
+
+                    var getjobLocations = await _dbContext.JobLocations.AsTracking().Where(dbLocation =>
+                        dbLocation.JobName == Name).ToListAsync();
+
                     foreach (var dataKvp in this.RunningLocationsData)
                     {
-                        var getTrackedLocation = await _dbContext.JobLocations.AsTracking().FirstAsync(dbLocation =>
+                        var getTrackedLocation = getjobLocations.FirstOrDefault(dbLocation =>
                             dbLocation.JobName == Name && dbLocation.LocationName == dataKvp.Value.LocationName);
+                       if (getTrackedLocation != null)
                         getTrackedLocation.Update(dataKvp.Value);
                     }
 
