@@ -25,6 +25,9 @@
 
         public WorkerDelayJobConfig DelayJob { get; set; }
 
+        public WfPDelayJobConfig WfPJob { get; set; }
+
+
         public DNSDelayJobConfig DNSJob { get; set; }
         public DNSDelayJobConfig DNSJobFree { get; set; }
 
@@ -32,6 +35,23 @@
         public CacheDelayJobConfig CacheJob { get; set; }
 
     }
+
+    public class WfPDelayJobConfig
+    {
+        public string API_Key { get; set; }
+
+        public string AccountId { get; set; }
+
+        public string ScriptName { get; set; }
+
+        public string NamespaceName { get; set; }
+
+
+
+        public string ScriptUrl { get; set; }
+
+    }
+
 
     public class WorkerDelayJobConfig
     {
