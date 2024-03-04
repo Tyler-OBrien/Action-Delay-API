@@ -39,7 +39,8 @@ namespace Action_Delay_API_Core.Jobs
         public override async Task RunAction()
         {
             _logger.LogInformation("Running Delay Job");
-            _generatedValue = $"{Guid.NewGuid()}-Cookies";
+            _generatedValue = $"{Guid.NewGuid()}-Cookies-Uploaded At {DateTime.UtcNow.ToString("R")} by Action-Delay-API {Program.VERSION} {_config.Location} ";
+
             // Appending 'worker.js' field
             string workerJsContent = $@"export default {{
   async fetch(request, env, ctx) {{
@@ -77,7 +78,7 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name}"}
+                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"}
                 },
                 URL = _config.DelayJob.ScriptUrl,
                 NetType = location.NetType ?? NetType.Either,

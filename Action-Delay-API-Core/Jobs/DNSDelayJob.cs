@@ -54,7 +54,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public  override async Task RunAction()
         {
-            _valueToLookFor = $"Are Blobs Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R}";
+            _valueToLookFor = $"Are Blobs Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R} - {Name} - Action Delay API {Program.VERSION} {_config.Location}";
             var newUpdateRequest = new UpdateRecordRequest()
             {
                 Comment = "Blame Walshy",

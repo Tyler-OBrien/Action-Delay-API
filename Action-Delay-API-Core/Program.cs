@@ -25,6 +25,8 @@ public class Program
 
     public static string SENTRY_DSN = "";
 
+    public static string VERSION = Assembly.GetCallingAssembly().GetName().Version.ToString();
+
 
     public static readonly JsonSerializerOptions JsonSerializerOptions =
         new()

@@ -121,7 +121,7 @@ namespace Action_Delay_API_Core.Jobs
 
             try
             {
-                _valueToLookFor = $"Date: {DateTime.UtcNow.ToString("R")} GUID: {Guid.NewGuid().ToString("D")}";
+                _valueToLookFor = $"Date: {DateTime.UtcNow.ToString("R")} GUID: {Guid.NewGuid().ToString("D")} By Action-Delay-API {Program.VERSION} {_config.Location}";
                 var tryFindData = await _dbContext.GenericJobData.FirstOrDefaultAsync(data => data.JobName == Name);
                 if (tryFindData == null)
                 {
@@ -171,7 +171,7 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name}"}
+                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"}
                 }, 
                 URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}", // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
                 NetType = location.NetType ?? NetType.Either,

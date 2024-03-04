@@ -52,7 +52,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override async Task RunAction()
         {
-            _valueToLookFor = $"You've been blocked - Last Updated: {DateTime.UtcNow:R}";
+            _valueToLookFor = $"You've been blocked - Last Updated: {DateTime.UtcNow:R} - Action Delay API {Program.VERSION} {_config.Location}";
             _specialPath = DateTime.UtcNow.ToFileTime().ToString();
             var newUpdateRequest = new UpdateCustomRuleRequest.UpdateCustomRuleRequestDTO()
             {
@@ -92,7 +92,7 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name}"}
+                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"}
                 },
                 URL = "https://" + _config.WAFJob.HostName + $"/{_specialPath}",
                 NetType = location.NetType ?? NetType.Either,
