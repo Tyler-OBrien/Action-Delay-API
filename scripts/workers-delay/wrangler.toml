@@ -1,0 +1,37 @@
+name = "workers-delay"
+main = "src/index.ts"
+compatibility_date = "2023-05-18"
+account_id = "b9e510810e1e12fcd40826d266a1fb12"
+logpush = true
+tail_consumers = [{service = "workers-delay-tail", environment = "production"}]
+
+analytics_engine_datasets = [
+    { binding = "workers_deploy_lag" }
+]
+
+
+kv_namespaces = [
+  { binding = "KV", id = "2d217399c6d8440a972033096c1223e3", preview_id = "2d217399c6d8440a972033096c1223e3" }
+  ]
+
+[vars]
+ACCOUNT_ID = 'b9e510810e1e12fcd40826d266a1fb12'
+WORKER_SCRIPT_NAME = 'update-me-pls'
+PROXY_ENDPOINT = 'https://delay.cloudflare.chaika.me'
+WORKER_URL = 'https://update-me-pls.workers.tylerobrien.dev'
+
+
+
+[triggers]
+crons = [ "*/1 * * * *" ]
+
+
+
+[durable_objects]
+bindings = [{name = "DO", class_name = "DO"}]
+
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["DO"]
+

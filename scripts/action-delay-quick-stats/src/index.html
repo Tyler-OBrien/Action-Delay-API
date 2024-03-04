@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS Delay Display</title>
+    <style>
+        /* Embedded CSS */
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        .card {
+            max-width: 90vw;
+            background: #fff;
+            padding: 2em;
+            margin: 1em;
+            text-align: center;
+            border-radius: 0.5em;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+        }
+        .header {
+            font-size: 2em;
+            margin-bottom: 0.2em;
+        }
+        .sub-header {
+            font-size: 1.5em;
+            margin-bottom: 0.2em;
+        }
+        .timestamp {
+            font-size: 1em;
+            color: #999;
+            margin-bottom: 0.5em;
+        }
+        .timeDuration, .highlightYellow, .medians {
+            font-size: 1em;
+            color: #999;
+            margin-bottom: 0.1em;
+        }
+        #peak-period {
+            margin-bottom: 0.5em;
+        }
+        .highlightYellow {
+            color: #ffeb3b;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">DNS Propagation Delay</div>
+        <div class="sub-header" id="delay">Loading...</div>
+        <div class="timestamp" id="lastUpdated"></div>
+        <div id="peak"></div>
+        <div id="peak-period"></div>
+        <div class="medians"></div>
+        <div class="medians"></div>
+        <div class="medians"></div>
+        <div class="links">
+            <a href="dns.cloudflare.chaika.me">DNS Delay (Paid)</a>
+            <a href="dnsfree.cloudflare.chaika.me">DNS Delay (Free)</a>
+            <a href="worker.cloudflare.chaika.me">Worker Update Delay</a>
+            <a href="waf.cloudflare.chaika.me">Custom Rule Update Delay</a>
+            <a href="purge.cloudflare.chaika.me">Single URL Purge Delay</a>
+        </div>
+    </div>
+</body>
+<script>
+    // Auto call function on load
+
+function formatTime(ms) {
+    
+    let seconds = ms / 1000;
+    if (seconds < 60) {
+        return seconds.toFixed(2) + ' second(s)';
+    }
+    
+    let minutes = seconds / 60;
+    if (minutes < 60) {
+        return minutes.toFixed(2) + ' minute(s)';
+    }
+    
+    let hours = minutes / 60;
+    return hours.toFixed(2) + ' hour(s)';
+}
+
+async function FetchCurrentInfo() {
+    const currentInfoResponse = await fetch('/CurrentInfo');
+        const currentInfoData = await currentInfoResponse.json();
+
+        let delay = document.getElementById('delay');
+        if (currentInfoData.currentRunStatus === "Deployed") {
+            delay.textContent = formatTime(currentInfoData.currentRunLengthMs);
+        } else if (currentInfoData.currentRunStatus === "Undeployed" && currentInfoData.currentRunLengthMs > 5000) {
+            delay.textContent = formatTime(currentInfoData.currentRunLengthMs) + " PENDING";
+            delay.className = 'highlightYellow';
+        }
+        else
+        {
+            delay.textContent = formatTime(currentInfoData.lastRunLengthMs);
+        }
+
+        document.getElementById('lastUpdated').textContent = "Last Updated: " + new Date(currentInfoData.currentRunTime).toLocaleTimeString();
+
+}
+
+async function FetchQuickAnalytics() {
+    try {
+const quickAnalyticsResponse = await fetch('/quickanalytics');
+const quickAnalyticsData = await quickAnalyticsResponse.json();
+
+// Parsing quickanalytics and updating the HTML
+let peakPeriod, dailyMedian, monthlyMedian, quarterlyMedian;
+
+quickAnalyticsData.forEach((item) => {
+    switch (item.period) {
+        case "Last 1 Day":
+            dailyMedian = formatTime(parseInt(item.median_run_length));
+            break;
+        case "Last 30 Days":
+            monthlyMedian = formatTime(parseInt(item.median_run_length));
+            break;
+        case "Last 90 Days":
+            quarterlyMedian = formatTime(parseInt(item.median_run_length));
+            break;
+        default:
+            peakPeriod = formatTime(parseInt(item.median_run_length));;
+            document.getElementById('peak-period').textContent = `From ${new Date(item.period).toLocaleTimeString()} - ${new Date(new Date(item.period).getTime() + parseInt(item.median_run_length)).toLocaleTimeString()} `
+    }
+})
+
+document.getElementById('peak').textContent = "Last Peak of " + peakPeriod;
+document.getElementsByClassName('medians')[0].textContent = "1 Day Median: " + dailyMedian;
+document.getElementsByClassName('medians')[1].textContent = "30 Days Median: " + monthlyMedian;
+document.getElementsByClassName('medians')[2].textContent = "90 days Median: " + quarterlyMedian;
+
+
+} catch (error) {
+console.error(`Fetch failed: ${error}`);
+}
+}
+
+setInterval(FetchCurrentInfo, 10000); 
+    setInterval(FetchQuickAnalytics, 60000);
+
+    FetchCurrentInfo();
+    FetchQuickAnalytics();
+
+</script>
+</html>

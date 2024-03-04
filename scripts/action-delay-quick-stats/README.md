@@ -1,0 +1,1 @@
+Used for the single stat cards like https://workers.cloudflare.chaika.me, https://dns.cloudflare.chaika.me, etc
