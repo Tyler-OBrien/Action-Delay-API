@@ -165,6 +165,18 @@ WHERE
     job_name = {jobName:String} 
     and run_status = 'Deployed'
     and run_time > now() - INTERVAL 90 DAY
+UNION ALL
+SELECT 
+  toString(run_time) as period,
+  toFloat64(run_length) as run_length
+FROM 
+    job_runs
+WHERE 
+    job_name = {jobName:String}
+    and run_status = 'Deployed'
+    and run_time > now() - INTERVAL 1 DAY
+ORDER BY run_length DESC
+LIMIT 1;
 ";
             var result = await command.ExecuteReaderAsync(token);
             List<QuickAnalyticsAPI> data = new List<QuickAnalyticsAPI>(3);
