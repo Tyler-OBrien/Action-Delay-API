@@ -167,11 +167,13 @@ namespace Action_Delay_API_Core.Jobs
 
         public  Task<Result<SerializableHttpResponse>> SendRequest(Location location, CancellationToken token)
         {
+            
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"}
+                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
+                    { "Worker", location.DisplayName ?? location.Name }
                 }, 
                 URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}", // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
                 NetType = location.NetType ?? NetType.Either,

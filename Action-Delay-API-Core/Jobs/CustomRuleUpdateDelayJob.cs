@@ -92,7 +92,8 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"}
+                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
+                    { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = "https://" + _config.WAFJob.HostName + $"/{_specialPath}",
                 NetType = location.NetType ?? NetType.Either,

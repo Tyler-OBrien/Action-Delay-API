@@ -153,7 +153,8 @@ namespace Action_Delay_API_Core.Services
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Program.VERSION} Update Colo location"}
+                    { "User-Agent", $"Action-Delay-API {Program.VERSION} Update Colo location"},
+                    { "Worker", location.DisplayName ?? location.Name }
 
                 },
                 URL = "https://debug.chaika.me",
