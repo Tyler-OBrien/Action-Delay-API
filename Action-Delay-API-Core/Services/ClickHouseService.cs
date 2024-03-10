@@ -5,7 +5,6 @@ using Action_Delay_API_Core.Models.Services;
 using ClickHouse.Client.ADO;
 using ClickHouse.Client.Copy;
 using System.Data.Common;
-using NATS.Client.JetStream.Models;
 using ClickHouse.Client.Utility;
 using Action_Delay_API_Core.Models.API.Quick;
 

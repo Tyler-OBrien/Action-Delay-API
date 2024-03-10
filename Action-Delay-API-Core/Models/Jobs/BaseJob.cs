@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker;
+﻿using System.Reflection.Metadata.Ecma335;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
@@ -96,6 +97,12 @@ namespace Action_Delay_API_Core.Models.Jobs
         public abstract Task<RunLocationResult> RunLocation(Location location, CancellationToken token);
         public abstract Task HandleCompletion();
 
+        public virtual Task JobInit() => Task.CompletedTask;
+        
+
+
+
+
         public async Task BaseRun()
         {
             using var scope = _logger.BeginScope(Name);
@@ -152,6 +159,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                 SentrySdk.AddBreadcrumb($"Set/Got Location Data");
 
                 await TrySave(true);
+
+                await JobInit();
 
                 // PreWarm
                 await PreWarmAction();

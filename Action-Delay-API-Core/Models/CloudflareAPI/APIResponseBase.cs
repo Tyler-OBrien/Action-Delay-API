@@ -57,4 +57,7 @@ public class ApiResponse
     [JsonPropertyName("errors")] public APIMessage[] Errors { get; set; }
 
     [JsonPropertyName("messages")] public APIMessage[] Messages { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)] public double? ResponseTimeMs { get; set; }
+
 }

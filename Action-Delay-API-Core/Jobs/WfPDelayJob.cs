@@ -20,6 +20,8 @@ namespace Action_Delay_API_Core.Jobs
         private readonly ILogger _logger;
         private readonly IQueue _queue;
         private string _generatedValue { get; set; }
+
+        private string _scriptName { get; set; }
         public override int TargetExecutionSecond => 20;
 
         public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
@@ -34,6 +36,11 @@ namespace Action_Delay_API_Core.Jobs
         public override async Task PreWarmRunLocation(Location location)
         {
             await SendLocation(location, CancellationToken.None);
+        }
+
+        public override async Task JobInit()
+        {
+            _scriptName = DateTimeOffset.Now.ToUnixTimeMilliseconds().ToString();
         }
 
         public override async Task RunAction()
@@ -58,7 +65,7 @@ namespace Action_Delay_API_Core.Jobs
 
 
             var tryPutAPI = await _apiBroker.UploadWFPScript(workerJsContent, metadataContent, _config.WfPJob.AccountId,
-                _config.WfPJob.NamespaceName, _config.WfPJob.ScriptName, _config.WfPJob.API_Key, CancellationToken.None);
+                _config.WfPJob.NamespaceName, _scriptName, _config.WfPJob.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating WfP User script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
@@ -77,12 +84,13 @@ namespace Action_Delay_API_Core.Jobs
             {
                 Headers = new Dictionary<string, string>()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"}
+                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
+                    { "Worker", location.DisplayName ?? location.Name }
                 },
-                URL = _config.WfPJob.ScriptUrl,
+                URL = _config.WfPJob.ScriptUrl + $"/?scriptName={_scriptName}",
                 NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
-                EnableConnectionReuse = false
+                EnableConnectionReuse = false,
             };
             return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
         }
@@ -122,6 +130,20 @@ namespace Action_Delay_API_Core.Jobs
         public override async Task HandleCompletion()
         {
             _logger.LogInformation($"Completed {Name}..");
+            try
+            {
+                using var newCancellationToken = new CancellationTokenSource(10000);
+                var tryDeleteWfpScript = await _apiBroker.DeleteWFPScript(_config.WfPJob.AccountId,
+                    _config.WfPJob.NamespaceName, _scriptName, _config.WfPJob.API_Key, newCancellationToken.Token);
+                if (tryDeleteWfpScript.IsFailed)
+                {
+                    _logger.LogCritical($"Failure deleting WfP User script, logs: {tryDeleteWfpScript.Errors?.FirstOrDefault()?.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting WfP Script");
+            }
         }
 
     }

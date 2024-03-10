@@ -32,7 +32,19 @@ namespace Action_Delay_API_Core.Broker
                 $"{BasePath}/accounts/{accountId}/workers/dispatch/namespaces/{namespaceName}/scripts/{scriptName}");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             request.Content = formData;
-            var tryPut = await _httpClient.ProcessHttpRequestAsync<UploadWorkerScript>(request, $"Uploading WfP User Script Script",
+            var tryPut = await _httpClient.ProcessHttpRequestAsync<UploadWorkerScript>(request, $"Uploading WfP User Script",
+                _logger);
+            if (tryPut.IsFailed) return Result.Fail(tryPut.Errors);
+            return tryPut.Value!;
+        }
+
+        public async Task<Result<ApiResponse>> DeleteWFPScript(string accountId, string namespaceName, string scriptName, string apiToken, CancellationToken token)
+        {
+
+            var request = new HttpRequestMessage(HttpMethod.Delete,
+                $"{BasePath}/accounts/{accountId}/workers/dispatch/namespaces/{namespaceName}/scripts/{scriptName}?force=true");
+            request.Headers.Add("Authorization", $"Bearer {apiToken}");
+            var tryPut = await _httpClient.ProcessHttpRequestAsyncNoResponse(request, $"Delete WfP User Script",
                 _logger);
             if (tryPut.IsFailed) return Result.Fail(tryPut.Errors);
             return tryPut.Value!;
