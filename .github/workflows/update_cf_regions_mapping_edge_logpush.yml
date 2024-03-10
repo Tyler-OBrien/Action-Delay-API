@@ -18,7 +18,7 @@ jobs:
             for i in {1..5}
             do 
                 # Fetch data
-                response=$(curl --write-out "%{http_code}" --silent --output scripts/logpush-colo-data/cf-colo-handler/src/routing.json "https://colo.cloudflare.chaika.me/?iataregion")
+                response=$(curl --write-out "%{http_code}" --silent --output scripts/logpush-colo-data/edge_log_queueing/src/routing.json "https://colo.cloudflare.chaika.me/?iataregion")
                 
                 # Check response code
                 if [ "$response" -ne 200 ]; then
@@ -26,7 +26,7 @@ jobs:
                 sleep 5
                 else
                 # Validate JSON
-                cat scripts/logpush-colo-data/cf-colo-handler/src/routing.json | jq empty > /dev/null 2>&1
+                cat scripts/logpush-colo-data/edge_log_queueing/src/routing.json | jq empty > /dev/null 2>&1
                 if [ "$?" -ne 0 ]; then
                     echo "Invalid JSON data, retrying in 5s. Retry: $i/5."
                     sleep 5
@@ -46,4 +46,4 @@ jobs:
       uses: cloudflare/wrangler-action@2.0.0
       with:
             apiToken: ${{ secrets.CF_API_TOKEN_DEPLOY }}
-            workingDirectory: "scripts/logpush-colo-data/cf-colo-handler"
+            workingDirectory: "scripts/logpush-colo-data/edge_log_queueing"
