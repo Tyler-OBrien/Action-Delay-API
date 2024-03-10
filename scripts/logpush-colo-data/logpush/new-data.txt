@@ -1,0 +1,38 @@
+CREATE TABLE `machines` (
+  coloId INT,
+  machineId INT,
+  dateFound date,
+  lastUpdated date,
+  PRIMARY KEY (coloId, machineId)
+);
+
+
+CREATE TABLE machines (
+  coloId INTEGER,
+  machineId INTEGER,
+  dateFound Date,
+  lastUpdated Date,
+  PRIMARY KEY (coloId, machineId)
+);
+
+
+
+CREATE TABLE colos (
+  coloId INTEGER,
+  coloName string,
+  smartRoutingColo bool,
+  upperTierColo bool,
+  region string,
+  friendlyLocation string,
+  Country string,
+  latitude REAL,
+  longitude REAL,
+  PRIMARY KEY (coloId)
+);
+
+Create Table meta (
+  Key Text,
+  Value Text,
+  Type Text,
+  PRIMARY KEY (Key)
+)

@@ -1,0 +1,25 @@
+name = "axiom-logpush"
+main = "src/index.ts"
+compatibility_date = "2023-05-17"
+
+[limits]
+cpu_ms = 30000
+
+
+
+[[ analytics_engine_datasets ]]
+binding = "IngestRate"
+
+
+
+
+[[ d1_databases ]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "cloudflare-machines"
+database_id = "972558fd-cadf-4bec-8b0b-5a140d7d51fb"
+
+
+[[ d1_databases ]]
+binding = "DB2" # i.e. available in your Worker on env.DB
+database_name = "cloudflare-machines-v2"
+database_id = "9cc3c208-b7fd-41e9-be43-97253311760b"

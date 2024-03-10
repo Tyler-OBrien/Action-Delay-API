@@ -1,0 +1,31 @@
+name = "colos"
+main = "src/worker.ts"
+compatibility_date = "2024-02-11"
+workers_dev = true
+minify = true
+
+rules = [
+  { type = "Text", globs = ["**/*.json"], fallthrough = true }
+]
+
+
+[triggers]
+crons = [ "*/30 * * * *" ]
+
+
+[[routes]]
+pattern = "colo.cloudflare.chaika.me/*"
+zone_name = "chaika.me"
+
+
+
+[[ d1_databases ]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "cloudflare-machines"
+database_id = "972558fd-cadf-4bec-8b0b-5a140d7d51fb"
+
+
+[[ d1_databases ]]
+binding = "DB2" # i.e. available in your Worker on env.DB
+database_name = "cloudflare-machines-v2"
+database_id = "9cc3c208-b7fd-41e9-be43-97253311760b"
