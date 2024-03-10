@@ -1,6 +1,7 @@
 name = "axiom-logpush"
 main = "src/index.ts"
 compatibility_date = "2023-05-17"
+account_id = "b9e510810e1e12fcd40826d266a1fb12"
 
 [limits]
 cpu_ms = 30000
