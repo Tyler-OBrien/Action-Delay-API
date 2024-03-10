@@ -23,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-	  <PackageReference Include="FluentResults" Version="3.15.2" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.1" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.1">
 		  <PrivateAssets>all</PrivateAssets>
@@ -54,7 +53,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\API\Requests\DTOs\" />
+    <Folder Include="Models\NewFolder\" />
   </ItemGroup>
 
 </Project>

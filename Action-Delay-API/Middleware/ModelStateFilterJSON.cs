@@ -1,5 +1,5 @@
 ﻿using System.Net;
-using Action_Delay_API.Models.Responses;
+using Action_Delay_API.Models.API.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 

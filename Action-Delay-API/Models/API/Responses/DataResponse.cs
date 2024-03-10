@@ -1,10 +1,8 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Net;
+using System.Text.Json.Serialization;
 
-namespace Action_Delay_API.Models.Responses;
+namespace Action_Delay_API.Models.API.Responses;
 
-/// <summary>
-///     Default Rest API Data Response (i.e not an error)
-/// </summary>
 public class DataResponse<T> : IResponse
 {
     public DataResponse()

@@ -1,4 +1,4 @@
-﻿using Action_Delay_API.Models.Responses;
+﻿using Action_Delay_API.Models.API.Responses;
 using Sentry;
 using Serilog;
 

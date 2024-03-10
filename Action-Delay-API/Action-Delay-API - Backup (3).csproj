@@ -55,6 +55,7 @@
 
   <ItemGroup>
     <Folder Include="Models\API\Requests\DTOs\" />
+    <Folder Include="Models\API\Responses\NewFolder\" />
   </ItemGroup>
 
 </Project>

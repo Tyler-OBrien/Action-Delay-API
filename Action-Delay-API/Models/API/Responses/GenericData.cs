@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using System.Text.Json.Serialization;
 
-namespace Action_Delay_API.Models.Responses;
+namespace Action_Delay_API.Models.API.Responses;
 
 public class GenericDataResponse : DataResponse<GenericData>
 {

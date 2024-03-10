@@ -1,4 +1,6 @@
-﻿using Action_Delay_API.Models.Responses;
+﻿using Action_Delay_API.Extensions;
+using Action_Delay_API.Models.API.Responses;
+using Action_Delay_API.Models.Services;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
 using Microsoft.AspNetCore.Mvc;
@@ -16,25 +18,26 @@ namespace Action_Delay_API.Controllers;
 [SwaggerResponse(429, Type = typeof(ErrorResponse), Description = "On hitting a rate limit, a rate limit response will be returned.")]
 public class CacheJobController : ControllerBase
 {
-    private readonly ActionDelayDatabaseContext _genericServersContext;
     private readonly ILogger _logger;
+    private readonly ICacheJobService _cacheJobService;
 
 
-    public CacheJobController(ActionDelayDatabaseContext serversContext,
+
+    public CacheJobController(ICacheJobService cacheJobService,
         ILogger<CacheJobController> logger)
     {
-        _genericServersContext = serversContext;
         _logger = logger;
+        _cacheJobService = cacheJobService;
     }
 
 
     // GET: api/<ScrapeJobController>
     [HttpGet]
-    [SwaggerResponse(200, Type = typeof(DataResponse<List<Location>>), Description = "On success")]
+    [SwaggerResponse(200, Type = typeof(string), Description = "Cache Testing Value including Date and GUID for Identification, used in Cache Delay Job")]
 
-    public async Task<ActionResult<IResponse>> Get(CancellationToken token)
+    public async Task<IActionResult> Get(CancellationToken token)
     {
-        return Ok(((await _genericServersContext.GenericJobData.AsNoTracking().FirstOrDefaultAsync(jobData => jobData.JobName == "Single URL Purge Delay Job", cancellationToken: token))?.Value ?? ""));
+        return (await _cacheJobService.GetCacheValue(token)).MapToResult();
     }
 
 }

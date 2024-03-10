@@ -23,7 +23,6 @@
   </ItemGroup>
 
   <ItemGroup>
-	  <PackageReference Include="FluentResults" Version="3.15.2" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.1" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.1">
 		  <PrivateAssets>all</PrivateAssets>
@@ -48,13 +47,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="appsettings.json">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
+    <Folder Include="Models\Responses\" />
+    <Folder Include="NewFolder\" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\API\Requests\DTOs\" />
+    <None Include="appsettings.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

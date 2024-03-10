@@ -1,4 +1,8 @@
-﻿using Action_Delay_API.Models.Responses;
+﻿using Action_Delay_API.Extensions;
+using Action_Delay_API.Models.API.Responses;
+using Action_Delay_API.Models.API.Responses.DTOs;
+using Action_Delay_API.Models.API.Responses.DTOs.CompatiableJobAnalytics;
+using Action_Delay_API.Models.Services;
 using Action_Delay_API_Core.Models.API.CompatAPI;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
@@ -18,49 +22,35 @@ namespace Action_Delay_API.Controllers;
 [SwaggerResponse(429, Type = typeof(ErrorResponse), Description = "On hitting a rate limit, a rate limit response will be returned.")]
 public class CompatibleJobAnalyticsController : ControllerBase
 {
-    private readonly ActionDelayDatabaseContext _genericServersContext;
-    private readonly IClickHouseService _clickHouseService;
+
     private readonly ILogger _logger;
+    private readonly ICompatibleJobAnalyticsService _compatibleJobAnalyticsService;
 
 
-    public CompatibleJobAnalyticsController(ActionDelayDatabaseContext serversContext, IClickHouseService clickHouseService,
+
+    public CompatibleJobAnalyticsController(ICompatibleJobAnalyticsService compatibleJobAnalyticsService, 
         ILogger<CacheJobController> logger)
     {
-        _genericServersContext = serversContext;
-        _clickHouseService = clickHouseService;
         _logger = logger;
+        _compatibleJobAnalyticsService = compatibleJobAnalyticsService;
     }
 
 
     // GET: api/<ScrapeJobController>
     [HttpGet("CompatibleWorkerScriptDeploymentAnalytics")]
-    [SwaggerResponse(200, Type = typeof(DataResponse<List<Location>>), Description = "On success")]
+    [SwaggerResponse(200, Type = typeof(DeploymentStatisticResponse[]), Description = "On success, return analytics")]
 
-    public async Task<ActionResult<IResponse>> CompatibleWorkerScriptDeploymentAnalytics(CancellationToken token)
+    public async Task<IActionResult> CompatibleWorkerScriptDeploymentAnalytics(CancellationToken token)
     {
-        var getClickHouseData = await _clickHouseService.GetCompatibleDeploymentStatistics(token);
-        var getCurrentJobStatus =
-            await _genericServersContext.JobData.FirstOrDefaultAsync(job => job.JobName == "Worker Script Delay Job", token);
-        if (getCurrentJobStatus is { CurrentRunStatus: not null } and { CurrentRunStatus: "Undeployed", CurrentRunLengthMs: not null, CurrentRunTime: not null })
-        {
-            getClickHouseData.Add(new DeploymentStatistic()
-            {
-                Deployed = "False",
-                RunLength = getCurrentJobStatus.CurrentRunLengthMs.Value,
-                RunTime = (ulong)new DateTimeOffset(getCurrentJobStatus.CurrentRunTime.Value).ToUnixTimeMilliseconds(),
-                Time = new DateTimeOffset(getCurrentJobStatus.CurrentRunTime.Value).ToUnixTimeMilliseconds().ToString(),
-            });
-        }
-        return Ok(getClickHouseData);
+        return (await _compatibleJobAnalyticsService.CompatibleWorkerScriptDeploymentAnalytics(token)).MapToResult();
     }
     // GET: api/<ScrapeJobController>
     [HttpGet("CompatibleWorkerScriptDeploymentCurrentRun")]
-    [SwaggerResponse(200, Type = typeof(DataResponse<List<Location>>), Description = "On success")]
+    [SwaggerResponse(200, Type = typeof(JobDataResponse), Description = "On success, return job")]
 
-    public async Task<ActionResult<IResponse>> CompatibleWorkerScriptDeploymentCurrentRun(CancellationToken token)
+    public async Task<IActionResult> CompatibleWorkerScriptDeploymentCurrentRun(CancellationToken token)
     {
-        return Ok(await _genericServersContext.JobData.FirstOrDefaultAsync(
-            job => job.JobName == "Worker Script Delay Job", token));
+        return (await _compatibleJobAnalyticsService.CompatibleWorkerScriptDeploymentCurrentRun(token)).MapToResult();
 
     }
 

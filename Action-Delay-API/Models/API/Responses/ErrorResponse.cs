@@ -1,12 +1,12 @@
-﻿using System.Net;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Net;
 using System.Text.Json.Serialization;
+using FluentResults;
 
-namespace Action_Delay_API.Models.Responses;
+namespace Action_Delay_API.Models.API.Responses;
 
-/// <summary>
-///     Default Rest API error Response, containing status code, message, and error type
-/// </summary>
-public class ErrorResponse : IResponse
+
+public class ErrorResponse : IError, IResponse
 {
     private ErrorResponse()
     {
@@ -23,6 +23,16 @@ public class ErrorResponse : IResponse
     }
 
     [JsonPropertyName("error")] public GenericError? Error { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public string Message { get; }
+    [NotMapped]
+    [JsonIgnore]
+    public Dictionary<string, object> Metadata { get; }
+    [NotMapped]
+    [JsonIgnore]
+    public List<IError> Reasons { get; }
 }
 
 public class GenericError

@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using Serilog.Events;
 using Action_Delay_API.Middleware;
-using Action_Delay_API.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Action_Delay_API_Core.Services;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +10,10 @@ using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
 using System.Diagnostics;
 using System.Reflection;
+using Action_Delay_API.Models.API.Local;
+using Action_Delay_API.Models.Services;
+using Action_Delay_API.Services;
+using Microsoft.OpenApi.Models;
 using Sentry.Extensibility;
 
 namespace Action_Delay_API;
@@ -88,6 +91,8 @@ public class Program
 #endif
 
 
+        builder.Services.AddScoped<ICacheJobService, CacheJobService>();
+
         builder.Services.AddControllers().AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
@@ -95,7 +100,13 @@ public class Program
 
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle  
         builder.Services.AddEndpointsApiExplorer();
-        builder.Services.AddSwaggerGen();
+        builder.Services.AddSwaggerGen(options =>
+        {
+            options.AddServer(new OpenApiServer()
+            {
+                Url = "https://delay.cloudflare.chaika.me"
+            });
+        });
 
 
         builder.WebHost.UseKestrel(options => { options.AddServerHeader = false;  });
@@ -106,6 +117,8 @@ public class Program
         });
 
         builder.Services.AddScoped<IClickHouseService, ClickHouseService>();
+        builder.Services.AddScoped<ICompatibleJobAnalyticsService, CompatibleJobAnalyticsService>();
+        builder.Services.AddScoped<IQuickAPIService, QuickAPIService>();
 
         builder.Services.AddScoped<JSONErrorMiddleware>();
         builder.Services.Configure<ApiBehaviorOptions>(options =>

@@ -1,4 +1,4 @@
-﻿namespace Action_Delay_API.Models.Local
+﻿namespace Action_Delay_API.Models.API.Local
 {
     public class APIConfig
     {
