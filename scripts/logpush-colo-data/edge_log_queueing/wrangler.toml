@@ -1,0 +1,34 @@
+name = "edge-log-processor"
+main = "src/index.ts"
+compatibility_date = "2023-11-12"
+logpush = true
+
+
+analytics_engine_datasets = [
+    { binding = "EdgeIngestRate" }
+]
+
+
+[durable_objects]
+bindings = [{name = "BATCHER", class_name = "Batcher"}]
+
+
+
+
+
+
+
+[[ d1_databases ]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "cloudflare-machines"
+database_id = "972558fd-cadf-4bec-8b0b-5a140d7d51fb"
+
+
+[[ d1_databases ]]
+binding = "DB2" # i.e. available in your Worker on env.DB
+database_name = "cloudflare-machines-v2"
+database_id = "9cc3c208-b7fd-41e9-be43-97253311760b"
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_classes = ["Batcher"]
