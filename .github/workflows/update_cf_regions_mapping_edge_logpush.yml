@@ -1,0 +1,49 @@
+name: update_cf_regions_mapping_edge_logpush
+
+on:
+  workflow_dispatch: {}  
+  schedule: 
+      - cron: '1 6,20 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      name: Checkout Repository
+    - name: Install jq
+      run: sudo apt-get install jq
+    - name: Fetch data and validate JSON
+      run: |
+            for i in {1..5}
+            do 
+                # Fetch data
+                response=$(curl --write-out "%{http_code}" --silent --output scripts/logpush-colo-data/cf-colo-handler/src/routing.json "https://colo.cloudflare.chaika.me/?iataregion")
+                
+                # Check response code
+                if [ "$response" -ne 200 ]; then
+                echo "Failed to fetch data, retrying in 5s. Retry: $i/5."
+                sleep 5
+                else
+                # Validate JSON
+                cat scripts/logpush-colo-data/cf-colo-handler/src/routing.json | jq empty > /dev/null 2>&1
+                if [ "$?" -ne 0 ]; then
+                    echo "Invalid JSON data, retrying in 5s. Retry: $i/5."
+                    sleep 5
+                else
+                    echo "Successfully fetched and validated JSON data"
+                    break
+                fi
+                fi
+
+                # Failed after max retries
+                if [ "$i" -eq 5 ]; then
+                echo "Failed to fetch and validate data after $i attempts"
+                exit 1
+                fi
+            done
+    - name: Publish
+      uses: cloudflare/wrangler-action@2.0.0
+      with:
+            apiToken: ${{ secrets.CF_API_TOKEN_DEPLOY }}
+            workingDirectory: "scripts/logpush-colo-data/cf-colo-handler"
