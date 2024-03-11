@@ -3,6 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2023-11-12"
 logpush = true
 account_id = "b9e510810e1e12fcd40826d266a1fb12"
+workers_dev = false
 
 
 

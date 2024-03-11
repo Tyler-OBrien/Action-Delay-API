@@ -1,6 +1,8 @@
 name = "action-delay-api-wfp-worker"
 main = "src/index.ts"
 compatibility_date = "2023-11-12"
+workers_dev = false
+
 
 [[dispatch_namespaces]]
 binding = "dispatcher"

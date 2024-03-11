@@ -1,6 +1,7 @@
 name = "action-delay-api-durable-object-proxy"
 main = "src/index.ts"
 compatibility_date = "2023-08-21"
+workers_dev = false
 
 
 

@@ -3,6 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2023-05-18"
 account_id = "b9e510810e1e12fcd40826d266a1fb12"
 logpush = true
+workers_dev = false
 tail_consumers = [{service = "workers-delay-tail", environment = "production"}]
 
 analytics_engine_datasets = [
