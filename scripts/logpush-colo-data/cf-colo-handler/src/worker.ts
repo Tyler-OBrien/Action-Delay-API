@@ -18,7 +18,7 @@ export interface Env {
 }
 
 export class ResultObj {
-  constructor() {}
+  constructor() { }
 
   Region?: string;
   FriendlyLocation?: string;
@@ -208,7 +208,7 @@ export default {
     }
 
     // extra stuff 
- 
+
 
 
     if (batchStmts.length != 0) {
@@ -253,43 +253,42 @@ export default {
   },
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     var url = new URL(request.url);
-    if (newurl.pathname == "/supersecretfetchmetotriggercron" && request.headers.has("APIKEY") && request.headers.get("APIKEY") == env.CRONAPIKEY) {
+    if (url.pathname == "/supersecretfetchmetotriggercron" && request.headers.has("APIKEY") && request.headers.get("APIKEY") === env.CRONAPIKEY) {
       await this.scheduled(null, env, ctx);
       return new Response('Yerp', { status: 200 });
     }
-    if (url.pathname.trim() != '/') {
-      return new Response("There's nothing here for you", { status: 404 });
-    }
-    if (url.searchParams.has('simple')) {
+    if (url.searchParams.has('simple') || url.pathname == '/v2/colos/iata') {
       var newUrlMatch = `https://${url.hostname}/colonamessimple`;
       var tryMatch = await caches.default.match(newUrlMatch);
       if (tryMatch != null) return tryMatch;
 
       var getColos = await env.DB.prepare('SELECT coloId as ID, coloName as IATA from colos order by coloId asc;').all();
       var coloInfo = getColos.results;
-      var newResponse = new Response(JSON.stringify(coloInfo), { status: 200,  headers: { "Content-Type": "application/json"}  });
+      var newResponse = new Response(JSON.stringify(coloInfo), { status: 200, headers: { "Content-Type": "application/json" } });
       newResponse.headers.append('Cache-Control', 'public, max-age=600, immutable');
       ctx.waitUntil(caches.default.put(newUrlMatch, newResponse.clone()));
       return newResponse;
-    } else {
+    }
+    if (url.pathname == '/' || url.pathname == '/v2/colos/' || url.pathname == '/v2/colos/iataregion' ||  url.pathname == '/v2/colos/idregion')
+    {
       let noMeta = url.searchParams.has("nometa");
       let extraCacheKey = noMeta ? "nometa" : "meta";
 
 
       let selectColumns = 'coloId as ID, coloName as IATA, region as cfRegionLB, friendlyLocation as niceName, Country as country,  latitude as lat, longitude as long';
 
-      let iataRegion = url.searchParams.has("iataregion");
-      let idRegion = url.searchParams.has("idregion");
+      let iataRegion = url.searchParams.has("iataregion") || url.pathname == '/v2/colos/iataregion';
+      let idRegion = url.searchParams.has("idregion")  || url.pathname == '/v2/colos/idregion';
       if (iataRegion || idRegion) noMeta = true;
-      if (iataRegion) { 
+      if (iataRegion) {
         selectColumns = 'coloName as IATA, region as cfRegionLB'
         extraCacheKey += "iataRegion"
-       }
+      }
       if (idRegion) {
         selectColumns = 'coloId as ID, region as cfRegionLB'
         extraCacheKey += "idRegion"
       }
-      
+
 
 
       var newUrlMatch = `https://${url.hostname}/colonames${extraCacheKey}`;
@@ -302,9 +301,9 @@ export default {
       var coloInfo = getColos.results;
       this.GetDORegions(coloInfo)
 
-      var results: any = { }
+      var results: any = {}
       if (iataRegion || idRegion) {
-        results.results =  {};
+        results.results = {};
         if (iataRegion) {
           for (const colo of coloInfo) {
             if (colo.cfRegionDO)
@@ -319,7 +318,7 @@ export default {
         }
       }
       else {
-      results.results = coloInfo;
+        results.results = coloInfo;
       }
       if (noMeta == false) {
         var getMeta = await env.DB.prepare(
@@ -330,10 +329,11 @@ export default {
           results.meta[result.Key] = result.Value;
         }
       }
-      var newResponse = new Response(JSON.stringify(results), { status: 200, headers: { "Content-Type": "application/json"} });
+      var newResponse = new Response(JSON.stringify(results), { status: 200, headers: { "Content-Type": "application/json" } });
       newResponse.headers.append('Cache-Control', 'public, max-age=600, immutable');
       ctx.waitUntil(caches.default.put(newUrlMatch, newResponse.clone()));
       return newResponse;
     }
+    return new Response("Found nothing", { status: 404})
   },
 };
