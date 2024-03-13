@@ -23,6 +23,7 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
         public DbSet<LocationData> LocationData { get; set; }
 
         public DbSet<ColoData> ColoData { get; set; }
+        public DbSet<MetalData> MetalData { get; set; }
 
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -55,6 +56,9 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
 
             modelBuilder.Entity<ColoData>().ToTable("ColoData");
             modelBuilder.Entity<ColoData>().HasKey(job => job.ColoId);
+
+            modelBuilder.Entity<MetalData>().ToTable("MetalData");
+            modelBuilder.Entity<MetalData>().HasKey(metal => new { metal.ColoId, metal.MachineID});
 
         }
 

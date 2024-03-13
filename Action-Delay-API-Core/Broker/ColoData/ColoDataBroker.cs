@@ -26,19 +26,18 @@ namespace Action_Delay_API_Core.Broker.ColoData
         {
             _logger = logger;
             _httpClient = httpClient;
-            _httpClient.BaseAddress = new Uri("https://colo.cloudflare.chaika.me/?nometa");
             _httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
         }
 
-        public async Task<Result<ColoApiData>> GetColoData(CancellationToken token)
+        public async Task<Result<ColoApiData?>> GetColoData(CancellationToken token)
         {
             HttpResponseMessage httpResponse = null;
             try
             {
-                var request = new HttpRequestMessage(HttpMethod.Get, "/");
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://colo.cloudflare.chaika.me/?nometa");
                 request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
-                httpResponse = await _httpClient.SendAsync(request);
-                var rawString = await httpResponse.Content.ReadAsStringAsync();
+                httpResponse = await _httpClient.SendAsync(request, token);
+                var rawString = await httpResponse.Content.ReadAsStringAsync(token);
 
 
                 if (string.IsNullOrWhiteSpace(rawString))
@@ -48,7 +47,7 @@ namespace Action_Delay_API_Core.Broker.ColoData
                     return Result.Fail(new CustomAPIError($"Could not get response colos from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null));
                 }
 
-                ColoApiData response = null;
+                ColoApiData? response = null;
                 try
                 {
                     response = JsonSerializer.Deserialize<ColoApiData>(rawString);
@@ -74,6 +73,53 @@ namespace Action_Delay_API_Core.Broker.ColoData
             {
                 _logger.LogCritical(ex, $"Get Colos Unexpected Error: API Returned: {httpResponse?.StatusCode}");
                 return Result.Fail(new CustomAPIError($"Get Colos Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", null));
+
+            }
+        }
+        public async Task<Result<MetalAPIData[]?>> GetMetalData(CancellationToken token)
+        {
+            HttpResponseMessage httpResponse = null;
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://metal.cloudflare.chaika.me/data");
+                request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+                httpResponse = await _httpClient.SendAsync(request, token);
+                var rawString = await httpResponse.Content.ReadAsStringAsync(token);
+
+
+                if (string.IsNullOrWhiteSpace(rawString))
+                {
+                    _logger.LogCritical(
+                        $"Could not get response metal from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
+                    return Result.Fail(new CustomAPIError($"Could not get response metal from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null));
+                }
+
+                MetalAPIData[]? response = null;
+                try
+                {
+                    response = JsonSerializer.Deserialize<MetalAPIData[]>(rawString);
+                }
+                catch (Exception ex)
+                {
+                    // Better messages for Deserialization errors
+                    _logger.LogCritical(ex, "metal api: Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
+                        rawString.Truncate(25));
+                    return Result.Fail(new CustomAPIError(
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.Truncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.Truncate(25)}", "", null));
+                }
+
+                return response;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogCritical(ex, $"Get metal Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
+                return Result.Fail(new CustomAPIError($"Get metal Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", null));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, $"Get metal Unexpected Error: API Returned: {httpResponse?.StatusCode}");
+                return Result.Fail(new CustomAPIError($"Get metal Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", null));
 
             }
         }

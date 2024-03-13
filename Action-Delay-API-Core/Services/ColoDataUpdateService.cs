@@ -43,12 +43,21 @@ namespace Action_Delay_API_Core.Services
         {
             try
             {
-                await TryUpdateLocalDB();
+                await TryUpdateColoLocalDB();
                 _logger.LogInformation("Successfully updated local colos DB");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating local colo data db");
+            }
+            try
+            {
+                await TryUpdateMetalLocalDB();
+                _logger.LogInformation("Successfully updated local metals DB");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating local metal data db");
             }
             var getAllCurrentColos = await _context.ColoData.ToListAsync();
             var getCurrentLocationData = await _context.LocationData.ToListAsync();
@@ -165,7 +174,7 @@ namespace Action_Delay_API_Core.Services
             return _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
         }
 
-        public async Task TryUpdateLocalDB()
+        public async Task TryUpdateColoLocalDB()
         {
             var getData = await _coloData.GetColoData(CancellationToken.None);
             if (getData.IsFailed)
@@ -192,6 +201,43 @@ namespace Action_Delay_API_Core.Services
                     getExistingColoData.Update(coloData);
                 }
             }
+            await _context.SaveChangesAsync();
+
+        }
+        public async Task TryUpdateMetalLocalDB()
+        {
+            var getData = await _coloData.GetMetalData(CancellationToken.None);
+            if (getData.IsFailed)
+            {
+                _logger.LogInformation($"Failed to get metal data, {getData.Errors.FirstOrDefault()?.ToString()}");
+                return;
+            }
+
+            var getMetalData = getData.Value;
+
+            var getAllCurrentMetals = await _context.MetalData.ToListAsync();
+
+            foreach (var metalApiData in getMetalData)
+            {
+                if (metalApiData.Machines != null)
+                {
+                    foreach (var machine in metalApiData.Machines)
+                    {
+                        var getExistingMetalData = getAllCurrentMetals.FirstOrDefault(metal =>
+                            metal.MachineID == machine.MachineId && metal.ColoId == metalApiData.ColoId);
+                        if (getExistingMetalData == null)
+                        {
+                            var newInstance = new MetalData(machine, metalApiData.ColoId);
+                            _context.MetalData.Add(newInstance);
+                        }
+                        else
+                        {
+                            getExistingMetalData.Update(machine, metalApiData.ColoId);
+                        }
+                    }
+                }
+            }
+
             await _context.SaveChangesAsync();
 
         }
