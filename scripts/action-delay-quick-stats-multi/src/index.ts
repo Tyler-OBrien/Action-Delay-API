@@ -58,12 +58,37 @@ const HTML = `
 /* Embedded CSS */
 body {
     display: flex;
+    flex-direction: column;  /* Adjust the direction to column */
     align-items: center;
     justify-content: center;
     min-height: 100vh;
     margin: 0;
     background: #f0f0f0;
     font-family: Arial, sans-serif;
+    padding: 0;
+}
+
+.header-container {
+    text-align: center;
+    margin: 0;
+    padding: 2em;
+    max-width: 90vw;
+    border-radius: 0.5em;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+    background-color: #fff; /* Adjust color according to your need */
+}
+
+.main-header {
+    font-size: 2.5em;
+    font-weight: bold;
+    margin-bottom: 0.5em; 
+}
+
+.sub-header-text {
+    font-size: 1.2em; 
+    line-height: 1.6;
+    color: #555; 
+    margin: 0 auto;
 }
 .card {
     max-width: 90vw;
@@ -159,6 +184,16 @@ a:active {
 </style>
 </head>
 <body>
+<div class="header-container">
+<h1 class="main-header"> <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Action Delay Tracker</a></h1>
+<p class="sub-header-text">
+    We do each action once a minute using the CF API. For example, 
+    updating a DNS Record, or updating a Worker. <br> Then from ~22 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
+    we make requests until we see the change. <br> When 
+    half of those locations see the change, we consider the change propagated 
+    and the job complete. 
+</p>
+</div>
 <div class="cards" id="grid-container">
 ${jobs.map(job => 
 `<div class="card" id="card${job.short}">
