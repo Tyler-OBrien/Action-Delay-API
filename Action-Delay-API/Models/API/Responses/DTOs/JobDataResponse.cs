@@ -2,9 +2,29 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using Swashbuckle.AspNetCore.Filters;
 
 namespace Action_Delay_API.Models.API.Responses.DTOs
 {
+
+    public class JobDataResponseExample : IExamplesProvider<DataResponse<JobDataResponse>>
+    {
+        public DataResponse<JobDataResponse> GetExamples()
+        {
+            return new DataResponse<JobDataResponse>(
+                new JobDataResponse()
+                {
+                   JobName = "DNS Delay Job",
+                   CurrentRunLengthMs = 5000,
+                   CurrentRunStatus = "Undeployed",
+                   CurrentRunTime = DateTime.UtcNow,
+                   LastRunLengthMs = 50,
+                   LastRunStatus = "Deployed",
+                   LastRunTime = DateTime.UtcNow - TimeSpan.FromMinutes(2),
+                }
+            );
+        }
+    }
     public class JobDataResponse
     {
         [JsonPropertyName("jobName")]

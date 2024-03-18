@@ -12,9 +12,12 @@ using System.Diagnostics;
 using System.Reflection;
 using Action_Delay_API.Models.API.Local;
 using Action_Delay_API.Models.Services;
+using Action_Delay_API.Models.Services.v2;
 using Action_Delay_API.Services;
+using Action_Delay_API.Services.v2;
 using Microsoft.OpenApi.Models;
 using Sentry.Extensibility;
+using Swashbuckle.AspNetCore.Filters;
 
 namespace Action_Delay_API;
 
@@ -102,11 +105,13 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {
+            options.ExampleFilters();
             options.AddServer(new OpenApiServer()
             {
                 Url = "https://delay.cloudflare.chaika.me"
             });
         });
+        builder.Services.AddSwaggerExamplesFromAssemblies(Assembly.GetEntryAssembly());
 
 
         builder.WebHost.UseKestrel(options => { options.AddServerHeader = false;  });
@@ -119,6 +124,12 @@ public class Program
         builder.Services.AddScoped<IClickHouseService, ClickHouseService>();
         builder.Services.AddScoped<ICompatibleJobAnalyticsService, CompatibleJobAnalyticsService>();
         builder.Services.AddScoped<IQuickAPIService, QuickAPIService>();
+        builder.Services.AddSingleton<ICacheSingletonService, CacheSingletonService>();
+        builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+        builder.Services.AddScoped<IColoDataService, ColoDataService>();
+        builder.Services.AddScoped<IJobDataService, JobDataService>();
+        builder.Services.AddScoped<ILocationDataService, LocationDataService>();
+
 
         builder.Services.AddScoped<JSONErrorMiddleware>();
         builder.Services.Configure<ApiBehaviorOptions>(options =>
