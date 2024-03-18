@@ -263,11 +263,12 @@ return hours.toFixed(2) + ' hour(s)';
 }
 
 async function FetchCurrentInfo() {
+    const currentInfoResponse = await fetch('https://delay.cloudflare.chaika.me/v2/jobs');
+    const getAllJobs = await currentInfoResponse.json();
 for (let job of jobs)
 try
 {
-const currentInfoResponse = await fetch('/currentinfo/' + job.internalName);
-const currentInfoData = await currentInfoResponse.json();
+    var currentInfoData = getAllJobs.data.find(info => info.jobName.toUpperCase() == job.internalName.toUpperCase());
 
 let delay = document.getElementById('delay' + job.short);
 let pending = document.getElementById('pending' + job.short);
@@ -309,8 +310,8 @@ console.error(\`Fetch failed: \${error}\`);
 async function FetchQuickAnalytics() {
 for (let job of jobs)
 try {
-const quickAnalyticsResponse = await fetch('/quickanalytics/' + job.internalName);
-const quickAnalyticsData = await quickAnalyticsResponse.json();
+    const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + job.internalName);
+    const quickAnalyticsData = await quickAnalyticsResponse.json();
 
 // Parsing quickanalytics and updating the HTML
 let peakPeriod, dailyMedian, monthlyMedian, quarterlyMedian;
@@ -356,23 +357,7 @@ FetchQuickAnalytics();
 export default {
 	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		var newUrl = new URL(req.url);
-		if (newUrl.pathname.startsWith("/currentinfo")) {
-            var getName = newUrl.pathname.replace("/currentinfo/", "").replaceAll("%20", " ");
-            if (jobs.some(job => job.internalName == getName) == false) {
-                return new Response(`${getName} isn't a valid job name you can use. Pls no abuse api :( )`, { status: 500})
-            }
-            
-			return fetch("https://delay.cloudflare.chaika.me/v1/quick/CurrentInfo/" + getName )
-		}
-		if (newUrl.pathname.startsWith("/quickanalytics")) {
-
-            var getName = newUrl.pathname.replace("/quickanalytics/", "").replaceAll("%20", " ");
-            if (jobs.some(job => job.internalName == getName) == false) {
-                return new Response(`${getName} isn't a valid job name you can use. Pls no abuse api :( )`, { status: 500})
-            }
-			return fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/" + getName)
-		}
-		else if (newUrl.pathname == "/") {
+		if (newUrl.pathname == "/") {
 		return new Response(HTML, { headers: {"Content-Type": "text/html"}});
 		}
 		return new Response("There's nothing here friend", { status: 404})

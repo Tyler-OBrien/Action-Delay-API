@@ -46,13 +46,7 @@ export default {
 		}
 		
 
-		if (newUrl.pathname == "/currentinfo") {
-			return fetch("https://delay.cloudflare.chaika.me/v1/quick/CurrentInfo/" + internalName)
-		}
-		if (newUrl.pathname == "/quickanalytics") {
-			return fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/" + internalName)
-		}
-		else if (newUrl.pathname == "/") {
+		if (newUrl.pathname == "/") {
 		let HTML = `
 		<!DOCTYPE html>
 <html lang="en">
@@ -170,7 +164,7 @@ function formatTime(ms) {
 }
 
 async function FetchCurrentInfo() {
-    const currentInfoResponse = await fetch('/currentinfo');
+    const currentInfoResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/CurrentInfo/${internalName}');
         const currentInfoData = await currentInfoResponse.json();
 
         let delay = document.getElementById('delay');
@@ -209,7 +203,7 @@ async function FetchCurrentInfo() {
 
 async function FetchQuickAnalytics() {
     try {
-const quickAnalyticsResponse = await fetch('/quickanalytics');
+const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/${internalName}');
 const quickAnalyticsData = await quickAnalyticsResponse.json();
 
 // Parsing quickanalytics and updating the HTML
