@@ -13,6 +13,7 @@ import { GetCFSpeed, SpeedLocations } from './speedcloudflare';
 
 export interface Env {
   TOKEN: string;
+  CRONAPIKEY: string;
   DB: D1Database;
   DB2: D1Database;
 }
