@@ -1,14 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-using System.Xml.Linq;
-using Action_Delay_API_Core.Broker.ColoData;
+﻿using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Models.Database.Postgres;
-using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Requests;
@@ -16,6 +7,7 @@ using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Models.Services;
 using FluentResults;
 using Microsoft.EntityFrameworkCore;
+using System.Net;
 
 namespace Action_Delay_API_Core.Services
 {
@@ -90,7 +82,7 @@ namespace Action_Delay_API_Core.Services
 
                    tryGetCurrentLocationData.ColoId = tryGetColoId.Value;
                    tryGetCurrentLocationData.IATA = tryGetColoInfo.IATA;
-                   tryGetCurrentLocationData.FriendlyLocationName = tryGetColoInfo.FriendlyName;
+                   tryGetCurrentLocationData.ColoFriendlyLocationName = tryGetColoInfo.FriendlyName;
                    tryGetCurrentLocationData.ColoLatitude = tryGetColoInfo.Latitude;
                    tryGetCurrentLocationData.ColoLongitude = tryGetColoInfo.Longitude;
                    tryGetCurrentLocationData.Enabled = !location.Disabled;

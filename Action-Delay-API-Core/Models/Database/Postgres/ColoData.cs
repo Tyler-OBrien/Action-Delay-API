@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.API.ColoAPI;
 
@@ -24,6 +25,8 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             this.Country = apiData.Country ?? string.Empty;
             this.Latitude = apiData.Lat ?? 0;
             this.Longitude = apiData.Long ?? 0;
+            this.CfRegionDo = apiData.CfRegionDo;
+            this.CfRegionLb = apiData.CfRegionLb;
         }
 
         public void Update(Colo apiData)
@@ -34,6 +37,8 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             this.Country = apiData.Country ?? string.Empty;
             this.Latitude = apiData.Lat ?? 0;
             this.Longitude = apiData.Long ?? 0;
+            this.CfRegionDo = apiData.CfRegionDo;
+            this.CfRegionLb = apiData.CfRegionLb;
         }
         
         [Required]
@@ -51,6 +56,10 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
         public double Latitude { get; set; }
 
         public double Longitude { get; set; }
+
+        public string? CfRegionLb { get; set; }
+
+        public string? CfRegionDo { get; set; }
 
     }
 }
