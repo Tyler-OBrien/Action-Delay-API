@@ -17,9 +17,20 @@ public class LocationData
 
     public string FriendlyLocationName { get; set; }
 
+    public string Provider { get; set; }
+
+    public int ASN { get; set; }
+
+    public double CfLatency { get; set; }
+
+    // either IX, Peering, or Transit
+    public string PathToCF { get; set; }
+
     public double LocationLatitude { get; set; }
 
     public double LocationLongitude { get; set; }
+
+    public string ColoFriendlyLocationName { get; set; }
 
     public int ColoId { get; set; }
 
@@ -33,4 +44,6 @@ public class LocationData
     public double ColoLatitude { get; set; }
 
     public double ColoLongitude { get; set; }
+
+    
 }
