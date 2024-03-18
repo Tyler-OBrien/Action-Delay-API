@@ -1,7 +1,7 @@
 Collection of Scripts used to glue everything together
 
 
-Action-Delay-API-Durable-Object-Proxy is a auth required Durable Object HTTP Request Proxy. We generate one DO per location. The idea is to have some colo-affinity for things like checking if cache clearing worked. It's currently only used by the Purge Cache Job.
+Action-Delay-API-Durable-Object-Proxy is a auth required Durable Object HTTP Request Proxy. We generate one DO per location. The idea is to have some colo-affinity for things like checking if cache clearing worked. It was used by the Purge Cache Job.
 
 
 You just need to define the secret `APIKEY` to be passed in a header, then the path is used as a Durable Object Name (ex I use locations), and the `url` query param is set for the URL you want to use. 
