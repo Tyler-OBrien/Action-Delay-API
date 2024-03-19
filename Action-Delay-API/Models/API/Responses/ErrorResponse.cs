@@ -1,11 +1,45 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 using System.Text.Json.Serialization;
+using Action_Delay_API.Models.API.Responses.DTOs;
 using FluentResults;
+using Swashbuckle.AspNetCore.Filters;
 
 namespace Action_Delay_API.Models.API.Responses;
 
+public class ErrorResponseExample404 : IExamplesProvider<ErrorResponse>
+{
+    public ErrorResponse GetExamples()
+    {
+        return (new ErrorResponse(404,
+            "Could not find job", "job_not_found"));
+    }
+}
 
+public class ErrorResponseExample500 : IExamplesProvider<ErrorResponse>
+{
+    public ErrorResponse GetExamples()
+    {
+        return (new ErrorResponse(500,
+            "Internal server error", "internal_server_error"));
+    }
+}
+public class ErrorResponseExample405 : IExamplesProvider<ErrorResponse>
+{
+    public ErrorResponse GetExamples()
+    {
+        return (new ErrorResponse(405,
+            "Method not allowed: (PUT: /v/yourpath)", "method_not_allowed"));
+    }
+}
+public class ErrorResponseExample429 : IExamplesProvider<ErrorResponse>
+{
+    public ErrorResponse GetExamples()
+    {
+        return (new ErrorResponse(429,
+            "Rate limiting: Try again in a bit. Slow down", "rate_limit_hit"));
+    }
+}
 public class ErrorResponse : IError, IResponse
 {
     private ErrorResponse()

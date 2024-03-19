@@ -14,13 +14,8 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace Action_Delay_API.Controllers;
 
 [Route("v1/compat")]
-[ApiController]
-[SwaggerResponse(400, Type = typeof(ErrorResponseDetails<object>), Description = "On request failure, an object will be returned indicating what part of your request is invalid. Optionally includes details object of type BadRequestObjectResult.")]
-[SwaggerResponse(404, Type = typeof(ErrorResponse), Description = "On invalid route, an object will be returned indicating the invalid route.")]
-[SwaggerResponse(500, Type = typeof(ErrorResponse), Description = "On an internal server error, an object will be returned indicating the server error.")]
-[SwaggerResponse(405, Type = typeof(ErrorResponse), Description = "On an invalid request method,  an object will be returned indicating the wrong request method.")]
-[SwaggerResponse(429, Type = typeof(ErrorResponse), Description = "On hitting a rate limit, a rate limit response will be returned.")]
-public class CompatibleJobAnalyticsController : ControllerBase
+[ApiExplorerSettings(IgnoreApi = true)]
+public class CompatibleJobAnalyticsController : CustomBaseController
 {
 
     private readonly ILogger _logger;
@@ -29,7 +24,7 @@ public class CompatibleJobAnalyticsController : ControllerBase
 
 
     public CompatibleJobAnalyticsController(ICompatibleJobAnalyticsService compatibleJobAnalyticsService, 
-        ILogger<CacheJobController> logger)
+        ILogger<CompatibleJobAnalyticsController> logger)
     {
         _logger = logger;
         _compatibleJobAnalyticsService = compatibleJobAnalyticsService;
