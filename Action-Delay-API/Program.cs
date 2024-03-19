@@ -102,16 +102,19 @@ public class Program
         });
 
         // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle  
+
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {
             options.ExampleFilters();
+            options.OperationFilter<AddResponseHeadersFilter>();
             options.AddServer(new OpenApiServer()
             {
                 Url = "https://delay.cloudflare.chaika.me"
             });
+
         });
-        builder.Services.AddSwaggerExamplesFromAssemblies(Assembly.GetEntryAssembly());
+        builder.Services.AddSwaggerExamplesFromAssemblyOf(typeof(Program));
 
 
         builder.WebHost.UseKestrel(options => { options.AddServerHeader = false;  });
@@ -124,7 +127,7 @@ public class Program
         builder.Services.AddScoped<IClickHouseService, ClickHouseService>();
         builder.Services.AddScoped<ICompatibleJobAnalyticsService, CompatibleJobAnalyticsService>();
         builder.Services.AddScoped<IQuickAPIService, QuickAPIService>();
-        builder.Services.AddSingleton<ICacheSingletonService, CacheSingletonService>();
+        builder.Services.AddScoped<ICacheSingletonService, CacheSingletonService>();
         builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
         builder.Services.AddScoped<IColoDataService, ColoDataService>();
         builder.Services.AddScoped<IJobDataService, JobDataService>();
