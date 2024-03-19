@@ -1,4 +1,4 @@
-using System.Reflection.Metadata.Ecma335;
+﻿using System.Reflection.Metadata.Ecma335;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Errors;
 using Sentry;
 using Exception = System.Exception;
+using System.Diagnostics;
 
 namespace Action_Delay_API_Core.Models.Jobs
 {
@@ -388,8 +389,10 @@ namespace Action_Delay_API_Core.Models.Jobs
                 while (true)
                 {
                     if (token.IsCancellationRequested) throw new OperationCanceledException();
+                    var timer = Stopwatch.StartNew();
                     // Send a request and get a response
                     var response = await RunLocation(location, token);
+                    var elapsedTimeRunning = timer.Elapsed;
                     if (token.IsCancellationRequested) throw new OperationCanceledException();
 
                     this.RunningLocationsData[location].ResponseTimeUtc = response.ResponseTimeMs;
@@ -434,7 +437,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     {
                         this.JobData.CurrentRunLengthMs =
                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                        _logger.LogInformation($"{Name} Run Still {this.JobData.CurrentRunStatus}, updating time, new time: {this.JobData.CurrentRunLengthMs}");
+                        _logger.LogInformation($"{Name} Run Still {this.JobData.CurrentRunStatus}, updating time, new time: {this.JobData.CurrentRunLengthMs}. took {elapsedTimeRunning.TotalMilliseconds}ms to check.");
                     }
 
                     if (response.Done == false)
@@ -442,8 +445,9 @@ namespace Action_Delay_API_Core.Models.Jobs
                         this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_UNDEPLOYED;
                         _ = TrySave();
                         // Use a backoff strategy for the delay between retries
-                        var delay = CalculateBackoff((DateTime.UtcNow - utcStart).TotalSeconds);
-                        await Task.Delay(delay, token);
+                        var delay = CalculateBackoff((DateTime.UtcNow - utcStart).TotalSeconds) - elapsedTimeRunning;
+                        if (delay.TotalMilliseconds > 0)
+                            await Task.Delay(delay, token);
                     }
                     else
                     {
