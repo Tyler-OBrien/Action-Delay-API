@@ -15,6 +15,9 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string Name => "DNS Delay Job Free";
 
+        public override string InternalName => "dnsfree";
+
+
         public override int TargetExecutionSecond => 55;
 
     }

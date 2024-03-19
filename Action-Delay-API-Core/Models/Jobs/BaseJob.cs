@@ -1,4 +1,4 @@
-﻿using System.Reflection.Metadata.Ecma335;
+using System.Reflection.Metadata.Ecma335;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
@@ -53,6 +53,9 @@ namespace Action_Delay_API_Core.Models.Jobs
 
 
         public abstract string Name { get; }
+
+        public abstract string InternalName { get; }
+
 
         public abstract int TargetExecutionSecond { get; }
 
@@ -119,7 +122,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                 {
                     var newJobData = new JobData()
                     {
-                        JobName = Name
+                        JobName = Name,
+                        InternalJobName = InternalName,
                     };
                      _dbContext.JobData.Add(newJobData);
                      await TrySave(true);
@@ -145,6 +149,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                         var newLocation = new JobDataLocation()
                         {
                             JobName = Name,
+                            InternalJobName = InternalName,
                             LocationName = location.Name,
                         };
                        _dbContext.JobLocations.Add(newLocation);

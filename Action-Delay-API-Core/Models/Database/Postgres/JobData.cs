@@ -1,14 +1,19 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres;
 
+[Index(nameof(InternalJobName))]
 public class JobData
 {
     [Required]
     [Key]
     public string JobName { get; set; }
+
+    public string InternalJobName { get; set; }
 
     public DateTime? LastRunTime { get; set; }
 
@@ -40,9 +45,12 @@ public class JobData
 
 }
 
+[Index(nameof(InternalJobName))]
 public class JobDataLocation
 {
     public string JobName { get; set; }
+
+    public string InternalJobName { get; set; }
 
     public string LocationName { get; set; }
 

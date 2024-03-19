@@ -40,6 +40,8 @@ namespace Action_Delay_API_Core.Jobs
 
         public override int TargetExecutionSecond => 10;
         public override string Name => "DNS Delay Job";
+        public override string InternalName => "dns";
+
 
 
         public override async Task HandleCompletion()

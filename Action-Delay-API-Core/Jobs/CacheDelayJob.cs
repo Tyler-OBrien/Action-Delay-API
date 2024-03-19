@@ -41,6 +41,9 @@ namespace Action_Delay_API_Core.Jobs
 
 
         public override string Name => "Single URL Purge Delay Job";
+
+        public override string InternalName => "purge";
+
         public override int TargetExecutionSecond => 40;
 
 

@@ -1,15 +1,15 @@
-﻿namespace Action_Delay_API.Models.Services.v2
+﻿using Action_Delay_API_Core.Models.Database.Postgres;
+
+namespace Action_Delay_API.Models.Services.v2
 {
     public interface ICacheSingletonService
     {
-        public void CacheJobNames(IEnumerable<string> jobName);
+        public void CacheJobNames(List<JobData> jobs);
 
-        public Task<HashSet<string>> GetJobNames(CancellationToken token);
         public void CacheLocationNames(IEnumerable<string> locationNames);
 
-        public  Task<HashSet<string>> GetLocationNames(CancellationToken token);
+        public ValueTask<string?> GetInternalJobName(string jobName, CancellationToken token);
 
-        public Task<bool> DoesJobExist(string jobName, CancellationToken token);
-        public Task<bool> DoesLocationExist(string locationName, CancellationToken token);
+        public ValueTask<bool> DoesLocationExist(string locationName, CancellationToken token);
     }
 }

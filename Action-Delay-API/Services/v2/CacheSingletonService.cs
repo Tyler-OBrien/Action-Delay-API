@@ -11,12 +11,13 @@ public class CacheSingletonService : ICacheSingletonService
     public readonly ILogger _logger;
 
 
-    public HashSet<string> JOB_NAMES;
-    public DateTime JOB_NAMES_LAST_CACHE = DateTime.MinValue;
+    public static HashSet<string> INTERNAL_NAMES;
+    public static Dictionary<string, string> PUBLIC_TO_INTERNAL_NAMES;
+    public static DateTime JOB_NAMES_LAST_CACHE = DateTime.MinValue;
 
 
-    public HashSet<string> LOCATION_NAMES;
-    public DateTime LOCATION_NAMES_LAST_CACHE = DateTime.MinValue;
+    public static HashSet<string> LOCATION_NAMES;
+    public static DateTime LOCATION_NAMES_LAST_CACHE = DateTime.MinValue;
 
     public CacheSingletonService(ActionDelayDatabaseContext genericServersContext,
         ILogger<CacheSingletonService> logger)
@@ -25,26 +26,32 @@ public class CacheSingletonService : ICacheSingletonService
         _logger = logger;
     }
 
-    public void CacheJobNames(IEnumerable<string> jobNames)
+    public void CacheJobNames(List<JobData> jobs)
     {
-        Interlocked.Exchange(ref JOB_NAMES, new HashSet<string>(jobNames));
+        Interlocked.Exchange(ref INTERNAL_NAMES, new HashSet<string>(jobs.Select(job => job.InternalJobName)));
+        Interlocked.Exchange(ref PUBLIC_TO_INTERNAL_NAMES, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.JobName, job => job.InternalJobName));
         JOB_NAMES_LAST_CACHE = DateTime.UtcNow;
     }
 
-    public async Task<HashSet<string>> GetJobNames(CancellationToken token)
+    public async ValueTask CacheJobNames(CancellationToken token)
     {
         if ((DateTime.UtcNow - JOB_NAMES_LAST_CACHE).TotalSeconds > 30)
         {
             // new
-            CacheJobNames(await _genericServersContext.JobData.Select(job => job.JobName).ToListAsync(token));
+            CacheJobNames(await _genericServersContext.JobData.ToListAsync(token));
         }
 
-        return JOB_NAMES;
     }
 
-    public async Task<bool> DoesJobExist(string jobName, CancellationToken token)
+    public async ValueTask<string?> GetInternalJobName(string jobName, CancellationToken token)
     {
-        return (await GetJobNames(token)).Contains(jobName);
+        await CacheJobNames(token);
+
+        if (INTERNAL_NAMES.Contains(jobName)) return jobName;
+
+        if (PUBLIC_TO_INTERNAL_NAMES.TryGetValue(jobName, out var internalName)) return internalName;
+        return null;
+
     }
 
     public void CacheLocationNames(IEnumerable<string> locationNames)
@@ -54,7 +61,7 @@ public class CacheSingletonService : ICacheSingletonService
         LOCATION_NAMES_LAST_CACHE = DateTime.UtcNow;
     }
 
-    public async Task<HashSet<string>> GetLocationNames(CancellationToken token)
+    public async ValueTask<HashSet<string>> GetLocationNames(CancellationToken token)
     {
         if ((DateTime.UtcNow - LOCATION_NAMES_LAST_CACHE).TotalSeconds > 30)
         {
@@ -66,7 +73,7 @@ public class CacheSingletonService : ICacheSingletonService
         return LOCATION_NAMES;
     }
 
-    public async Task<bool> DoesLocationExist(string locationName, CancellationToken token)
+    public async ValueTask<bool> DoesLocationExist(string locationName, CancellationToken token)
     {
         return (await GetLocationNames(token)).Contains(locationName);
     }

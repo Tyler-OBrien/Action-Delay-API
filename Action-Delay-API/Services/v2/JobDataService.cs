@@ -32,11 +32,12 @@ public class JobDataService : IJobDataService
 
     public async Task<Result<DataResponse<JobDataResponse>>> GetJob(string jobName, CancellationToken token)
     {
-        if (await _cacheSingletonService.DoesJobExist(jobName, token) == false)
+        var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+        if (tryGetJobInternalName == null)
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
-        var tryGetJob = await _genericServersContext.JobData.FirstOrDefaultAsync(job => job.JobName == jobName, token);
+        var tryGetJob = await _genericServersContext.JobData.FirstOrDefaultAsync(job => job.InternalJobName == tryGetJobInternalName, token);
         if (tryGetJob == null)
         {
             return Result.Fail(new ErrorResponse(404,

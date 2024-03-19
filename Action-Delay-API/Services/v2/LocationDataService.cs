@@ -53,12 +53,14 @@ public class LocationDataService : ILocationDataService
     public async Task<Result<DataResponse<JobLocationDataResponse[]>>> GetLocationJobData(string jobName,
         CancellationToken token)
     {
-        if (await _cacheSingletonService.DoesJobExist(jobName, token) == false)
+        var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+
+        if (tryGetJobInternalName == null)
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
 
-        var getLocations = await _genericServersContext.JobLocations.Where(job => job.JobName == jobName)
+        var getLocations = await _genericServersContext.JobLocations.Where(job => job.InternalJobName == tryGetJobInternalName)
             .ToListAsync(token);
 
         return new DataResponse<JobLocationDataResponse[]>(getLocations
@@ -68,7 +70,9 @@ public class LocationDataService : ILocationDataService
     public async Task<Result<DataResponse<JobLocationDataResponse>>> GetLocationsJobData(string jobName,
         string locationName, CancellationToken token)
     {
-        if (await _cacheSingletonService.DoesJobExist(jobName, token) == false)
+        var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+
+        if (tryGetJobInternalName == null)
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
@@ -78,7 +82,7 @@ public class LocationDataService : ILocationDataService
 
         var tryGetLocation =
             await _genericServersContext.JobLocations.FirstOrDefaultAsync(
-                job => job.JobName == jobName && job.LocationName == locationName, token);
+                job => job.InternalJobName == tryGetJobInternalName && job.LocationName == locationName, token);
         if (tryGetLocation == null)
         {
             return Result.Fail(new ErrorResponse(404,

@@ -39,6 +39,9 @@ namespace Action_Delay_API_Core.Jobs
         public override int TargetExecutionSecond => 50;
         public override string Name => "Custom Rule Block Delay Job";
 
+        public override string InternalName => "waf";
+
+
 
         public override async Task HandleCompletion()
         {
@@ -131,6 +134,21 @@ namespace Action_Delay_API_Core.Jobs
                 }
                 return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.GetColoId());
             }
+        }
+        public override TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
+        {
+            double secondsUntilNextAlarm = totalWaitTimeInSeconds switch
+            {
+                > 1800 => 30,
+                > 600 => 15,
+                > 120 => 10,
+                > 60 => 4,
+                > 30 => 2,
+                > 5 => 1,
+                > 2 => 0.5,
+                _ => 0.1,
+            };
+            return TimeSpan.FromSeconds(secondsUntilNextAlarm);
         }
     }
 }
