@@ -21,27 +21,27 @@ public class ColoDataService : IColoDataService
 
     public async Task<Result<DataResponse<ColoDataAPI[]>>> GetColos(CancellationToken token)
     {
-        return new DataResponse<ColoDataAPI[]>((await _genericServersContext.ColoData.ToListAsync(token))
+        return new DataResponse<ColoDataAPI[]>((await _genericServersContext.ColoData.OrderBy(colo => colo.ColoId).ToListAsync(token))
             .Select(ColoDataAPI.FromDB).ToArray());
     }
 
     public async Task<Result<DataResponse<ColoDataAPISimple[]>>> GetColosByIataList(CancellationToken token)
     {
-        return new DataResponse<ColoDataAPISimple[]>((await _genericServersContext.ColoData.ToListAsync(token))
+        return new DataResponse<ColoDataAPISimple[]>((await _genericServersContext.ColoData.OrderBy(colo => colo.ColoId).ToListAsync(token))
             .Select(ColoDataAPISimple.FromDB).ToArray());
     }
 
 
     public async Task<Result<DataResponse<Dictionary<string, string>>>> GetColosRegionColoName(CancellationToken token)
     {
-        return new DataResponse<Dictionary<string, string>>((await _genericServersContext.ColoData.ToListAsync(token))
-            .ToDictionary(data => data.IATA, data => data.CfRegionDo));
+        return new DataResponse<Dictionary<string, string>>((await _genericServersContext.ColoData.ToListAsync(token)).Where(data => data.CfRegionDo != null && string.IsNullOrWhiteSpace(data.CfRegionDo) == false).DistinctBy(data => data.IATA)
+            .ToDictionary(data => data.IATA, data => data.CfRegionDo!));
     }
 
 
     public async Task<Result<DataResponse<Dictionary<int, string>>>> GetColosRegionID(CancellationToken token)
     {
-        return new DataResponse<Dictionary<int, string>>((await _genericServersContext.ColoData.ToListAsync(token))
-            .ToDictionary(data => data.ColoId, data => data.CfRegionDo));
+        return new DataResponse<Dictionary<int, string>>((await _genericServersContext.ColoData.ToListAsync(token)).Where(data => data.CfRegionDo != null && string.IsNullOrWhiteSpace(data.CfRegionDo) == false).OrderBy(data => data.ColoId)
+            .ToDictionary(data => data.ColoId, data => data.CfRegionDo!));
     }
 }
