@@ -157,6 +157,12 @@ namespace Action_Delay_API_Core.Models.Jobs
                         tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
                            dbLocation.JobName == Name && dbLocation.LocationName == location.Name);
                     }
+                    else
+                    {
+                        tryFindLocation.LastRunStatus = tryFindLocation.CurrentRunStatus;
+                        tryFindLocation.LastRunLengthMs = tryFindLocation.CurrentRunLengthMs;
+                        tryFindLocation.LastRunTime = tryFindLocation.CurrentRunTime;
+                    }
 
                     this.RunningLocationsData[location] = tryFindLocation;
                     tryFindLocation.CurrentRunTime = DateTime.UtcNow;
