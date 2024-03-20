@@ -60,7 +60,8 @@ namespace Action_Delay_API_Core.Models.Jobs
 
         public abstract int TargetExecutionSecond { get; }
 
-        public virtual TimeSpan CancelAfterIfHalfDone => TimeSpan.FromMinutes(15);
+        // Delay for up to 5 minutes once half are done.
+        public virtual TimeSpan CancelAfterIfHalfDone => TimeSpan.FromMinutes(5);
 
         /* Run the Task (DNS or HTTP) Request to get caches warm and such for more consistent results */
         public virtual async Task PreWarmAction()
