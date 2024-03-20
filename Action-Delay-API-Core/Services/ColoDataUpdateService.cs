@@ -72,7 +72,12 @@ namespace Action_Delay_API_Core.Services
                        _logger.LogInformation($"We tried to get {location.Name}, but we couldn't find it, creating new..");
                        tryGetCurrentLocationData = new LocationData();
                        tryGetCurrentLocationData.LocationName = location.Name;
-                       _context.LocationData.Add(tryGetCurrentLocationData);
+                       tryGetCurrentLocationData.FriendlyLocationName = tryGetColoInfo.FriendlyName;
+                       tryGetCurrentLocationData.PathToCF = "Unk";
+                       tryGetCurrentLocationData.ASN = -1;
+                       tryGetCurrentLocationData.Provider = "Unk";
+                       tryGetCurrentLocationData.CfLatency = -1;
+                        _context.LocationData.Add(tryGetCurrentLocationData);
                    }
                    // changed!
                    if (tryGetCurrentLocationData.IATA == null || tryGetCurrentLocationData.IATA.Equals(tryGetColoInfo.IATA, StringComparison.OrdinalIgnoreCase) == false)
