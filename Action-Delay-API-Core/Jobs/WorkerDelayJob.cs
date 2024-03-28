@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -102,17 +102,17 @@ namespace Action_Delay_API_Core.Jobs
             }
             var getResponse = tryGetResult.Value;
 
-            _logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess} - Response UTC: {getResponse.ResponseUTC}");
+            //_logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess} - Response UTC: {getResponse.ResponseUTC}");
 
             if (getResponse.Body.Equals(_generatedValue, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees the change! Let's remove this and move on..");
+                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} see change.");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.GetColoId());
             }
             else
             {
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_generatedValue}! Status Code: {getResponse.StatusCode} Let's try again...");
+                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_generatedValue}! Status Code: {getResponse.StatusCode}");
                 if (getResponse is { WasSuccess: false, ProxyFailure: true })
                 {
                     _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");

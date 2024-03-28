@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -116,7 +116,7 @@ namespace Action_Delay_API_Core.Jobs
             }
             var getResponse = tryGetResult.Value;
 
-            _logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
+            //_logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
 
             if (getResponse.StatusCode == HttpStatusCode.UnsupportedMediaType && getResponse.Body.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {

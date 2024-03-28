@@ -1,4 +1,4 @@
-﻿using System.Reflection.Metadata.Ecma335;
+using System.Reflection.Metadata.Ecma335;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
@@ -260,7 +260,6 @@ namespace Action_Delay_API_Core.Models.Jobs
                                     if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
                                         (_config.Locations.Count(location => location.Disabled == false) / 2))
                                     {
-                                        _logger.LogInformation($"Current Run Status: {this.JobData.CurrentRunStatus}");
                                         _logger.LogInformation(
                                             $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
                                         cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
@@ -438,7 +437,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     {
                         this.JobData.CurrentRunLengthMs =
                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                        _logger.LogInformation($"{Name} Run Still {this.JobData.CurrentRunStatus}, updating time, new time: {this.JobData.CurrentRunLengthMs}. took {elapsedTimeRunning.TotalMilliseconds}ms to check.");
+                        //_logger.LogInformation($"{Name} Run Still {this.JobData.CurrentRunStatus}, updating time, new time: {this.JobData.CurrentRunLengthMs}. took {elapsedTimeRunning.TotalMilliseconds}ms to check.");
                     }
 
                     if (response.Done == false)

@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Models.Jobs;
+using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using FluentResults;
 using Action_Delay_API_Core.Models.NATS.Responses;
@@ -106,17 +106,17 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-            _logger.LogInformation($"{Name}: One DNS Request returned from {location.NATSName} - Success {getResponse.ResponseCode}");
+            //_logger.LogInformation($"{Name}: One DNS Request returned from {location.NATSName} - Success {getResponse.ResponseCode}");
             string tryGetAnswer = getResponse.Answers.FirstOrDefault()?.Value ?? "";
             if (tryGetAnswer.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{Name}: {location.Name} sees the change! Let's remove this and move on..");
+                _logger.LogInformation($"{Name}: {location.Name} sees the change!");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, -1 );
             }
             else
             {
-                _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}! Let's try again...");
+                _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name} sees {tryGetAnswer} instead of {_valueToLookFor}!");
                 return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, -1);
             }
         }
