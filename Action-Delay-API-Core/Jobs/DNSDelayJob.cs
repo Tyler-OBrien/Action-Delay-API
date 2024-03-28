@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Models.Jobs;
+﻿using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using FluentResults;
 using Action_Delay_API_Core.Models.NATS.Responses;
@@ -57,6 +57,11 @@ namespace Action_Delay_API_Core.Jobs
         public  override async Task RunAction()
         {
             _valueToLookFor = $"Are Blobs Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R} - {Name} - Action Delay API {Program.VERSION} {_config.Location}";
+            await RunRepeatableAction();
+        }
+
+        public override async Task RunRepeatableAction()
+        {
             var newUpdateRequest = new UpdateRecordRequest()
             {
                 Comment = "Blame Walshy",
@@ -77,7 +82,6 @@ namespace Action_Delay_API_Core.Jobs
                 return;
             }
             this.JobData.APIResponseTimeUtc = tryPutAPI.Value.ResponseTimeMs;
-
         }
 
         public async Task<Result<SerializableDNSResponse>> SendRequest(Location location, CancellationToken token)

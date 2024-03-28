@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -73,23 +73,28 @@ namespace Action_Delay_API_Core.Jobs
         {
             _valueToLookFor = $"You've been blocked - Last Updated: {DateTime.UtcNow:R} - Action Delay API {Program.VERSION} {_config.Location}";
             _specialPath = DateTime.UtcNow.ToFileTime().ToString();
+            await RunRepeatableAction();
+        }
+
+        public override async Task RunRepeatableAction()
+        {
             var newUpdateRequest = new UpdateCustomRuleRequest.UpdateCustomRuleRequestDTO()
             {
-               Action = "Block",
-               ActionParameters = new UpdateCustomRuleRequest.ActionParameters()
-               {
-                   Response = new UpdateCustomRuleRequest.Response()
-                   {
-                       Content = _valueToLookFor,
-                       StatusCode = 415,
-                       ContentType = "text/html"
-                   }
-               },
-               Description = "Auto updating block me pls rule",
-               Enabled = true,
-               Expression = $"(http.host eq \"{_config.WAFJob.HostName}\" and http.request.uri.path in {{\"/\" \"/{_specialPath}\" \"/hii\"}})",
-               Id = _config.WAFJob.RuleId,
-               Ref = _config.WAFJob.RuleId,
+                Action = "Block",
+                ActionParameters = new UpdateCustomRuleRequest.ActionParameters()
+                {
+                    Response = new UpdateCustomRuleRequest.Response()
+                    {
+                        Content = _valueToLookFor,
+                        StatusCode = 415,
+                        ContentType = "text/html"
+                    }
+                },
+                Description = "Auto updating block me pls rule",
+                Enabled = true,
+                Expression = $"(http.host eq \"{_config.WAFJob.HostName}\" and http.request.uri.path in {{\"/\" \"/{_specialPath}\" \"/hii\"}})",
+                Id = _config.WAFJob.RuleId,
+                Ref = _config.WAFJob.RuleId,
             };
             var tryPutAPI = await _apiBroker.UpdateCustomRule(_config.WAFJob.RuleId, _config.WAFJob.RuleSetId, _config.WAFJob.ZoneId, newUpdateRequest, _config.WAFJob.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)

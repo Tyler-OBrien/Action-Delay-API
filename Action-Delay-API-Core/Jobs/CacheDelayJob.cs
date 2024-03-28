@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
@@ -147,6 +147,11 @@ namespace Action_Delay_API_Core.Jobs
             }
 
 
+            await RunRepeatableAction();
+        }
+
+        public override async Task RunRepeatableAction()
+        {
             var newUpdateRequest = new PurgeCacheByURLRequest()
             {
                 Files = new[]
@@ -164,8 +169,6 @@ namespace Action_Delay_API_Core.Jobs
                 return;
             }
             this.JobData.APIResponseTimeUtc = tryPutAPI.Value.ResponseTimeMs;
-
-
         }
 
         public  Task<Result<SerializableHttpResponse>> SendRequest(Location location, CancellationToken token)

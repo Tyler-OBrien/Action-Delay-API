@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -41,7 +41,11 @@ namespace Action_Delay_API_Core.Jobs
         {
             _logger.LogInformation("Running Delay Job");
             _generatedValue = $"{Guid.NewGuid()}-Cookies-Uploaded At {DateTime.UtcNow.ToString("R")} by Action-Delay-API {Program.VERSION} {_config.Location} ";
+            await RunRepeatableAction();
+        }
 
+        public override async Task RunRepeatableAction()
+        {
             // Appending 'worker.js' field
             string workerJsContent = $@"export default {{
   async fetch(request, env, ctx) {{
@@ -55,8 +59,6 @@ namespace Action_Delay_API_Core.Jobs
                 compatibility_date = "2023-12-17",
                 main_module = "worker.js"
             });
-
-
 
 
             var tryPutAPI = await _apiBroker.UploadWorkerScript(workerJsContent, metadataContent, _config.DelayJob.AccountId,

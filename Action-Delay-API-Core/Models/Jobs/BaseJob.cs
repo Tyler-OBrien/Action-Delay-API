@@ -1,4 +1,4 @@
-using System.Reflection.Metadata.Ecma335;
+﻿using System.Reflection.Metadata.Ecma335;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
@@ -99,6 +99,9 @@ namespace Action_Delay_API_Core.Models.Jobs
 
 
         public abstract Task RunAction();
+        public abstract Task RunRepeatableAction();
+
+        public virtual TimeSpan RepeatActionAfter => TimeSpan.FromMinutes(15);
         public abstract Task<RunLocationResult> RunLocation(Location location, CancellationToken token);
         public abstract Task HandleCompletion();
 
@@ -200,6 +203,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                 SentrySdk.AddBreadcrumb($"Ran Action for {Name}");
 
                 ConfirmedUpdateUtc = DateTime.UtcNow;
+
+                var backgroundRepeatableActionRun = RunRepeatableActionBackground(cancellationTokenSource.Token);
 
                 // Start monitoring on each Location
                 foreach (var location in _config.Locations.Where(location => location.Disabled == false))
@@ -348,6 +353,49 @@ namespace Action_Delay_API_Core.Models.Jobs
             finally
             { 
               // await _queue.DisposeAsync();
+            }
+        }
+
+        public async Task RunRepeatableActionBackground(CancellationToken token)
+        {
+            try
+            {
+                while (token.IsCancellationRequested == false)
+                {
+                    // Execute the action for this Job
+                    try
+                    {
+                        await Task.Delay(RepeatActionAfter, token);
+                        _logger.LogInformation("Running Repeatable Action for {jobName} due to timeSpan over of {timeSpan}", this.Name, RepeatActionAfter);
+                        if (token.IsCancellationRequested) return;
+                        await RunRepeatableAction();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger.LogInformation("Job {jobName} over, stopping RepeatableActionBackground", this.Name);
+                    }
+                    catch (CustomAPIError ex)
+                    {
+                        _logger.LogWarning(ex, "Repeatable Run for {jobName} failed due to API Issues: {err}",
+                            this.Name,
+                            ex.Message);
+
+                    }
+                    catch (Exception exc)
+                    {
+                        _logger.LogWarning(exc, "Repeatable Run for {jobName} failed due to API Issues: {err}",
+                            this.Name, exc.Message);
+                    }
+               
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Job {jobName} over, stopping RepeatableActionBackground", this.Name);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in RunBackgroundAction");
             }
         }
 
