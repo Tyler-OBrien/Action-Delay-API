@@ -124,7 +124,7 @@ namespace Action_Delay_API_Core.Services
 
 
 
-            _logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
+            //_logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
 
             if (getResponse.StatusCode == HttpStatusCode.OK)
             {
