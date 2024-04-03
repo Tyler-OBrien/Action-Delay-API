@@ -1,8 +1,9 @@
-﻿using Action_Delay_API_Core.Models.CloudflareAPI;
+using Action_Delay_API_Core.Models.CloudflareAPI;
 using System.Text.Json;
 using FluentResults;
 using Action_Delay_API_Core.Models.Errors;
 using static Action_Delay_API_Core.Broker.CloudflareAPIBroker;
+using System.Reflection.PortableExecutable;
 
 namespace Action_Delay_API_Core.Extensions
 {
@@ -89,6 +90,7 @@ namespace Action_Delay_API_Core.Extensions
                 }
 
                 response.ResponseTimeMs = listener.GetTime();
+                response.ColoId = httpResponse.GetColoId();
                 return response;
             }
     
@@ -109,6 +111,13 @@ namespace Action_Delay_API_Core.Extensions
             }
 
             return null;
+        }
+        public  static int GetColoId(this HttpResponseMessage msg)
+        {
+            if (msg?.Headers != null && msg.Headers.TryGetValues("colo", out var coloStr) &&
+                int.TryParse(coloStr.FirstOrDefault(), out var coloInt))
+                return coloInt;
+            return -1;
         }
 
         public static async Task<Result<ApiResponse?>> ProcessHttpRequestAsyncNoResponse(
@@ -181,6 +190,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     return Result.Fail(new CustomAPIError($"Response Success did not indicate success but returned no errors, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Non-Success with no errors, response body: {rawString}", "", listener.GetTime()));
                 }
                 response.ResponseTimeMs = listener.GetTime();
+                response.ColoId = httpResponse.GetColoId();
                 return response;
             }
             catch (HttpRequestException ex)

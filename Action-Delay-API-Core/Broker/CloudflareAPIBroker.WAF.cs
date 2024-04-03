@@ -4,6 +4,7 @@ using FluentResults;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
 using static Action_Delay_API_Core.Models.CloudflareAPI.WAF.UpdateCustomRuleResponse;
 using static Action_Delay_API_Core.Models.CloudflareAPI.WAF.UpdateCustomRuleRequest;
+using System.Net.Http.Headers;
 
 namespace Action_Delay_API_Core.Broker
 {
@@ -16,6 +17,7 @@ namespace Action_Delay_API_Core.Broker
                 $"{BasePath}/zones/{zoneId}/rulesets/{ruleSetId}/rules/{ruleId}");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             request.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(newUpdateRequest));
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             var tryPut = await _httpClient.ProcessHttpRequestAsync<UpdateCustomRuleResponseDto>(request, $"Updating Custom Rule",
                 _logger);
             if (tryPut.IsFailed) return FluentResults.Result.Fail(tryPut.Errors);

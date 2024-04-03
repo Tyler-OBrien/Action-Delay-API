@@ -32,6 +32,10 @@ public class JobData
     [JsonIgnore]
     public double? APIResponseTimeUtc { get; set; }
 
+    [NotMapped]
+    [JsonIgnore]
+    public int ColoId { get; set; }
+
     public void Update(JobData data)
     {
         this.LastRunTime = data.LastRunTime;
@@ -41,6 +45,7 @@ public class JobData
         this.CurrentRunLengthMs = data.CurrentRunLengthMs;
         this.CurrentRunStatus = data.CurrentRunStatus;
         this.APIResponseTimeUtc =  data.APIResponseTimeUtc;
+        this.ColoId =  data.ColoId;
     }
 
 }

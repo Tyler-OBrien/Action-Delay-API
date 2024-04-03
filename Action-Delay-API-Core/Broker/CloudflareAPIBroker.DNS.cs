@@ -2,6 +2,7 @@
 using Action_Delay_API_Core.Models.CloudflareAPI;
 using FluentResults;
 using Action_Delay_API_Core.Models.CloudflareAPI.DNS;
+using System.Net.Http.Headers;
 
 namespace Action_Delay_API_Core.Broker
 {
@@ -14,6 +15,7 @@ namespace Action_Delay_API_Core.Broker
                 $"{BasePath}/zones/{zoneId}/dns_records/{recordId}");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             request.Content = new StringContent(System.Text.Json.JsonSerializer.Serialize(newUpdateRequest));
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             var tryPut = await _httpClient.ProcessHttpRequestAsync<UpdateRecordResponse>(request, $"Updating DNS Record",
                 _logger);
             if (tryPut.IsFailed) return Result.Fail(tryPut.Errors);
