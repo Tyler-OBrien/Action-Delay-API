@@ -12,5 +12,7 @@
 
         public string ClickhouseConnectionString { get; set; }
 
+        public string ExternalJobAPIKey { get; set; }
+
     }
 }

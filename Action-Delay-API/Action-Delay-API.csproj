@@ -57,7 +57,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Models\API\Requests\DTOs\" />
     <Folder Include="Models\API\Responses\DTOs\v2\Jobs\" />
   </ItemGroup>
 

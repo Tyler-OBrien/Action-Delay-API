@@ -132,6 +132,7 @@ public class Program
         builder.Services.AddScoped<IColoDataService, ColoDataService>();
         builder.Services.AddScoped<IJobDataService, JobDataService>();
         builder.Services.AddScoped<ILocationDataService, LocationDataService>();
+        builder.Services.AddScoped<IExternalJobService, ExternalJobService>();
 
 
         builder.Services.AddScoped<JSONErrorMiddleware>();

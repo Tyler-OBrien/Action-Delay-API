@@ -1,4 +1,4 @@
-﻿using Action_Delay_API.Extensions;
+using Action_Delay_API.Extensions;
 using Action_Delay_API.Models.API.Responses;
 using Action_Delay_API.Models.API.Responses.DTOs;
 using Action_Delay_API.Models.API.Responses.DTOs.CompatiableJobAnalytics;
