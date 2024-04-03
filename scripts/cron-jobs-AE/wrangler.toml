@@ -1,0 +1,13 @@
+name = "action-delay-api-cron"
+main = "src/index.ts"
+compatibility_date = "2024-03-31"
+
+analytics_engine_datasets = [
+    { binding = "cron" }
+]
+
+
+[triggers]
+crons = ["* * * * *"]
+
+
