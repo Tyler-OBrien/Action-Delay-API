@@ -13,12 +13,9 @@ using Microsoft.Extensions.Options;
 
 namespace Action_Delay_API_Core.Jobs
 {
-    public class WfPJob : IBaseJob
+    public class WfPJob : BasePropagationJob
     {
-        private readonly ICloudflareAPIBroker _apiBroker;
-        private readonly LocalConfig _config;
-        private readonly ILogger _logger;
-        private readonly IQueue _queue;
+
         private string _generatedValue { get; set; }
 
         private string _scriptName { get; set; }
@@ -26,10 +23,6 @@ namespace Action_Delay_API_Core.Jobs
 
         public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
-            _apiBroker = apiBroker;
-            _config = config.Value;
-            _logger = logger;
-            _queue = queue;
         }
 
         public override string Name => "WfP User Script Delay Job";

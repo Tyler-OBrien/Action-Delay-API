@@ -13,22 +13,15 @@ using Action_Delay_API_Core.Models.Errors;
 
 namespace Action_Delay_API_Core.Jobs
 {
-    public class DNSDelayJob : IBaseJob
+    public class DNSDelayJob : BasePropagationJob
     {
 
-        internal readonly ICloudflareAPIBroker _apiBroker;
-        internal readonly LocalConfig _config;
-        internal readonly ILogger _logger;
-        internal readonly IQueue _queue;
+
         internal DNSDelayJobConfig _jobConfig;
         internal string _valueToLookFor;
 
         public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue )
         {
-            _apiBroker = apiBroker;
-            _config = config.Value;
-            _logger = logger;
-            _queue = queue;
             if (_jobConfig == null)
                 _jobConfig = _config.DNSJob;
         }
@@ -56,7 +49,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public  override async Task RunAction()
         {
-            _valueToLookFor = $"Are Blobs Still Breaking Things? Yes - Last Updated: {DateTime.UtcNow:R} - {Name} - Action Delay API {Program.VERSION} {_config.Location}";
+            _valueToLookFor = $"Automagically Updating DNS Record - Last Updated: {DateTime.UtcNow:R} - {Name} - Action Delay API {Program.VERSION} {_config.Location}";
             await RunRepeatableAction();
         }
 

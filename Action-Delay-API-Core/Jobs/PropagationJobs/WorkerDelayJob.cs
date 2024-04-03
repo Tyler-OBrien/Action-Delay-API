@@ -13,21 +13,13 @@ using Microsoft.Extensions.Options;
 
 namespace Action_Delay_API_Core.Jobs
 {
-    public class WorkerDelayJob : IBaseJob
+    public class WorkerDelayJob : BasePropagationJob
     {
-        private readonly ICloudflareAPIBroker _apiBroker;
-        private readonly LocalConfig _config;
-        private readonly ILogger _logger;
-        private readonly IQueue _queue;
         private string _generatedValue { get; set; }
         public override int TargetExecutionSecond => 30;
 
         public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
-            _apiBroker = apiBroker;
-            _config = config.Value;
-            _logger = logger;
-            _queue = queue;
         }
 
         public override string Name => "Worker Script Delay Job";

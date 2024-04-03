@@ -15,25 +15,15 @@ using Action_Delay_API_Core.Models.Errors;
 
 namespace Action_Delay_API_Core.Jobs
 {
-    public class CacheDelayJob : IBaseJob
+    public class CacheDelayJob : BasePropagationJob
     {
 
-        private readonly ICloudflareAPIBroker _apiBroker;
-        private readonly LocalConfig _config;
-        private readonly ILogger _logger;
-        private readonly IQueue _queue;
-        private readonly ActionDelayDatabaseContext _dbContext;
         private string _valueToLookFor;
 
 
 
         public CacheDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CacheDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
-            _apiBroker = apiBroker;
-            _config = config.Value;
-            _logger = logger;
-            _queue = queue;
-            _dbContext = dbContext;
         }
 
 

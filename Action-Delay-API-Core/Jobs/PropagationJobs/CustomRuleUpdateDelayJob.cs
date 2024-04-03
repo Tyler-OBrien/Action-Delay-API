@@ -14,22 +14,15 @@ using Microsoft.Extensions.Options;
 
 namespace Action_Delay_API_Core.Jobs
 {
-    public class CustomRuleUpdateDelayJob : IBaseJob
+    public class CustomRuleUpdateDelayJob : BasePropagationJob
     {
 
-        private readonly ICloudflareAPIBroker _apiBroker;
-        private readonly LocalConfig _config;
-        private readonly ILogger _logger;
-        private readonly IQueue _queue;
+ 
         private string _valueToLookFor;
         private string _specialPath;
 
         public CustomRuleUpdateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CustomRuleUpdateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
-            _apiBroker = apiBroker;
-            _config = config.Value;
-            _logger = logger;
-            _queue = queue;
         }
 
 

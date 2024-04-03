@@ -25,7 +25,7 @@ namespace Action_Delay_API_Core
             var jobs =
                 Assembly.GetExecutingAssembly()
                     .GetExportedTypes()
-                    .Where(x => typeof(IBaseJob).IsAssignableFrom(x) && x.GetConstructors().Any());
+                    .Where(x => typeof(BaseJob).IsAssignableFrom(x) && x.GetConstructors().Any());
             foreach (var job in jobs)
             {
              _logger.LogInformation($"Found the {job.Name} job...");   
@@ -88,7 +88,7 @@ namespace Action_Delay_API_Core
                     if (memoryJob.NextExecutionTime == null)
                     {
                         using var jobScope = _scopeFactory.CreateScope();
-                        var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as IBaseJob;
+                        var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as BaseJob;
 
                         var currentDateTime = DateTime.UtcNow;
                         var targetDateTime = new DateTime(currentDateTime.Year, currentDateTime.Month, currentDateTime.Day,
@@ -107,7 +107,7 @@ namespace Action_Delay_API_Core
                         (DateTime.UtcNow >= memoryJob.NextExecutionTime))
                     {
                         var jobScope = _scopeFactory.CreateScope();
-                        var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as IBaseJob;
+                        var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as BaseJob;
 
 
 
@@ -141,7 +141,7 @@ namespace Action_Delay_API_Core
         }
 
 
-        private async Task RunJobAsync(IBaseJob job, MemoryJob memoryJob)
+        private async Task RunJobAsync(BaseJob job, MemoryJob memoryJob)
         {
             try
             {

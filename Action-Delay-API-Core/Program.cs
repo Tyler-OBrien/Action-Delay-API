@@ -137,7 +137,7 @@ public class Program
                 var jobs =
                     Assembly.GetExecutingAssembly()
                         .GetExportedTypes()
-                        .Where(x => typeof(IBaseJob).IsAssignableFrom(x) && x.GetConstructors().Any()).ToArray();
+                        .Where(x => typeof(BaseJob).IsAssignableFrom(x) && x.GetConstructors().Any()).ToArray();
 
                 foreach (var job in jobs)
                 {
