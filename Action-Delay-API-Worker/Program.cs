@@ -85,7 +85,9 @@ namespace Action_Deplay_API_Worker
                             {
                                 PooledConnectionLifetime = TimeSpan.FromMinutes(15),
                                 ConnectCallback = ConnectCallBackTask,
-                                EnableMultipleHttp2Connections = true
+                                EnableMultipleHttp2Connections = true,
+                                AllowAutoRedirect = false,
+                                MaxConnectionsPerServer = Int32.MaxValue,
                             };
                         });
 
@@ -102,7 +104,9 @@ namespace Action_Deplay_API_Worker
                             {
                                 PooledConnectionLifetime = TimeSpan.FromTicks(1),
                                 ConnectCallback = ConnectCallBackTask,
-                                EnableMultipleHttp2Connections = true
+                                EnableMultipleHttp2Connections = true,
+                                AllowAutoRedirect = false,
+                                MaxConnectionsPerServer =  Int32.MaxValue,
                             };
                         });
 
@@ -122,7 +126,6 @@ namespace Action_Deplay_API_Worker
         public static async ValueTask<Stream> ConnectCallBackTask(SocketsHttpConnectionContext context,
             CancellationToken cancellationToken)
         {
-
             IPHostEntry entry = null;
             if (context.InitialRequestMessage.Options.TryGetValue(new HttpRequestOptionsKey<NetType>("IPVersion"),
                     out var version) &&
