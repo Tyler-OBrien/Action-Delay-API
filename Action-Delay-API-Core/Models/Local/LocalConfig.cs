@@ -1,4 +1,4 @@
-namespace Action_Delay_API_Core.Models.Local
+﻿namespace Action_Delay_API_Core.Models.Local
 {
     public class LocalConfig
     {
@@ -36,6 +36,19 @@ namespace Action_Delay_API_Core.Models.Local
         public ZoneAnalyticDelayJob ZoneAnalyticsDelayJob { get; set; }
         public PageRuleUpdateConfig PageRuleJob { get; set; }
 
+    }
+
+
+    public class PageRuleUpdateConfig
+    {
+        public string API_Key { get; set; }
+        public string ZoneId { get; set; }
+
+        public string PageRuleId { get; set; }
+
+        public string PageRuleHostname { get; set; }
+
+    }
 
     public class ZoneAnalyticDelayJob
     {
