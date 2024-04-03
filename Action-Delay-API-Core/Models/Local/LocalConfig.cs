@@ -1,4 +1,4 @@
-﻿namespace Action_Delay_API_Core.Models.Local
+namespace Action_Delay_API_Core.Models.Local
 {
     public class LocalConfig
     {
@@ -33,9 +33,17 @@
 
         public CustomRuleUpdateConfig WAFJob { get; set; }
         public CacheDelayJobConfig CacheJob { get; set; }
+        public ZoneAnalyticDelayJob ZoneAnalyticsDelayJob { get; set; }
+        public PageRuleUpdateConfig PageRuleJob { get; set; }
+
+
+    public class ZoneAnalyticDelayJob
+    {
+        public string API_Key { get; set; }
+
+        public string ZoneId { get; set; }
 
     }
-
     public class WfPDelayJobConfig
     {
         public string API_Key { get; set; }
