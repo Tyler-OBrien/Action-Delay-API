@@ -45,6 +45,22 @@ const jobs = [
         internalName: "WfP User Script Delay Job",
         short: "wfp"
     },
+    {
+        display: "Page Rules Update Delay",
+        internalName: "Page Rule Update Delay Job",
+        short: "pagerule"
+    },
+    {
+        display: "Workers CRON Delay",
+        internalName: "CRON Delay Job",
+        short: "cron",
+        cron: true,
+    },
+    {
+        display: "Zone Analytics Delay",
+        internalName: "Zone Analytics Delay Job",
+        short: "analytics"
+    },
 ]
 
 const HTML = `
@@ -127,6 +143,9 @@ body {
 .highlightYellow {
     color: #ffa300;
 }
+.highlightGreen {
+    color: green;
+}
 .highlightRed {
     color: #fc0d03;
 }
@@ -191,7 +210,9 @@ a:active {
     updating a DNS Record, or updating a Worker. <br> Then from ~22 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
     we make requests until we see the change. <br> When 
     half of those locations see the change, we consider the change propagated 
-    and the job complete. 
+    and the job complete.  <br>
+    This is not designed to be a benchmark. Results may be faster. This is aimed to show issues with updates rolling out. <br>
+    <a href="https://delay.cloudflare.chaika.me/swagger">API Docs</a>,  <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Source</a>, <a href="https://status.tylerobrien.dev/status/action-delay-api">WIP Status Page</a>
 </p>
 </div>
 <div class="cards" id="grid-container">
@@ -199,12 +220,18 @@ ${jobs.map(job =>
 `<div class="card" id="card${job.short}">
 <div class="header" id="header${job.short}"><a  href="https://${job.short}.cloudflare.chaika.me">${job.display}</a></div>
 <div class="sub-header" id="delay${job.short}">Loading... </div><a class="pendingLbl" id="pending${job.short}"></a>
+${job.cron ? `
+<div class="sub-header" id="cron${job.short}">Loading... </div><a class="pendingLbl" id="cron${job.short}"></a>
+` : ""}
 <div class="timestamp" id="lastUpdated${job.short}"></div>
+
 <div class="peak" id="peak${job.short}"></div>
 <div class="peak-period" id="peak-period${job.short}"></div>
+${!job.cron ? `
 <div class="medians" id="median1${job.short}"></div>
 <div class="medians" id="median2${job.short}"></div>
 <div class="medians" id="median3${job.short}"></div>
+` : ""}
 </div>`
 ).join("")}
 </div>
@@ -243,7 +270,22 @@ short: "waf"
     display: "WfP User Script Delay Job",
     internalName: "WfP User Script Delay Job",
     short: "wfp"
-}
+},
+{
+    display: "Page Rules Update Delay",
+    internalName: "Page Rule Update Delay Job",
+    short: "pagerule"
+},
+{
+    display: "Workers CRON Delay",
+    internalName: "CRON Delay Job",
+    short: "cron"
+},
+{
+    display: "Zone Analytics Delay",
+    internalName: "Zone Analytics Delay Job",
+    short: "analytics"
+},
 ]
 
 function formatTime(ms) {
@@ -273,7 +315,21 @@ try
 let delay = document.getElementById('delay' + job.short);
 let pending = document.getElementById('pending' + job.short);
 if (currentInfoData.currentRunStatus === "Deployed") {
+    if (job.short === "cron") {
+        let cronId = document.getElementById('cron' + job.short);
+        delay.textContent = formatTime(currentInfoData.currentRunLengthMs) + " ago";
+        if (currentInfoData.currentRunLengthMs < 120000) {
+            cronId.textContent = "Healthy";
+            cronId.className = 'sub-header highlightGreen';
+        }
+        else {
+            cronId.textContent = "Delayed";
+            pending.className = 'sub-header highlightYellow';
+        }
+    }
+    else {
     delay.textContent = formatTime(currentInfoData.currentRunLengthMs);
+    }
     pending.className = '';
     pending.textContent = '';
 } else if (currentInfoData.currentRunStatus === "Undeployed" && currentInfoData.currentRunLengthMs > 5000) {
@@ -344,8 +400,8 @@ console.error(\`Fetch failed: \${error}\`);
 }
 }
 
-setInterval(FetchCurrentInfo, 30000); 
-setInterval(FetchQuickAnalytics, 60000);
+setInterval(FetchCurrentInfo, 10000); 
+setInterval(FetchQuickAnalytics, 360000);
 
 FetchCurrentInfo();
 FetchQuickAnalytics();
