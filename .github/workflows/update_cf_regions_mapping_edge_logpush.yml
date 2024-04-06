@@ -2,8 +2,6 @@ name: update_cf_regions_mapping_edge_logpush
 
 on:
   workflow_dispatch: {}  
-  schedule: 
-      - cron: '1 6,20 * * *'
 
 jobs:
   build:
