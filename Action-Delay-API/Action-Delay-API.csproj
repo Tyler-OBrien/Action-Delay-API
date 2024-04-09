@@ -7,10 +7,11 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <RootNamespace>Action_Delay_API</RootNamespace>
 	  <SelfContained>true</SelfContained>
-	  <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
 	  <FileVersion>1.1.0</FileVersion>
 	  <Version>1.1.0</Version>
   </PropertyGroup>
+
+
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DebugType>embedded</DebugType>
@@ -18,6 +19,7 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DebugType>embedded</DebugType>
+	  <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>

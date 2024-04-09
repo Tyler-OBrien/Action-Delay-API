@@ -1,0 +1,128 @@
+'CRON Delay Job' -> 'cron'
+'Zone Analytics Delay Job' -> 'analytics'
+"Worker Script Delay Job" -> 'worker'
+"WfP User Script Delay Job" -> 'wfp'
+"Single URL Purge Delay Job" -> 'purge'
+"DNS Delay Job" -> 'dns'
+"DNS Delay Job Free" -> 'dnsfree'
+"Custom Rule Block Delay Job" -> 'waf'
+"Page Rule Update Delay Job" -> 'pagerule
+
+
+RENAME TABLE job_runs TO job_runs_old
+CREATE TABLE job_runs
+(
+ `job_name` String,
+ `run_time` DateTime,
+ `run_length` UInt64, 
+ `run_status` String,
+ `run_info` String,
+ `response_latency` UInt32,
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, job_name)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, job_name)
+AS 
+SELECT 
+  multiIf(
+    job_name = 'CRON Delay Job', 'cron',
+    job_name = 'Zone Analytics Delay Job', 'analytics',
+    job_name = 'Worker Script Delay Job', 'worker',
+    job_name = 'WfP User Script Delay Job', 'wfp',
+    job_name = 'Single URL Purge Delay Job', 'purge',
+    job_name = 'DNS Delay Job', 'dns',
+    job_name = 'DNS Delay Job Free', 'dnsfree',
+    job_name = 'Custom Rule Block Delay Job', 'waf',
+    job_name = 'Page Rule Update Delay Job', 'pagerule',
+    job_name -- else condition (keeps the job_name as is if it's not any of the above)
+  ) as job_name,
+  run_time,
+  run_length,
+  run_status,
+  run_info,
+  `response_latency`
+FROM job_runs_old;
+
+DROP TABLE job_runs_old;
+
+
+
+
+
+
+RENAME TABLE api_errors TO api_errors_old;
+
+CREATE TABLE api_errors
+(
+ `job_name` String,
+ `run_time` DateTime,
+ `error_type` String,
+ `error_description` String,
+ `error_hash` String, 
+ `response_latency` UInt32,
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, error_hash)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, error_hash)
+AS 
+SELECT 
+  multiIf(
+    job_name = 'CRON Delay Job', 'cron',
+    job_name = 'Zone Analytics Delay Job', 'analytics',
+    job_name = 'Worker Script Delay Job', 'worker',
+    job_name = 'WfP User Script Delay Job', 'wfp',
+    job_name = 'Single URL Purge Delay Job', 'purge',
+    job_name = 'DNS Delay Job', 'dns',
+    job_name = 'DNS Delay Job Free', 'dnsfree',
+    job_name = 'Custom Rule Block Delay Job', 'waf',
+    job_name = 'Page Rule Update Delay Job', 'pagerule',
+    job_name -- else condition
+  ) as job_name,
+  run_time,
+  error_type,
+  error_description,
+  error_hash,
+  response_latency
+FROM api_errors_old;
+
+
+RENAME TABLE job_runs_locations TO job_runs_locations_old;
+
+
+CREATE TABLE job_runs_locations
+(
+ `job_name` String,
+ `location_name` String,
+ `run_time` DateTime,
+ `run_length` UInt64, 
+ `run_status` String,
+ `response_latency` UInt32,
+ `colo_id` int
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, job_name, location_name)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, job_name, location_name)
+AS 
+SELECT 
+  multiIf(
+    job_name = 'CRON Delay Job', 'cron',
+    job_name = 'Zone Analytics Delay Job', 'analytics',
+    job_name = 'Worker Script Delay Job', 'worker',
+    job_name = 'WfP User Script Delay Job', 'wfp',
+    job_name = 'Single URL Purge Delay Job', 'purge',
+    job_name = 'DNS Delay Job', 'dns',
+    job_name = 'DNS Delay Job Free', 'dnsfree',
+    job_name = 'Custom Rule Block Delay Job', 'waf',
+    job_name = 'Page Rule Update Delay Job', 'pagerule',
+    job_name -- else condition
+  ) as job_name,
+  location_name,
+  run_time,
+  run_length,
+  run_status,
+  `response_latency`,
+  `colo_id`
+FROM job_runs_locations_old;

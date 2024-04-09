@@ -35,16 +35,16 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
 
 
             modelBuilder.Entity<JobData>().ToTable("Jobs");
-            modelBuilder.Entity<JobData>().HasKey(job => job.JobName);
+            modelBuilder.Entity<JobData>().HasKey(job => job.InternalJobName);
 
 
 
             modelBuilder.Entity<JobDataLocation>().ToTable("JobLocations");
-            modelBuilder.Entity<JobDataLocation>().HasKey(location => new  { location.JobName, location.LocationName});
+            modelBuilder.Entity<JobDataLocation>().HasKey(location => new  { location.InternalJobName, location.LocationName});
             modelBuilder.Entity<JobDataLocation>()
                 .HasOne<JobData>()
                 .WithMany()
-                .HasForeignKey(location => location.JobName);
+                .HasForeignKey(location => location.InternalJobName);
 
 
 

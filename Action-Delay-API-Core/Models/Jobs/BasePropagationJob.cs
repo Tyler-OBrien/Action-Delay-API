@@ -100,7 +100,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 // Pre-init job and locations in database
                 _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
                 // We always want NonTracking Here because we'll manually push back the changes we make in a semaphore, preventing issues with the ChangeTracker Dict being modified mid-save
-                JobData = await _dbContext.JobData.AsNoTracking().FirstOrDefaultAsync(job => job.JobName == Name);
+                JobData = await _dbContext.JobData.AsNoTracking().FirstOrDefaultAsync(job => job.InternalJobName == InternalName);
                 if (JobData == null)
                 {
                     var newJobData = new JobData()
@@ -110,7 +110,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     };
                      _dbContext.JobData.Add(newJobData);
                      await TrySave(true);
-                     JobData = await _dbContext.JobData.AsNoTracking().FirstAsync(job => job.JobName == Name);
+                     JobData = await _dbContext.JobData.AsNoTracking().FirstAsync(job => job.InternalJobName == InternalName);
                 }
                 else
                 {
@@ -126,7 +126,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 foreach (var location in _config.Locations.Where(location => location.Disabled == false))
                 {
                     var tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstOrDefaultAsync(dbLocation =>
-                        dbLocation.JobName == Name && dbLocation.LocationName == location.Name);
+                        dbLocation.InternalJobName == InternalName && dbLocation.LocationName == location.Name);
                     if (tryFindLocation == null)
                     {
                         var newLocation = new JobDataLocation()
@@ -138,7 +138,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                        _dbContext.JobLocations.Add(newLocation);
                        await TrySave(true);
                         tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
-                           dbLocation.JobName == Name && dbLocation.LocationName == location.Name);
+                           dbLocation.InternalJobName == InternalName && dbLocation.LocationName == location.Name);
                     }
                     else
                     {
@@ -298,13 +298,13 @@ namespace Action_Delay_API_Core.Models.Jobs
                     await _clickHouseService.InsertRun(
                         new ClickhouseJobRun()
                         {
-                            JobName = JobData.JobName, RunStatus = JobData.CurrentRunStatus!,
+                            JobName = JobData.InternalJobName, RunStatus = JobData.CurrentRunStatus!,
                             RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value, ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
                         }, this.RunningLocationsData.ToList()
                             .Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null).Select(
                                 locationDataKv => new ClickhouseJobLocationRun()
                                 {
-                                    JobName = locationDataKv.Value.JobName,
+                                    JobName = locationDataKv.Value.InternalJobName,
                                     RunStatus = locationDataKv.Value.CurrentRunStatus!,
                                     LocationName = locationDataKv.Value.LocationName,
                                     RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
@@ -384,12 +384,12 @@ namespace Action_Delay_API_Core.Models.Jobs
                 await _clickHouseService.InsertRun(
                     new ClickhouseJobRun()
                     {
-                        JobName = JobData.JobName,
+                        JobName = JobData.InternalJobName,
                         RunStatus = JobData.CurrentRunStatus ?? errorCause,
                         RunLength = JobData.CurrentRunLengthMs ?? 0,
                         RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
                         ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
-                    }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.Name, customApiError));
+                    }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.InternalName, customApiError));
             }
             catch (Exception ex)
             {
@@ -521,17 +521,17 @@ namespace Action_Delay_API_Core.Models.Jobs
                 {
                     // Take Changes from Non-Tracked local objects and commit them to tracked versions
                     // This is done to avoid issues where Tracked objects were being modified mid-save.
-                    var getTrackedJobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.JobName == Name);
+                    var getTrackedJobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.InternalJobName == InternalName);
                     if (getTrackedJobData != null)
                         getTrackedJobData.Update(JobData);
 
                     var getjobLocations = await _dbContext.JobLocations.AsTracking().Where(dbLocation =>
-                        dbLocation.JobName == Name).ToListAsync();
+                        dbLocation.InternalJobName == InternalName).ToListAsync();
 
                     foreach (var dataKvp in this.RunningLocationsData)
                     {
                         var getTrackedLocation = getjobLocations.FirstOrDefault(dbLocation =>
-                            dbLocation.JobName == Name && dbLocation.LocationName == dataKvp.Value.LocationName);
+                            dbLocation.InternalJobName == InternalName && dbLocation.LocationName == dataKvp.Value.LocationName);
                        if (getTrackedLocation != null)
                         getTrackedLocation.Update(dataKvp.Value);
                     }

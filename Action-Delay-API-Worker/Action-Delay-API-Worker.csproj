@@ -14,8 +14,11 @@
 	  <AssemblyVersion>2.4.0</AssemblyVersion>
 	  <FileVersion>2.4.0</FileVersion>
 	  <Version>2.4.0</Version>
-	  <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
   </PropertyGroup>
+
+	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+		<RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+	</PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="DnsClient" Version="1.7.0" />

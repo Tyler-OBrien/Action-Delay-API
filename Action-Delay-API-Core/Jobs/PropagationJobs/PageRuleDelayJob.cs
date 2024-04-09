@@ -105,7 +105,8 @@ public class PageRuleDelayJob : BasePropagationJob
             },
             URL = $"https://{_config.PageRuleJob.PageRuleHostname}/",
             NetType = location.NetType ?? NetType.Either,
-            TimeoutMs = 10_000
+            TimeoutMs = 10_000,
+            EnableConnectionReuse = false
         };
         return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
     }

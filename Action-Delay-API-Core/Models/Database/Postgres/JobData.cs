@@ -9,10 +9,12 @@ namespace Action_Delay_API_Core.Models.Database.Postgres;
 [Index(nameof(InternalJobName))]
 public class JobData
 {
-    [Required]
-    [Key]
+
     public string JobName { get; set; }
 
+
+    [Required]
+    [Key]
     public string InternalJobName { get; set; }
 
     public DateTime? LastRunTime { get; set; }
@@ -55,6 +57,8 @@ public class JobDataLocation
 {
     public string JobName { get; set; }
 
+    [Required]
+    [Key]
     public string InternalJobName { get; set; }
 
     public string LocationName { get; set; }

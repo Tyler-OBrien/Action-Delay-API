@@ -30,7 +30,7 @@ namespace Action_Delay_API.Services
         {
             var getClickHouseData = await _clickHouseService.GetCompatibleDeploymentStatistics(token);
             var getCurrentJobStatus =
-                await _genericServersContext.JobData.FirstOrDefaultAsync(job => job.JobName == "Worker Script Delay Job", token);
+                await _genericServersContext.JobData.FirstOrDefaultAsync(job => job.InternalJobName == "worker", token);
             if (getCurrentJobStatus is { CurrentRunStatus: not null } and { CurrentRunStatus: "Undeployed", CurrentRunLengthMs: not null, CurrentRunTime: not null })
             {
                 getClickHouseData.Add(new DeploymentStatistic()
@@ -52,7 +52,7 @@ namespace Action_Delay_API.Services
         public async Task<Result<JobDataResponse>> CompatibleWorkerScriptDeploymentCurrentRun(CancellationToken token)
         {
             var tryGetJob = await _genericServersContext.JobData.FirstOrDefaultAsync(
-                job => job.JobName == "Worker Script Delay Job", token);
+                job => job.InternalJobName == "worker", token);
 
             if (tryGetJob == null)
             {

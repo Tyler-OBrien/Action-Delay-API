@@ -74,7 +74,7 @@ public abstract class BaseJob
             var cancellationTokenSource = new CancellationTokenSource();
             // Pre-init job and locations in database
             _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
-            JobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.JobName == Name);
+            JobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.InternalJobName == InternalName);
             if (JobData == null)
             {
                 var newJobData = new JobData()
@@ -84,7 +84,7 @@ public abstract class BaseJob
                 };
                 _dbContext.JobData.Add(newJobData);
                 await TrySave(true);
-                JobData = await _dbContext.JobData.AsTracking().FirstAsync(job => job.JobName == Name);
+                JobData = await _dbContext.JobData.AsTracking().FirstAsync(job => job.InternalJobName == InternalName);
             }
             else
             {
@@ -136,12 +136,12 @@ public abstract class BaseJob
             await _clickHouseService.InsertRun(
                 new ClickhouseJobRun()
                 {
-                    JobName = JobData.JobName,
+                    JobName = JobData.InternalJobName,
                     RunStatus = JobData.CurrentRunStatus!,
                     RunLength = JobData.CurrentRunLengthMs ?? 0,
                     RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
                     ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
-                }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.Name, customApiError));
+                }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.InternalName, customApiError));
         }
         catch (Exception ex)
         {
@@ -165,12 +165,12 @@ public abstract class BaseJob
             await _clickHouseService.InsertRun(
                 new ClickhouseJobRun()
                 {
-                    JobName = JobData.JobName,
+                    JobName = JobData.InternalJobName,
                     RunStatus = JobData.CurrentRunStatus ?? errorCause,
                     RunLength = JobData.CurrentRunLengthMs ?? 0,
                     RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
                     ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
-                }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.Name, customApiError));
+                }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.InternalName, customApiError));
         }
         catch (Exception ex)
         {

@@ -67,7 +67,7 @@ namespace Action_Delay_API.Services.v2
                 await _clickHouseService.InsertRun(
                     new ClickhouseJobRun()
                     {
-                        JobName = jobRequest.JobName,
+                        JobName = jobRequest.InternalJobName,
                         RunStatus = jobRequest.RunStatus,
                         RunLength = jobRequest.RunLengthMs,
                         RunTime = jobRequest.RunTime,

@@ -115,12 +115,12 @@ namespace Action_Delay_API_Core.Jobs
             try
             {
                 _valueToLookFor = $"Date: {DateTime.UtcNow.ToString("R")} GUID: {Guid.NewGuid().ToString("D")} By Action-Delay-API {Program.VERSION} {_config.Location}";
-                var tryFindData = await _dbContext.GenericJobData.FirstOrDefaultAsync(data => data.JobName == Name);
+                var tryFindData = await _dbContext.GenericJobData.FirstOrDefaultAsync(data => data.JobName == InternalName);
                 if (tryFindData == null)
                 {
                     tryFindData = new GenericJobData()
                     {
-                        JobName = Name
+                        JobName = InternalName
                     };
                     _dbContext.GenericJobData.Add(tryFindData);
                 }

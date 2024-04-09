@@ -20,7 +20,7 @@ namespace Action_Delay_API.Services
         public async Task<Result<string>> GetCacheValue(CancellationToken token)
         {
             return (await _genericServersContext.GenericJobData.AsNoTracking()
-                .FirstOrDefaultAsync(jobData => jobData.JobName == "Single URL Purge Delay Job",
+                .FirstOrDefaultAsync(jobData => jobData.JobName == "purge",
                     cancellationToken: token))?.Value ?? "";
         }
 

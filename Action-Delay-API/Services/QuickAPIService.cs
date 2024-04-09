@@ -2,6 +2,7 @@
 using Action_Delay_API.Models.API.Responses.DTOs;
 using Action_Delay_API.Models.API.Responses.DTOs.QuickAnalytics;
 using Action_Delay_API.Models.Services;
+using Action_Delay_API.Models.Services.v2;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
@@ -17,14 +18,16 @@ namespace Action_Delay_API.Services
 
         private readonly ActionDelayDatabaseContext _genericServersContext;
         private readonly IClickHouseService _clickHouseService;
+        private readonly ICacheSingletonService _cacheSingletonService;
 
 
         private readonly ILogger _logger;
 
-        public QuickAPIService(ActionDelayDatabaseContext genericServersContext, ILogger<QuickAPIService> logger, IClickHouseService _clickhouseService)
+        public QuickAPIService(ActionDelayDatabaseContext genericServersContext, ILogger<QuickAPIService> logger, IClickHouseService _clickhouseService, ICacheSingletonService cacheSingletonService)
         {
             _genericServersContext = genericServersContext;
             _clickHouseService = _clickhouseService;
+            _cacheSingletonService = cacheSingletonService;
             _logger = logger;
         }
         // GET: api/<ScrapeJobController>
@@ -33,7 +36,12 @@ namespace Action_Delay_API.Services
 
         public async Task<Result<QuickAnalyticsResponse[]>> CompatibleWorkerScriptDeploymentAnalytics(string jobName, CancellationToken token)
         {
-            return (await _clickHouseService.GetQuickAnalytics(jobName, token)).Select(api => new QuickAnalyticsResponse()
+            var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+            if (tryGetJobInternalName == null)
+                return Result.Fail(new ErrorResponse(404,
+                    "Could not find job", "job_not_found"));
+
+            return (await _clickHouseService.GetQuickAnalytics(tryGetJobInternalName, token)).Select(api => new QuickAnalyticsResponse()
             {
                 MedianRunLength = api.MedianRunLength,
                 Period = api.Period,
@@ -45,8 +53,13 @@ namespace Action_Delay_API.Services
 
         public async Task<Result<JobDataResponse>> CompatibleWorkerScriptDeploymentCurrentRun(string jobName, CancellationToken token)
         {
+            var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+            if (tryGetJobInternalName == null)
+                return Result.Fail(new ErrorResponse(404,
+                    "Could not find job", "job_not_found"));
+
             var tryGetJob = await _genericServersContext.JobData.FirstOrDefaultAsync(
-                job => job.JobName == jobName, token);
+                job => job.InternalJobName == tryGetJobInternalName, token);
 
             if (tryGetJob == null)
             {
