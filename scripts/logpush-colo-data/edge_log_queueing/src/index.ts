@@ -1,6 +1,3 @@
-import regions from "./routing.json";
-// Flattened to just have 3 world-wide, just an attempt at not going all to the same place/preventing override. You may need more if you had a ton of traffic/depending on how much you're sampling. I have sampling set really low and not too many requests in the zone.
-
 export interface Env {
 	BATCHER: DurableObjectNamespace;
 	APIKEY: string;
@@ -45,7 +42,8 @@ export default {
 		  eventsToPush.push(parsedEvent);
 		}
 
-
+		var DOIdName: string  = 'global';
+		/*
 		
 		var DOIdName: string = regions?.results[request.cf?.colo ?? ""] ?? "global";
     // just flattening regions down to 3
@@ -55,6 +53,7 @@ export default {
     if (DOIdName == "eeur") {
       DOIdName = "weur";
     }
+	*/
 		console.log(`[${DOIdName}] Pushing ${eventsToPush.length} items.. to batcher`);
 	  let id = env.BATCHER.idFromName(DOIdName);
 	  return await env.BATCHER.get(id).fetch(request, {
@@ -63,9 +62,10 @@ export default {
 	},
   };
   
-  const SECONDS = 3000;
-  
+  const SECONDS = 1000;
+    const countKey = 'count';
   export class Batcher {
+
 
 	queue: object[];
 	storage: DurableObjectStorage;
@@ -83,7 +83,9 @@ export default {
 	  this.ID = "unk";
 	}
 	async fetch(request: Request) {
-  
+
+		this.ID = 'global';
+  /*
     this.ID = regions?.results[request.cf?.colo ?? ""] ?? "global";
     // just flattening regions down to 3
     if (this.ID  == "wnam") {
@@ -92,14 +94,15 @@ export default {
     if (this.ID  == "eeur") {
       this.ID  = "weur";
     }
+	*/
 	  // If there is no alarm currently set, set one for 10 seconds from now
 	  // Any further POSTs in the next 10 seconds will be part of this kh.
 	  let currentAlarm = await this.storage.getAlarm();
 	  if (currentAlarm == null) {
       // you may want to adjust the alarm
-		var alarmDate = Date.now() + 60 * SECONDS;
-		this.storage.setAlarm(alarmDate);
-		console.log(`[${this.ID}] Set Alarm for ${alarmDate}`)
+	  var alarmDate = Date.now() + 10 * SECONDS;
+      this.storage.setAlarm(alarmDate);
+	  console.log(`[${this.ID}] Set Alarm for ${alarmDate}`)
 	  }
   
 	  // Add the request to the batch.
@@ -107,7 +110,8 @@ export default {
 	  var arrayItems = await request.json() as object[];
 	  //console.log(`Adding ${arrayItems.length} items to queue..`)
 	  this.queue.push(...arrayItems);
-
+	  var currentCount: number = (await this.storage.get(countKey)) ?? 0;
+	  await this.storage.put(countKey, currentCount += arrayItems.length);
 	  if (this.queue.length > 1000) {
 		  await this.alarm();
 	  }
@@ -119,12 +123,13 @@ export default {
 	  });
 	}
 	async alarm() {
-		console.log(`[${this.ID}] Alarm! Pushing ${this.queue.length} items..`)
+		var currentCount: number = (await this.storage.get(countKey)) ?? 0;
+		await this.storage.put(countKey, 0);
 		if (this.queue.length == 0 ) {
-			console.log(`[${this.ID}] No items to push, returning`)
+			console.log(`[${this.ID}] No items to push, returning. We thought there would be ${currentCount}`)
 			return;
 		}
-
+	
 	  try {
 		if (this.env.EdgeIngestRate) {
 		  this.env.EdgeIngestRate.writeDataPoint({
@@ -132,7 +137,7 @@ export default {
 			  this.ID,
 			  "HTTP"
 			],
-			doubles: [this.queue.length],
+			doubles: [this.queue.length, currentCount],
 			indexes: [this.ID],
 		  });
 		}
@@ -141,6 +146,8 @@ export default {
 		  `[${this.ID}] Error ingesting Analytics Engine events into ${this.ID}, HTTP: ${exception}`
 		);
 	  }
+	  console.log(`[${this.ID}] Alarm! Pushing ${this.queue.length} items.. we thought there would be ${currentCount}`)
+
 	  this.state.waitUntil(handleHTTPEvents(this.env, this.queue));
 
 
