@@ -48,7 +48,8 @@ const jobs = [
     {
         display: "Page Rules Update Delay",
         internalName: "Page Rule Update Delay Job",
-        short: "pagerule"
+        short: "pagerule",
+        realShort: "pagerules"
     },
     {
         display: "Workers CRON Delay",
@@ -207,18 +208,18 @@ a:active {
 <h1 class="main-header"> <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Action Delay Tracker</a></h1>
 <p class="sub-header-text">
     We do each action once a minute using the CF API. For example, 
-    updating a DNS Record, or updating a Worker. <br> Then from ~22 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
+    updating a DNS Record, or updating a Worker. <br> Then from 25 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
     we make requests until we see the change. <br> When 
     half of those locations see the change, we consider the change propagated 
     and the job complete.  <br>
-    This is not designed to be a benchmark. Results may be faster. This is aimed to show issues with updates rolling out. <br>
+    This is not designed to be a benchmark. Results may be faster then shown. This is aimed to show/detect issues/delay. <br>
     <a href="https://delay.cloudflare.chaika.me/swagger">API Docs</a>,  <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Source</a>, <a href="https://status.tylerobrien.dev/status/action-delay-api">WIP Status Page</a>
 </p>
 </div>
 <div class="cards" id="grid-container">
 ${jobs.map(job => 
 `<div class="card" id="card${job.short}">
-<div class="header" id="header${job.short}"><a  href="https://${job.short}.cloudflare.chaika.me">${job.display}</a></div>
+<div class="header" id="header${job.short}"><a  href="https://${job.realShort ?? job.short}.cloudflare.chaika.me">${job.display}</a></div>
 <div class="sub-header" id="delay${job.short}">Loading... </div><a class="pendingLbl" id="pending${job.short}"></a>
 ${job.cron ? `
 <div class="sub-header" id="cron${job.short}">Loading... </div><a class="pendingLbl" id="cron${job.short}"></a>
@@ -274,7 +275,8 @@ short: "waf"
 {
     display: "Page Rules Update Delay",
     internalName: "Page Rule Update Delay Job",
-    short: "pagerule"
+    short: "pagerule",
+    realShort: "pagerules"
 },
 {
     display: "Workers CRON Delay",
@@ -366,7 +368,7 @@ console.error(\`Fetch failed: \${error}\`);
 async function FetchQuickAnalytics() {
 for (let job of jobs)
 try {
-    const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + job.internalName);
+    const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + job.short);
     const quickAnalyticsData = await quickAnalyticsResponse.json();
 
 // Parsing quickanalytics and updating the HTML

@@ -19,30 +19,51 @@ export default {
 		var newUrl = new URL(req.url);
 		let display = ""
 		let internalName = "";
+        let apiName = ""
 		if (newUrl.hostname.startsWith("dnsfree")) {
 			display = "Free DNS Propagation Delay";
 			internalName = "DNS Delay Job Free"
+            apiName = "dnsfree";
 		}
 		else if (newUrl.hostname.startsWith("dns")) {
 			display = "Paid DNS Propagation Delay";
 			internalName = "DNS Delay Job";
+            apiName = "dns";
 		}
-		else if (newUrl.hostname.startsWith("worker") || newUrl.hostname == '127.0.0.1') {
+		else if (newUrl.hostname.startsWith("worker")) {
 			display = "Worker Deployment Delay";
 			internalName = "Worker Script Delay Job";
+            apiName = "worker";
 		}
 		else if (newUrl.hostname.startsWith("waf")) {
 			display = "Custom Rule Update Delay";
 			internalName = "Custom Rule Block Delay Job";
+            apiName = "waf"
 		}
 		else if (newUrl.hostname.startsWith("purge")) {
 			display = "Single URL Purge Lag";
 			internalName = "Single URL Purge Delay Job";
+            apiName = "purge";
 		}
-        
 		else if (newUrl.hostname.startsWith("wfp")) {
 			display = "WfP User Script Delay Job";
 			internalName = "WfP User Script Delay Job";
+            apiName = "wfp";
+		}
+        else if (newUrl.hostname.startsWith("pagerule")) {
+			display = "Page Rules Update Delay";
+			internalName = "Page Rules Update Delay";
+            apiName = "pagerule";
+		}
+        else if (newUrl.hostname.startsWith("cron") || newUrl.hostname == '127.0.0.1') {
+			display = "Workers CRON Delay";
+			internalName = "Workers CRON Delay";
+            apiName = "cron";
+		}
+        else if (newUrl.hostname.startsWith("analytics")) {
+			display = "Zone Analytics Delay";
+			internalName = "Zone Analytics Delay";
+            apiName = "analytics";
 		}
 		
 
@@ -95,6 +116,9 @@ export default {
         #peak-period {
             margin-bottom: 0.5em;
         }
+        .highlightGreen {
+            color: green;
+        }
         .highlightYellow {
             color: #ffa300;
         }
@@ -127,6 +151,9 @@ export default {
     <div class="card">
         <div class="header">${display}</div>
         <div class="sub-header" id="delay">Loading...</div><a class="pendingLbl" id="pending"></a>
+        ${apiName === "cron" ? `
+<div class="sub-header" id="cron">Loading... </div><a class="pendingLbl" id="cron"></a>
+` : ""}
         <div class="timestamp" id="lastUpdated"></div>
         <div id="peak"></div>
         <div id="peak-period"></div>
@@ -140,6 +167,9 @@ export default {
 		<a href="https://wfp.cloudflare.chaika.me">WFP User Script Deployment Lag</a><br>
 		<a href="https://waf.cloudflare.chaika.me">Custom Rule Update Delay</a><br>
 		<a href="https://purge.cloudflare.chaika.me">Single URL Purge Delay</a><br>
+		<a href="https://pagerules.cloudflare.chaika.me">Page Rule Update Delay</a><br>
+		<a href="https://cron.cloudflare.chaika.me">Workers Cron Delay</a><br>
+		<a href="https://analytics.cloudflare.chaika.me">Zone Analytics Delay</a><br>
 		<a href="https://all.cloudflare.chaika.me">Overview of All</a><br>
 	</div>
     </div>
@@ -164,15 +194,27 @@ function formatTime(ms) {
 }
 
 async function FetchCurrentInfo() {
-    const currentInfoResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/CurrentInfo/${internalName}');
-        const currentInfoData = await currentInfoResponse.json();
+    const currentInfoResponse = await fetch('https://delay.cloudflare.chaika.me/v2/jobs/${apiName}');
+        const currentInfoData = (await currentInfoResponse.json()).data;
 
         let delay = document.getElementById('delay');
         let pending = document.getElementById('pending');
         if (currentInfoData.currentRunStatus === "Deployed") {
-            delay.textContent = formatTime(currentInfoData.currentRunLengthMs);
+            ${apiName === "cron" ? `
+                let cronId = document.getElementById('cron');
+                delay.textContent = "Last Event: " + formatTime(new Date() - new Date(currentInfoData.currentRunTime)) + " ago"
+                if (currentInfoData.currentRunLengthMs < 120000) {
+                    cronId.textContent = "Healthy";
+                    cronId.className = 'sub-header highlightGreen';
+                }
+                else {
+                    cronId.textContent = "Delayed";
+                    pending.className = 'sub-header highlightYellow';
+                }
+            `: `delay.textContent = formatTime(currentInfoData.currentRunLengthMs);`}
             pending.className = '';
             pending.textContent = '';
+            
         } else if (currentInfoData.currentRunStatus === "Undeployed" && currentInfoData.currentRunLengthMs > 5000) {
             delay.textContent = formatTime(currentInfoData.currentRunLengthMs);
             if (currentInfoData.currentRunLengthMs > 60000)
@@ -203,7 +245,7 @@ async function FetchCurrentInfo() {
 
 async function FetchQuickAnalytics() {
     try {
-const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/${internalName}');
+const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/${apiName}');
 const quickAnalyticsData = await quickAnalyticsResponse.json();
 
 // Parsing quickanalytics and updating the HTML
@@ -227,18 +269,19 @@ quickAnalyticsData.forEach((item) => {
 })
 
 document.getElementById('peak').textContent = "Last 24H Peak of " + peakPeriod;
+${apiName === "cron" ? "" : `
 document.getElementsByClassName('medians')[0].textContent = "1 Day Median: " + dailyMedian;
 document.getElementsByClassName('medians')[1].textContent = "30 Days Median: " + monthlyMedian;
 document.getElementsByClassName('medians')[2].textContent = "90 days Median: " + quarterlyMedian;
 
-
+`}
 } catch (error) {
 console.error(\`Fetch failed: \${error}\`);
 }
 }
 
-setInterval(FetchCurrentInfo, 30000); 
-    setInterval(FetchQuickAnalytics, 60000);
+setInterval(FetchCurrentInfo, 10000); 
+setInterval(FetchQuickAnalytics, 360000);
 
     FetchCurrentInfo();
     FetchQuickAnalytics();
