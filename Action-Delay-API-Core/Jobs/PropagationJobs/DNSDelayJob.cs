@@ -19,6 +19,7 @@ namespace Action_Delay_API_Core.Jobs
 
         internal DNSDelayJobConfig _jobConfig;
         internal string _valueToLookFor;
+        private int _repeatedRunCount = 1;
 
         public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue )
         {
@@ -57,8 +58,8 @@ namespace Action_Delay_API_Core.Jobs
         {
             var newUpdateRequest = new UpdateRecordRequest()
             {
-                Comment = "Blame Walshy",
-                Content = _valueToLookFor,
+                Comment = "Automagically Updating DNS Record",
+                Content = _valueToLookFor + $" {_repeatedRunCount++}",
                 Name = _jobConfig.Name,
                 Proxied = false,
                 Ttl = 1,
@@ -105,7 +106,7 @@ namespace Action_Delay_API_Core.Jobs
 
             //_logger.LogInformation($"{Name}: One DNS Request returned from {location.NATSName} - Success {getResponse.ResponseCode}");
             string tryGetAnswer = getResponse.Answers.FirstOrDefault()?.Value ?? "";
-            if (tryGetAnswer.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
+            if (tryGetAnswer.StartsWith(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
                 _logger.LogInformation($"{Name}: {location.Name} sees the change!");

@@ -16,6 +16,7 @@ using Microsoft.Extensions.Options;
 public class PageRuleDelayJob : BasePropagationJob
 {
     private string _valueToLookFor;
+    private int _repeatedRunCount = 1;
 
     public PageRuleDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config,
         ILogger<PageRuleDelayJob> logger, IQueue queue, IClickHouseService clickHouse,
@@ -43,7 +44,7 @@ public class PageRuleDelayJob : BasePropagationJob
     public override async Task RunAction()
     {
         _valueToLookFor =
-            $"https://{Guid.NewGuid().ToString("N")}.{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.{_config.PageRuleJob.PageRuleHostname}/";
+            $"{Guid.NewGuid().ToString("N")}.{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}.{_config.PageRuleJob.PageRuleHostname}/";
         await RunRepeatableAction();
     }
 
@@ -71,7 +72,7 @@ public class PageRuleDelayJob : BasePropagationJob
                     Value = new PageRuleUpdateRequest.Value
                     {
                         StatusCode = 302,
-                        Url = _valueToLookFor
+                        Url = "https://" + _repeatedRunCount++ + _valueToLookFor
                     }
                 }
             },
@@ -138,7 +139,7 @@ public class PageRuleDelayJob : BasePropagationJob
 
         //_logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
         // super lax on purpose, idc about response codes or anything, just if its returning the right location header/was updated
-        if (locationHeader.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
+        if (locationHeader.EndsWith(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
         {
             // We got the right value!
             _logger.LogInformation(

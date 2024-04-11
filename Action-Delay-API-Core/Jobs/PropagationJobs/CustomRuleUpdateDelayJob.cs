@@ -19,6 +19,7 @@ namespace Action_Delay_API_Core.Jobs
 
  
         private string _valueToLookFor;
+        private int _repeatedRunCount = 1;
         private string _specialPath;
 
         public CustomRuleUpdateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CustomRuleUpdateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
@@ -78,7 +79,7 @@ namespace Action_Delay_API_Core.Jobs
                 {
                     Response = new UpdateCustomRuleRequest.Response()
                     {
-                        Content = _valueToLookFor,
+                        Content = _valueToLookFor + $" {_repeatedRunCount++}",
                         StatusCode = 415,
                         ContentType = "text/html"
                     }
@@ -132,7 +133,7 @@ namespace Action_Delay_API_Core.Jobs
 
             //_logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess}");
 
-            if (getResponse.StatusCode == HttpStatusCode.UnsupportedMediaType && getResponse.Body.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
+            if (getResponse.StatusCode == HttpStatusCode.UnsupportedMediaType && getResponse.Body.StartsWith(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
                 _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees the change! Let's remove this and move on..");

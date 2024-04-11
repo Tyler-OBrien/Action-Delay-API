@@ -18,6 +18,8 @@ namespace Action_Delay_API_Core.Jobs
 
         private string _generatedValue { get; set; }
 
+        private int _repeatedRunCount = 1;
+
         private string _scriptName { get; set; }
         public override int TargetExecutionSecond => 20;
 
@@ -49,7 +51,7 @@ namespace Action_Delay_API_Core.Jobs
             // Appending 'worker.js' field
             string workerJsContent = $@"export default {{
   async fetch(request, env, ctx) {{
-    return new Response('{_generatedValue}');
+    return new Response('{_generatedValue} {_repeatedRunCount++}');
   }},
 }};".ReplaceLineEndings(" ");
 
@@ -108,7 +110,7 @@ namespace Action_Delay_API_Core.Jobs
 
             //_logger.LogInformation($"One HTTP Request returned from {location.Name} - Success {getResponse.WasSuccess} - Response UTC: {getResponse.ResponseUTC}");
 
-            if (getResponse.Body.Equals(_generatedValue, StringComparison.OrdinalIgnoreCase))
+            if (getResponse.Body.StartsWith(_generatedValue, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
                 _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees change.");
