@@ -1,6 +1,7 @@
 ﻿using Action_Delay_API.Extensions;
 using Action_Delay_API.Models.API.Responses;
 using Action_Delay_API.Models.API.Responses.DTOs;
+using Action_Delay_API.Models.API.Responses.DTOs.v2.Jobs;
 using Action_Delay_API.Models.Services.v2;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
@@ -36,13 +37,23 @@ public class JobController : CustomBaseController
     }
 
     [HttpGet("{jobName}")]
-    [SwaggerResponse(200, Type = typeof(DataResponse<JobDataResponse[]>),
+    [SwaggerResponse(200, Type = typeof(DataResponse<JobDataResponse>),
         Description = "On success, return a list of all known jobs")]
     [SwaggerResponseExample(200, typeof(JobDataResponseExample))]
 
     public async Task<IActionResult> GetJob(string jobName, CancellationToken token)
     {
         return (await _jobDataService.GetJob(jobName, token)).MapToResult();
+    }
+
+    [HttpGet("{jobName}/streamdeck")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<StreamDeckResponseDTO>),
+        Description = "On success, return the simple text of the predicted response")]
+    [SwaggerResponseExample(200, typeof(StreamDeckResponseResponseExample))]
+
+    public async Task<IActionResult> GetStreamDeck(string jobName, CancellationToken token)
+    {
+        return (await _jobDataService.GetStreamDeckData(jobName, token)).MapToResult();
     }
 
     [HttpGet("{jobName}/locations")]
