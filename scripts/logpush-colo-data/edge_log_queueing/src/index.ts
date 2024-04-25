@@ -1,3 +1,7 @@
+import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
+import { instrumentDO } from '@microlabs/otel-cf-workers'
+import { DurableObject } from 'cloudflare:workers';
+
 export interface Env {
 	BATCHER: DurableObjectNamespace;
 	APIKEY: string;
@@ -7,13 +11,16 @@ export interface Env {
 	DB: D1Database;
 	DB2: D1Database;
 
+
+	BASELIME_API_KEY: string
+    SERVICE_NAME: string
   }
 
 
-export default {
+
+const handler = {
 	async fetch(request: Request, env: Env) {
-
-
+		var timeStart = new Date();
 		var url = new URL(request.url);
 		if (request.headers.get("Authorization") !== env.APIKEY && url.searchParams.get("header_Authorization") !== env.APIKEY) {
 			console.log("Unauthorized")
@@ -39,6 +46,16 @@ export default {
 			parsedEvent.EdgeStartTimestamp ??
 			parsedEvent.CreatedAt ??
 			parsedEvent.Datetime;
+			parsedEvent["timeReceived"] = timeStart.toISOString();
+			parsedEvent["source"] = "EdgeLogPush";
+
+			try {
+			  var parsedTimestamp = new Date(parsedEvent["_time"]);
+			  parsedEvent["eventDelay"] = (timeStart.getTime() - parsedTimestamp.getTime());
+			} catch (error: any) {
+			  console.log(`Error parsing EndEdgeTimestamp: ${error}, ${error?.cause}`);
+			}
+			
 		  eventsToPush.push(parsedEvent);
 		}
 
@@ -64,7 +81,7 @@ export default {
   
   const SECONDS = 1000;
     const countKey = 'count';
-  export class Batcher {
+ class BatcherUnwrapped implements DurableObject {
 
 
 	queue: object[];
@@ -307,3 +324,57 @@ export default {
   
   export const readlineStream = () =>
 	new TransformStream(new ReadlineTransformer());
+
+  const config: ResolveConfigFn = (env: Env, _trigger) => {
+	// if null, we're not going to export any..
+	if (!env.BASELIME_API_KEY) {
+		const headSamplerConfig = {
+			acceptRemote: false, //Whether to accept incoming trace contexts
+			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
+		}
+		return {
+			sampling: {
+				headSampler: headSamplerConfig
+			},
+			exporter: {},
+			service: {}
+		}
+	}
+	return {
+		exporter: {
+			url: 'https://otel.baselime.io/v1',
+			headers: { 'x-api-key': env.BASELIME_API_KEY },
+		},
+		service: { name: env.SERVICE_NAME },
+	}
+}
+const DOconfig: ResolveConfigFn = (env: Env, _trigger) => {
+	// if null, we're not going to export any..
+	if (!env.BASELIME_API_KEY) {
+		const headSamplerConfig = {
+			acceptRemote: false, //Whether to accept incoming trace contexts
+			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
+		}
+		return {
+			sampling: {
+				headSampler: headSamplerConfig
+			},
+			exporter: {},
+			service: {}
+		}
+	}
+	return {
+		exporter: {
+			url: 'https://otel.baselime.io/v1',
+			headers: { 'x-api-key': env.BASELIME_API_KEY },
+		},
+		service: { name: env.SERVICE_NAME + "-do" },
+	}
+}
+const Batcher = instrumentDO(BatcherUnwrapped, DOconfig);
+
+export { Batcher }
+
+
+
+export default instrument(handler, config)

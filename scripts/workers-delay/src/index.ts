@@ -1,5 +1,8 @@
 import { BetterKV } from "flareutils";
 import { Toucan } from 'toucan-js';
+import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
+import { instrumentDO } from '@microlabs/otel-cf-workers'
+
 
 
 const HTML = `<!DOCTYPE html>
@@ -241,6 +244,10 @@ export interface Env {
   WORKER_SCRIPT_NAME: string;
   PROXY_ENDPOINT: string;
   WORKER_URL: string;
+
+  
+	BASELIME_API_KEY: string
+  SERVICE_NAME: string
 }
 
 async function GetAEData(deployed: boolean, apiKey: string, acctId: string, KV: BetterKV, ctx: ExecutionContext): Promise<string> {
@@ -336,7 +343,7 @@ async function fetchUrlWithCache(url: string, APIKEY: string, query: string, KV:
 }
 
 
-export default {
+var handler = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     const bKv = new BetterKV(env.KV, ctx.waitUntil.bind(ctx), {
       cacheSpace: "cachespace",
@@ -413,7 +420,7 @@ export default {
   },
 };
 
-export class DO {
+class UnwrappedDO implements DurableObject {
   state: DurableObjectState;
   env: Env;
 
@@ -609,3 +616,55 @@ async function fetchPlus(url: any, options = {}, retries = 5): Promise<Response>
     return new Response("Fetch failed due to an error", { status: 500 });
   }
 }
+
+const config: ResolveConfigFn = (env: Env, _trigger) => {
+	// if null, we're not going to export any..
+	if (!env.BASELIME_API_KEY) {
+		const headSamplerConfig = {
+			acceptRemote: false, //Whether to accept incoming trace contexts
+			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
+		}
+		return {
+			sampling: {
+				headSampler: headSamplerConfig
+			},
+			exporter: {},
+			service: {}
+		}
+	}
+	return {
+		exporter: {
+			url: 'https://otel.baselime.io/v1',
+			headers: { 'x-api-key': env.BASELIME_API_KEY },
+		},
+		service: { name: env.SERVICE_NAME },
+	}
+}
+
+const DOconfig: ResolveConfigFn = (env: Env, _trigger) => {
+	// if null, we're not going to export any..
+	if (!env.BASELIME_API_KEY) {
+		const headSamplerConfig = {
+			acceptRemote: false, //Whether to accept incoming trace contexts
+			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
+		}
+		return {
+			sampling: {
+				headSampler: headSamplerConfig
+			},
+			exporter: {},
+			service: {}
+		}
+	}
+	return {
+		exporter: {
+			url: 'https://otel.baselime.io/v1',
+			headers: { 'x-api-key': env.BASELIME_API_KEY },
+		},
+		service: { name: env.SERVICE_NAME + "-do" },
+	}
+}
+const DO = instrumentDO(UnwrappedDO, DOconfig);
+
+export { DO }
+export default instrument(handler, config)

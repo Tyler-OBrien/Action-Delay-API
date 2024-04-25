@@ -11,5 +11,8 @@
 		"@cloudflare/workers-types": "^4.20231025.0",
 		"typescript": "^5.2.2",
 		"wrangler": "^3.48.0"
+	},
+	"dependencies": {
+		"@microlabs/otel-cf-workers": "^1.0.0-rc.35"
 	}
 }

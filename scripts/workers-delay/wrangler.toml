@@ -5,6 +5,8 @@ account_id = "b9e510810e1e12fcd40826d266a1fb12"
 logpush = true
 workers_dev = false
 tail_consumers = [{service = "workers-delay-tail", environment = "production"}]
+compatibility_flags = [ "nodejs_compat" ]
+
 
 analytics_engine_datasets = [
     { binding = "workers_deploy_lag" }
@@ -20,6 +22,7 @@ ACCOUNT_ID = 'b9e510810e1e12fcd40826d266a1fb12'
 WORKER_SCRIPT_NAME = 'update-me-pls'
 PROXY_ENDPOINT = 'https://delay.cloudflare.chaika.me'
 WORKER_URL = 'https://update-me-pls.workers.tylerobrien.dev'
+SERVICE_NAME = "workers_delay"
 
 
 
