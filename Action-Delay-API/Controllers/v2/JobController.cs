@@ -48,7 +48,7 @@ public class JobController : CustomBaseController
 
     [HttpGet("{jobName}/streamdeck")]
     [SwaggerResponse(200, Type = typeof(DataResponse<StreamDeckResponseDTO>),
-        Description = "On success, return the simple text of the predicted response")]
+        Description = "On success, return the simple text of the predicted response. This endpoint is nice and pre-calculated text, meant for display in simple systems where they can't parse/calculate things.")]
     [SwaggerResponseExample(200, typeof(StreamDeckResponseResponseExample))]
 
     public async Task<IActionResult> GetStreamDeck(string jobName, CancellationToken token)

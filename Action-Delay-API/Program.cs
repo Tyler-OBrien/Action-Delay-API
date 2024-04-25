@@ -106,13 +106,15 @@ public class Program
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(options =>
         {
+            options.EnableAnnotations();
             options.ExampleFilters();
             options.OperationFilter<AddResponseHeadersFilter>();
+            /*
             options.AddServer(new OpenApiServer()
             {
                 Url = "https://delay.cloudflare.chaika.me"
             });
-
+            */
         });
         builder.Services.AddSwaggerExamplesFromAssemblyOf(typeof(Program));
 

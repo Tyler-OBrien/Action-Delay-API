@@ -93,7 +93,7 @@ public class GenericError
     // HTTP Status Code
     public int Code { get; set; }
 
-    [JsonPropertyName("Message")] public string Message { get; set; }
+    [JsonPropertyName("message")] public string Message { get; set; }
 
 
     [JsonPropertyName("type")]

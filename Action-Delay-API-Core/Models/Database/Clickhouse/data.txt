@@ -43,3 +43,123 @@ ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name, location_name)
 PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
+
+ALTER TABLE job_runs
+    MODIFY COLUMN `job_name` LowCardinality(String),
+    MODIFY COLUMN `run_status` LowCardinality(String),
+    MODIFY COLUMN `run_info` LowCardinality(String),
+    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD)
+
+
+
+ALTER TABLE  api_errors
+    MODIFY COLUMN `job_name` LowCardinality(String),
+    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD),
+    MODIFY COLUMN `error_type` LowCardinality(String)
+
+
+
+
+
+ALTER TABLE job_runs_locations
+    MODIFY COLUMN `job_name` LowCardinality(String),
+    MODIFY COLUMN `location_name` LowCardinality(String),
+    MODIFY COLUMN `run_status` LowCardinality(String),
+    MODIFY COLUMN `colo_id` LowCardinality(Int32),
+    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD),
+
+
+
+CREATE MATERIALIZED VIEW job_runs_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    minState(run_length) as min_run_length,
+    maxState(run_length) as max_run_length,
+    avgState(run_length) as avg_run_length,
+    median(run_length) as median_run_length,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5)(response_latency) as median_response_latency
+FROM job_runs
+where run_status = 'Deployed'
+GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+
+
+
+CREATE MATERIALIZED VIEW job_runs_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    minState(run_length) as min_run_length,
+    maxState(run_length) as max_run_length,
+    avgState(run_length) as avg_run_length,
+    median(run_length) as median_run_length,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5)(response_latency) as median_response_latency
+FROM job_runs
+where run_status = 'Deployed'
+GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+
+
+
+
+
+CREATE MATERIALIZED VIEW job_runs_locations_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    location_name,
+    average_time,
+    minState(run_length) as min_run_length,
+    maxState(run_length) as max_run_length,
+    avgState(run_length) as avg_run_length,
+    quantilesState(0.5)(run_length) as median_run_length,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5)(response_latency) as median_response_latency
+FROM job_runs_locations
+where run_status = 'Deployed'
+GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+
+
+
+CREATE MATERIALIZED VIEW job_runs_locations_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    location_name,
+    average_time,
+    minState(run_length) as min_run_length,
+    maxState(run_length) as max_run_length,
+    avgState(run_length) as avg_run_length,
+    quantilesState(0.5)(run_length) as median_run_length,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5)(response_latency) as median_response_latency
+FROM job_runs_locations
+where run_status = 'Deployed'
+GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+
+
+
+
+
+
+
+
