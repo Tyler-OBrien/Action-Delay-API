@@ -27,6 +27,7 @@ CREATE TABLE colos (
   Country string,
   latitude REAL,
   longitude REAL,
+  processed bool,
   PRIMARY KEY (coloId)
 );
 

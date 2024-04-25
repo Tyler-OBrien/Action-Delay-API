@@ -15,6 +15,7 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<Response> {
+    var timeStart = new Date();
     var url = new URL(request.url);
     if (url.pathname == "/data") {
       var newUrlMatch = `https://${url.hostname}/data`;
@@ -133,6 +134,7 @@ export default {
       return new Response("No Body", { status: 500 });
     }
     const internalType = request.headers.get("internal-type") ?? "unknown"; // If you are pushing more then one logpush datasets into the same Axiom dataset, you can use this to differentiate them.
+    const zone = request.headers.get("requestZone") ?? "unknown"; // If you are pushing more then one logpush datasets into the same Axiom dataset, you can use this to differentiate them.
     const events = request.body
       .pipeThrough(new DecompressionStream("gzip"))
       .pipeThrough(new TextDecoderStream())
@@ -149,32 +151,48 @@ export default {
         parsedEvent.EdgeStartTimestamp ??
         parsedEvent.CreatedAt ??
         parsedEvent.Datetime;
+
+        var endTime =
+        parsedEvent.EdgeEndTimestamp ??
+        parsedEvent.EventTimestampMs ??
+        parsedEvent.Timestamp ??
+        parsedEvent.CreatedAt ??
+        parsedEvent.Datetime;
+      parsedEvent["timeReceived"] = timeStart.toISOString();
+      parsedEvent["source"] = "LogPush";
+
+      try {
+        var parsedTimestamp = new Date(endTime);
+        parsedEvent["eventDelay"] = (timeStart.getTime() - parsedTimestamp.getTime());
+      } catch (error: any) {
+        console.log(`Error parsing EndEdgeTimestamp: ${error}, ${error?.cause}`);
+      }
+      
       eventsToPush.push(parsedEvent);
     }
     let dataset = url.pathname.substring(1);
-    if (env.AuthSecret)
-    {
-    let json = JSON.stringify(eventsToPush);
-    var response = await fetch(
-      `https://api.axiom.co/v1/datasets/${dataset}/ingest`,
-      {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${env.AuthSecret}`,
-        },
-        body: json,
+    if (env.AuthSecret) {
+      let json = JSON.stringify(eventsToPush);
+      var response = await fetch(
+        `https://api.axiom.co/v1/datasets/${dataset}/ingest`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.AuthSecret}`,
+          },
+          body: json,
+        }
+      );
+      if (response.ok == false) {
+        return new Response(`Axiom responded with: ${await response.text()}`, {
+          status: 500,
+        });
       }
-    );
-    if (response.ok == false) {
-      return new Response(`Axiom responded with: ${await response.text()}`, {
-        status: 500,
-      });
-    }
-    console.log(
-      `Ingested ${eventsToPush.length} events into ${dataset} : ${internalType}`
-    );
+      console.log(
+        `Ingested ${eventsToPush.length} events into ${dataset} : ${internalType}`
+      );
     }
     try {
       if (env.IngestRate) {
@@ -191,7 +209,7 @@ export default {
       );
     }
     if (internalType == "HTTP") {
-      ctx.waitUntil(handleHTTPEvents(env, eventsToPush, ctx));
+      ctx.waitUntil(handleHTTPEvents(env, eventsToPush, ctx, zone));
     }
     return new Response("Nom nom!", { status: 202 });
   },
@@ -203,21 +221,23 @@ async function /* `handleHTTPEvents` is a function that takes in an `Env` object
 string using the filtered events and inserts them into a  database using the
 `machines` table. If there are any errors during the process, they are logged to the
 console. */
-handleHTTPEvents(env: Env, httpEvents: any, ctx: ExecutionContext): Promise<void> {
+  handleHTTPEvents(env: Env, httpEvents: any, ctx: ExecutionContext, zone: string): Promise<void> {
 
   const uniqueEvents: any = {};
   const uniqueUpperTierColos: any = {};
   const uniqueSmartRoutingColos: any = {};
   const uniqueEventsArray: object[] = [];
+  var lastEventDate: Date = new Date(0);
+  var oldestEventDate: Date = new Date();
 
   // Remove duplicates and prepare query values
   httpEvents.forEach((event: any) => {
     const key = `${event.EdgeColoID}-${event.ResponseHeaders.metal}`
     if (event.UpperTierColoID != 0 && event.UpperTierColoID.length != 0 && !uniqueUpperTierColos[event.UpperTierColoID])
-    uniqueUpperTierColos[event.UpperTierColoID] = true;
+      uniqueUpperTierColos[event.UpperTierColoID] = true;
 
     if (event.SmartRouteColoID != 0 && event.SmartRouteColoID.length != 0 && !uniqueSmartRoutingColos[event.SmartRouteColoID])
-    uniqueSmartRoutingColos[event.SmartRouteColoID] = true;
+      uniqueSmartRoutingColos[event.SmartRouteColoID] = true;
 
     if (
       !uniqueEvents[key] &&
@@ -226,6 +246,15 @@ handleHTTPEvents(env: Env, httpEvents: any, ctx: ExecutionContext): Promise<void
     ) {
       uniqueEvents[key] = true;
       uniqueEventsArray.push(event);
+    }
+    try {
+      var endEdgeTimestamp = event.EdgeEndTimestamp != null ? new Date(event.EdgeEndTimestamp) : new Date(event.EdgeStartTimestamp);
+      if (endEdgeTimestamp > lastEventDate)
+        lastEventDate = endEdgeTimestamp;
+      if (endEdgeTimestamp < oldestEventDate)
+        oldestEventDate = endEdgeTimestamp;
+    } catch (error: any) {
+      console.log(`Error parsing EndEdgeTimestamp: ${error}, ${error?.cause}`);
     }
   });
 
@@ -251,13 +280,13 @@ handleHTTPEvents(env: Env, httpEvents: any, ctx: ExecutionContext): Promise<void
       upperTierColo = CASE WHEN colos.upperTierColo = 1 THEN 1 ELSE ?4 END;`
     try {
       var requestStartTime = Date.now();
-    
+
       var preparedStmt2 = env.DB2.prepare(sqlite);
-      var db2result = await env.DB2.batch(uniqueEventsArray.map((event: any) =>  preparedStmt2.bind(event.EdgeColoID, parseInt(event.ResponseHeaders.metal))));
+      var db2result = await env.DB2.batch(uniqueEventsArray.map((event: any) => preparedStmt2.bind(event.EdgeColoID, parseInt(event.ResponseHeaders.metal))));
       console.log(`DB2 SQLITE  Execute:  count: ${db2result.reduce((accumulator, item) => accumulator + item.meta.changes, 0)}, dbtime: ${db2result.reduce((accumulator, item) => accumulator + item.meta.duration, 0)}ms, actual time: ${Math.round(Date.now() - requestStartTime)}ms`)
       var requestStartTime = Date.now();
       var preparedStmt2colos = env.DB2.prepare(sqlite2);
-      var db2resultcolos = await env.DB2.batch(uniqueEventsArray.filter((event: any) => event.EdgeColoCode && event.EdgeColoCode.length != 0).map((event: any) =>  preparedStmt2colos.bind(event.EdgeColoID, event.EdgeColoCode, uniqueSmartRoutingColos[event.EdgeColoID] ? 1 : 0, uniqueUpperTierColos[event.EdgeColoID] ? 1 : 0)));
+      var db2resultcolos = await env.DB2.batch(uniqueEventsArray.filter((event: any) => event.EdgeColoCode && event.EdgeColoCode.length != 0).map((event: any) => preparedStmt2colos.bind(event.EdgeColoID, event.EdgeColoCode, uniqueSmartRoutingColos[event.EdgeColoID] ? 1 : 0, uniqueUpperTierColos[event.EdgeColoID] ? 1 : 0)));
       console.log(`DB2 SQLITE Colos  Execute:  count: ${db2resultcolos.reduce((accumulator, item) => accumulator + item.meta.changes, 0)}, dbtime: ${db2resultcolos.reduce((accumulator, item) => accumulator + item.meta.duration, 0)}ms, actual time: ${Math.round(Date.now() - requestStartTime)}ms`)
     } catch (error: any) {
       console.log(`Error inserting into SQLITE: ${error}, ${error?.cause}`);
@@ -265,11 +294,11 @@ handleHTTPEvents(env: Env, httpEvents: any, ctx: ExecutionContext): Promise<void
     try {
       var requestStartTime = Date.now();
       var preparedStmt = env.DB.prepare(sqlite);
-      var dbresult = await env.DB.batch(uniqueEventsArray.map((event: any) =>  preparedStmt.bind(event.EdgeColoID, parseInt(event.ResponseHeaders.metal))));
+      var dbresult = await env.DB.batch(uniqueEventsArray.map((event: any) => preparedStmt.bind(event.EdgeColoID, parseInt(event.ResponseHeaders.metal))));
       console.log(`DB SQLITE  Execute:  count: ${dbresult.reduce((accumulator, item) => accumulator + item.meta.changes, 0)}, dbtime: ${dbresult.reduce((accumulator, item) => accumulator + item.meta.duration, 0)}ms, actual time: ${Math.round(Date.now() - requestStartTime)}ms`)
       var requestStartTime = Date.now();
       var preparedStmtcolos = env.DB.prepare(sqlite2);
-      var dbresultcolos = await env.DB.batch(uniqueEventsArray.filter((event: any) => event.EdgeColoCode && event.EdgeColoCode.length != 0).map((event: any) =>  preparedStmtcolos.bind(event.EdgeColoID, event.EdgeColoCode, uniqueSmartRoutingColos[event.EdgeColoID] ? 1 : 0, uniqueUpperTierColos[event.EdgeColoID] ? 1 : 0)));
+      var dbresultcolos = await env.DB.batch(uniqueEventsArray.filter((event: any) => event.EdgeColoCode && event.EdgeColoCode.length != 0).map((event: any) => preparedStmtcolos.bind(event.EdgeColoID, event.EdgeColoCode, uniqueSmartRoutingColos[event.EdgeColoID] ? 1 : 0, uniqueUpperTierColos[event.EdgeColoID] ? 1 : 0)));
       console.log(`DB SQLITE Colos  Execute:  count: ${dbresultcolos.reduce((accumulator, item) => accumulator + item.meta.changes, 0)}, dbtime: ${dbresultcolos.reduce((accumulator, item) => accumulator + item.meta.duration, 0)}ms, actual time: ${Math.round(Date.now() - requestStartTime)}ms`)
 
     } catch (error: any) {
@@ -278,7 +307,53 @@ handleHTTPEvents(env: Env, httpEvents: any, ctx: ExecutionContext): Promise<void
   } catch (error: any) {
     console.log(`Error inserting into SQLITE: ${error}, ${error?.cause}`);
   }
+  await pushMetadata(env.DB, zone, lastEventDate, oldestEventDate);
+  await pushMetadata(env.DB2, zone, lastEventDate, oldestEventDate);
   return;
+}
+async function pushMetadata(DB: D1Database, zone: string, latestEdgeEnd: Date, oldestEventDate: Date ) {
+  try {
+    var lastUpdate = await DB.prepare("Select Value from meta where Key = 'LastHttpEvent' and Type = 'logpushmeta' limit 1;").first();
+
+    try {
+      if (lastUpdate != null) {
+        var tryParseState = new Date(lastUpdate.Value);
+        if (tryParseState > latestEdgeEnd) {
+          console.log(`pushMetadata returning because latest Edge Update from here is ${latestEdgeEnd}, but DB says it is ${lastUpdate.Value}. Zone ${zone},  Lag: ${(new Date().getTime() - latestEdgeEnd.getTime()) / 1000}, Oldest Event: ${(new Date().getTime() - oldestEventDate.getTime()) / 1000}`)
+          return;
+        }
+      }
+    } catch (error: any) {
+      console.log(`Error parsing last Update from meta: ${error}, ${error?.cause}`);
+    }
+
+    var requestStartTime = Date.now();
+    var updateMeta = DB.prepare(`INSERT OR REPLACE INTO meta (Key, Value, Type)
+    VALUES (?1, ?2, ?3)
+    ON CONFLICT (Key) DO UPDATE SET Value = EXCLUDED.Value;`)
+
+    var newData = [
+      updateMeta.bind("LastDataUpdate", latestEdgeEnd.toISOString(), "colometa"),
+
+    ]
+    if (zone == "chaika.me") {
+      newData.push(updateMeta.bind("LastHttpEvent", latestEdgeEnd.toISOString(), "logpushmeta"));
+    }
+
+    var dbmetaresult = await DB.batch(newData);
+
+    console.log(
+      `DB Meta SQLITE  Execute:  count: ${dbmetaresult.reduce(
+        (accumulator, item) => accumulator + item.meta.changes,
+        0
+      )}, dbtime: ${dbmetaresult.reduce((accumulator, item) => accumulator + item.meta.duration, 0)}ms, actual time: ${Math.round(
+        Date.now() - requestStartTime
+      )}ms, for zone: ${zone}, last edge end ${latestEdgeEnd}, got ${lastUpdate.Value} before this. Lag: ${(new Date().getTime() - latestEdgeEnd.getTime()) / 1000}, Oldest Event: ${(new Date().getTime() - oldestEventDate.getTime()) / 1000}`
+    );
+
+  } catch (error: any) {
+    console.log(`Error inserting into SQLITE: ${error}, ${error?.cause}`);
+  }
 }
 
 async function* streamAsyncIterator(stream: ReadableStream) {
