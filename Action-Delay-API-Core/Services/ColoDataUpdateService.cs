@@ -168,7 +168,7 @@ namespace Action_Delay_API_Core.Services
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true
             };
-            return _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+            return _queue.HTTP(newRequest, location, token);
         }
 
         public async Task TryUpdateColoLocalDB()

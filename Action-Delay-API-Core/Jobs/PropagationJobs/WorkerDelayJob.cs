@@ -18,7 +18,12 @@ namespace Action_Delay_API_Core.Jobs
         private string _generatedValue { get; set; }
         private int _repeatedRunCount = 1;
 
+        public override bool Enabled => _config.DelayJob != null && (_config.DelayJob.Enabled.HasValue == false || _config.DelayJob is { Enabled: true });
+
+
         public override int TargetExecutionSecond => 30;
+
+
 
         public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
@@ -83,7 +88,7 @@ namespace Action_Delay_API_Core.Jobs
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = false
             };
-            return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+            return await _queue.HTTP(newRequest, location, token);
         }
 
         public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)

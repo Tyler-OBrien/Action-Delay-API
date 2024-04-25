@@ -36,6 +36,8 @@ namespace Action_Delay_API_Core.Jobs
 
         public override int TargetExecutionSecond => 40;
 
+        public override bool Enabled => _config.CacheJob != null && (_config.CacheJob.Enabled.HasValue == false || _config.CacheJob is { Enabled: true });
+
 
         public override async Task HandleCompletion()
         {
@@ -181,7 +183,7 @@ namespace Action_Delay_API_Core.Jobs
             {
                 newRequest.Headers.Add("APIKEY", _config.CacheJob.ProxyAPIKey);
             }
-            return  _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+            return  _queue.HTTP(newRequest, location, token);
         }
 
 

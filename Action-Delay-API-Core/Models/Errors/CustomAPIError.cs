@@ -27,6 +27,9 @@ namespace Action_Delay_API_Core.Models.Errors
         {
         }
 
+        // AI only
+        public string LocationName { get; set; }
+
         public int StatusCode { get; set; }
 
         public string WorkerStatusCode { get; set; }

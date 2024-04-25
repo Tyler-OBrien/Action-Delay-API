@@ -1,0 +1,70 @@
+CREATE TABLE job_runs_ai
+(
+ `job_name` String,
+ `run_time` DateTime,
+ `run_length` UInt64, 
+ `run_status` String,
+ `run_info` String,
+ `average_response_latency` UInt32,
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, job_name)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, job_name);
+
+CREATE TABLE api_errors_ai
+(
+ `job_name` String,
+ `location_name` String,
+ `run_time` DateTime,
+ `error_type` String,
+ `error_description` String,
+ `error_hash` String, 
+ `response_latency` UInt32,
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, error_hash)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, error_hash);
+
+
+
+CREATE TABLE job_runs_locations_ai
+(
+ `job_name` String,
+ `location_name` String,
+ `run_time` DateTime,
+ `run_length` UInt64, 
+ `run_status` String,
+ `response_latency` UInt32,
+ `colo_id` int
+)
+ENGINE = MergeTree
+PRIMARY KEY (run_time, job_name, location_name)
+PARTITION BY toYYYYMM(run_time)
+ORDER BY (run_time, job_name, location_name);
+
+ALTER TABLE job_runs_ai
+    MODIFY COLUMN `job_name` LowCardinality(String),
+    MODIFY COLUMN `run_status` LowCardinality(String),
+    MODIFY COLUMN `run_info` LowCardinality(String),
+    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD)
+
+
+
+ALTER TABLE  api_errors_ai
+    MODIFY COLUMN `job_name` LowCardinality(String),
+    MODIFY COLUMN `location_name` LowCardinality(String),
+    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD),
+    MODIFY COLUMN `error_type` LowCardinality(String)
+
+
+
+
+
+ALTER TABLE job_runs_locations_ai
+    MODIFY COLUMN `job_name` LowCardinality(String),
+    MODIFY COLUMN `location_name` LowCardinality(String),
+    MODIFY COLUMN `run_status` LowCardinality(String),
+    MODIFY COLUMN `colo_id` LowCardinality(Int32),
+    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD)

@@ -12,5 +12,7 @@
         public string Location { get; set; }
 
         public string NodeName { get; set; }
+
+        public string HttpRequestSecret { get; set; }
     }
 }

@@ -24,6 +24,7 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
                     ? error.StatusCode.ToString()
                     : error.WorkerStatusCode,
                 ResponseLatency = (uint)(error.ResponseTimeMs ?? 0),
+                LocationName = error.LocationName
             };
             newClickhouseError.ErrorHash =
                 Sha256Hash(newClickhouseError.ErrorDescription, newClickhouseError.ErrorType);
@@ -51,6 +52,10 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
         }
 
         public string JobName { get; set; }
+
+
+        // Used only for AI
+        public string LocationName { get; set; }
 
         public DateTime RunTime { get; set; }
         public string ErrorType { get; set; }

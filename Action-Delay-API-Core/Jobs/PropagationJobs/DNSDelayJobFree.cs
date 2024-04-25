@@ -20,5 +20,8 @@ namespace Action_Delay_API_Core.Jobs
 
         public override int TargetExecutionSecond => 55;
 
+        public override bool Enabled => _config.DNSJobFree != null && (_config.DNSJobFree.Enabled.HasValue == false || _config.DNSJobFree is { Enabled: true });
+
+
     }
 }

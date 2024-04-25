@@ -21,6 +21,9 @@ public class ZoneAnalyticsDelayJob : BaseJob
     {
     }
     public override int TargetExecutionSecond => 25;
+
+    public override bool Enabled => _config.ZoneAnalyticsDelayJob != null && (_config.ZoneAnalyticsDelayJob.Enabled.HasValue == false || _config.ZoneAnalyticsDelayJob is { Enabled: true });
+
     public override async Task RunAction()
     {
         // depends on plan, maybe shouldn't be hardcoded?

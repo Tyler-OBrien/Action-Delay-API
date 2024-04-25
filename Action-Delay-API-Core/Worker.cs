@@ -83,12 +83,19 @@ namespace Action_Delay_API_Core
             try
             {
                 
-                foreach (var memoryJob in _jobs)
+                foreach (var memoryJob in _jobs.Where(job => job.Disabled == false).ToList())
                 {
                     if (memoryJob.NextExecutionTime == null)
                     {
                         using var jobScope = _scopeFactory.CreateScope();
                         var job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as BaseJob;
+
+                        if (job!.Enabled == false)
+                        {
+                            _logger.LogInformation($"{job.Name} disabled, moving on.");
+                            memoryJob.Disabled = true;
+                            continue;
+                        }
 
                         var currentDateTime = DateTime.UtcNow;
                         var targetDateTime = new DateTime(currentDateTime.Year, currentDateTime.Month, currentDateTime.Day,

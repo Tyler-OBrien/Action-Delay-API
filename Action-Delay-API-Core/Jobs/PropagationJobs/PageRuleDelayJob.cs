@@ -26,6 +26,9 @@ public class PageRuleDelayJob : BasePropagationJob
 
 
     public override int TargetExecutionSecond => 05;
+
+    public override bool Enabled => _config.PageRuleJob != null && (_config.PageRuleJob.Enabled.HasValue == false || _config.PageRuleJob is { Enabled: true });
+
     public override string Name => "Page Rule Update Delay Job";
 
     public override string InternalName => "pagerule";
@@ -109,7 +112,7 @@ public class PageRuleDelayJob : BasePropagationJob
             TimeoutMs = 10_000,
             EnableConnectionReuse = false
         };
-        return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+        return await _queue.HTTP(newRequest, location, token);
     }
 
     public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)

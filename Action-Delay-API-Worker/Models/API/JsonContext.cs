@@ -20,7 +20,7 @@ namespace Action_Delay_API_Worker.Models.API
     [JsonSerializable(typeof(JobStartRequestResponse))]
     [JsonSerializable(typeof(JobStatusRequestResponse))]
     [JsonSerializable(typeof(JobEndRequestResponse))]
-
+    [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, AllowTrailingCommas = true)]
     internal partial class SerializableRequestJsonContext : JsonSerializerContext
     {
     }

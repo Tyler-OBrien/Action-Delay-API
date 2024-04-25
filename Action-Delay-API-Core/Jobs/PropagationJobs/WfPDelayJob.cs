@@ -23,6 +23,9 @@ namespace Action_Delay_API_Core.Jobs
         private string _scriptName { get; set; }
         public override int TargetExecutionSecond => 20;
 
+        public override bool Enabled => _config.WfPJob != null && (_config.WfPJob.Enabled.HasValue == false || _config.WfPJob is { Enabled: true });
+
+
         public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
         }
@@ -92,8 +95,9 @@ namespace Action_Delay_API_Core.Jobs
                 NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = false,
+                ReturnBody = true
             };
-            return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+            return await _queue.HTTP(newRequest, location, token);
         }
 
         public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)

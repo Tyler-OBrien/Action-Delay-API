@@ -56,6 +56,7 @@ public abstract class BaseJob
 
 
     public abstract int TargetExecutionSecond { get; }
+    public abstract bool Enabled { get; }
 
 
 

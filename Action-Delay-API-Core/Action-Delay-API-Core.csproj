@@ -7,7 +7,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <UserSecretsId>dotnet-Action_Delay_API_Core-d70128d1-fab6-4d42-94cf-7600870d3be1</UserSecretsId>
     <RootNamespace>Action_Delay_API_Core</RootNamespace>
-	  <SelfContained>true</SelfContained>
 	  <GenerateRuntimeConfigDevFile>true</GenerateRuntimeConfigDevFile>
 	  <Deterministic>true</Deterministic>
 	  <DebugType>embedded</DebugType>
@@ -16,7 +15,7 @@
 	  <AssemblyVersion>2.2.0</AssemblyVersion>
 	  <FileVersion>2.2.0</FileVersion>
 	  <Version>2.2.0</Version>
-	  
+	  <SelfContained>true</SelfContained>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -40,6 +39,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="8.0.3" />
     <PackageReference Include="NATS.Net" Version="2.1.3" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
     <PackageReference Include="Sentry" Version="4.2.1" />
     <PackageReference Include="Sentry.Extensions.Logging" Version="4.2.1" />
@@ -49,15 +49,26 @@
     <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Helpers\" />
+    <Folder Include="Resources\" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="appsettings.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Resources\sampleaudio.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\sampleimage.jpg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 </Project>

@@ -31,6 +31,9 @@ namespace Action_Delay_API_Core.Jobs
 
 
         public override int TargetExecutionSecond => 50;
+
+        public override bool Enabled => _config.WAFJob != null && (_config.WAFJob.Enabled.HasValue == false || _config.WAFJob is { Enabled: true });
+
         public override string Name => "Custom Rule Block Delay Job";
 
         public override string InternalName => "waf";
@@ -117,7 +120,7 @@ namespace Action_Delay_API_Core.Jobs
                 NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000
             }; 
-            return await _queue.HTTP(newRequest, location.NATSName ?? location.Name, token);
+            return await _queue.HTTP(newRequest, location, token);
         }
 
         public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)

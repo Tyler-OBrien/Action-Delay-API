@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using Action_Delay_API_Core.Models.NATS.Responses;
@@ -28,7 +28,7 @@ namespace Action_Delay_API_Core.Services
             var myRegistry = new NatsJsonContextSerializerRegistry(SerializableRequestJsonContext.Default);
 
 
-            var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(15), ConnectTimeout  = TimeSpan.FromSeconds(15), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(15)};
+            var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout  = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60)};
             _natsConnection = new NatsConnection(options);
 
 
@@ -36,11 +36,11 @@ namespace Action_Delay_API_Core.Services
         }
 
 
-        public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, string location, CancellationToken token)
+        public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, Location location, CancellationToken token)
         {
             using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
             newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
-            var tryGetReply = await SendMessage<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location}", request, cancellationToken: newCancellationTokenSource.Token);
+            var tryGetReply = await SendMessage<NATSDNSRequest, SerializableDNSResponse>($"DNS-{location.NATSName ?? location.Name}", request, cancellationToken: newCancellationTokenSource.Token);
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
             if (tryGetReply.ValueOrDefault == null)
@@ -48,11 +48,11 @@ namespace Action_Delay_API_Core.Services
             return tryGetReply.ValueOrDefault;
         }
 
-        public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, string location, CancellationToken token)
+        public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, Location location, CancellationToken token, int secondsTimeout = 30)
         {
             using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
-            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
-            var tryGetReply = await SendMessage<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location}", request, cancellationToken: newCancellationTokenSource.Token);
+            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(secondsTimeout));
+            var tryGetReply = await SendMessage<NATSHttpRequest, SerializableHttpResponse>($"HTTP-{location.NATSName ?? location.Name}", request, cancellationToken: newCancellationTokenSource.Token, secondsTimeout);
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
             if (tryGetReply.ValueOrDefault == null) 
@@ -60,12 +60,12 @@ namespace Action_Delay_API_Core.Services
             return tryGetReply.ValueOrDefault;
         }
 
-        public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken)
+        public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30)
         {
             try
             {
 
-                var tryGetMessage = await _natsConnection.RequestAsync<TIn, tOut>(subject, message, cancellationToken: cancellationToken, replyOpts: new NatsSubOpts() { Timeout = TimeSpan.FromSeconds(15), StartUpTimeout = TimeSpan.FromSeconds(15), IdleTimeout = TimeSpan.FromSeconds(15)});
+                var tryGetMessage = await _natsConnection.RequestAsync<TIn, tOut>(subject, message, cancellationToken: cancellationToken, replyOpts: new NatsSubOpts() { Timeout = TimeSpan.FromSeconds(60), StartUpTimeout = TimeSpan.FromSeconds(60), IdleTimeout = TimeSpan.FromSeconds(60)});
                 if (tryGetMessage.Data == null)
                     return Result.Fail($"Failed to get message from {subject}");
 

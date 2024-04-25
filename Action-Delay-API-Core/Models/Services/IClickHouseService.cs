@@ -1,6 +1,7 @@
-﻿using Action_Delay_API_Core.Models.API.CompatAPI;
+using Action_Delay_API_Core.Models.API.CompatAPI;
 using Action_Delay_API_Core.Models.API.Quick;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
+using Action_Delay_API_Core.Models.Services.ClickHouse;
 
 namespace Action_Delay_API_Core.Models.Services
 {
@@ -8,6 +9,10 @@ namespace Action_Delay_API_Core.Models.Services
     {
         Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, ClickhouseAPIError? apiError,
             CancellationToken token = default);
+
+        Task InsertRunAI(List<ClickhouseJobRun> run, List<ClickhouseJobLocationRun>? locations,
+            List<ClickhouseAPIError>? apiError = null, CancellationToken token = default);
+
 
         Task<List<DeploymentStatistic>> GetCompatibleDeploymentStatistics(CancellationToken token = default);
 

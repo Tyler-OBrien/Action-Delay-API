@@ -33,6 +33,8 @@ namespace Action_Delay_API_Core.Jobs
 
 
         public override int TargetExecutionSecond => 10;
+        public override bool Enabled => _config.DNSJob != null && (_config.DNSJob.Enabled.HasValue == false || _config.DNSJob is { Enabled: true });
+
         public override string Name => "DNS Delay Job";
         public override string InternalName => "dns";
 
@@ -88,7 +90,7 @@ namespace Action_Delay_API_Core.Jobs
                 NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 5000
             }; 
-            return await _queue.DNS(newRequest, location.NATSName ?? location.Name, token);
+            return await _queue.DNS(newRequest, location, token);
         }
 
         public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)

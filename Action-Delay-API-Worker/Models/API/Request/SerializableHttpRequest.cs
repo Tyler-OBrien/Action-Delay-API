@@ -20,6 +20,16 @@ namespace Action_Deplay_API_Worker.Models.API.Request
 
         public bool? EnableConnectionReuse { get; set; }
 
+        public MethodType? Method { get; set; }
+
+        public string? Base64Body { get; set; }
+
+        public byte[]? Body { get; set; }
+
+        public string? ContentType { get; set; }
+
+        public bool? ReturnBody { get; set; }
+
     }
 
 }

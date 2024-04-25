@@ -58,7 +58,7 @@ namespace Action_Deplay_API_Worker
             var myRegistry = new NatsJsonContextSerializerRegistry(SerializableRequestJsonContext.Default);
 
 
-            var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL, MaxReconnectRetry = -1, SerializerRegistry = myRegistry};
+            var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL, MaxReconnectRetry = -1, SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), RequestTimeout = TimeSpan.FromSeconds(60)};
             await using var natsConnection = new NatsConnection(options);
 
             await natsConnection.ConnectAsync();

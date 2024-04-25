@@ -8,9 +8,14 @@
 
         public string NATSConnectionURL { get; set; }
 
+        public bool UsingNATS { get; set; }
+
         public string PostgresConnectionString { get; set; }
 
         public string ClickhouseConnectionString { get; set; }
+
+        public string ActionDelayProxySecret { get; set; }
+
 
 
 
@@ -23,23 +28,33 @@
 
         public int Min_Locations { get; set; }
 
-        public WorkerDelayJobConfig DelayJob { get; set; }
+        public WorkerDelayJobConfig? DelayJob { get; set; }
 
-        public WfPDelayJobConfig WfPJob { get; set; }
+        public WfPDelayJobConfig? WfPJob { get; set; }
 
 
-        public DNSDelayJobConfig DNSJob { get; set; }
-        public DNSDelayJobConfig DNSJobFree { get; set; }
+        public DNSDelayJobConfig? DNSJob { get; set; }
+        public DNSDelayJobConfig? DNSJobFree { get; set; }
 
-        public CustomRuleUpdateConfig WAFJob { get; set; }
-        public CacheDelayJobConfig CacheJob { get; set; }
-        public ZoneAnalyticDelayJob ZoneAnalyticsDelayJob { get; set; }
-        public PageRuleUpdateConfig PageRuleJob { get; set; }
+        public CustomRuleUpdateConfig? WAFJob { get; set; }
+        public CacheDelayJobConfig? CacheJob { get; set; }
+        public ZoneAnalyticDelayJob? ZoneAnalyticsDelayJob { get; set; }
+        public PageRuleUpdateConfig? PageRuleJob { get; set; }
+        public AIConfig? AI { get; set; }
 
     }
 
+    public class AIConfig : BaseConfig
+    {
+        public string API_Key { get; set; }
+        public string AccountId { get; set; }
+        public string AIWorkerHostname { get; set; }
+        public string AIWorkerSecret { get; set; }
+        public List<string> Locations { get; set; }
 
-    public class PageRuleUpdateConfig
+    }
+
+    public class PageRuleUpdateConfig : BaseConfig
     {
         public string API_Key { get; set; }
         public string ZoneId { get; set; }
@@ -50,14 +65,14 @@
 
     }
 
-    public class ZoneAnalyticDelayJob
+    public class ZoneAnalyticDelayJob : BaseConfig
     {
         public string API_Key { get; set; }
 
         public string ZoneId { get; set; }
 
     }
-    public class WfPDelayJobConfig
+    public class WfPDelayJobConfig : BaseConfig
     {
         public string API_Key { get; set; }
 
@@ -74,7 +89,7 @@
     }
 
 
-    public class WorkerDelayJobConfig
+    public class WorkerDelayJobConfig : BaseConfig
     {
         public string API_Key { get; set; }
 
@@ -87,7 +102,7 @@
 
     }
 
-    public class DNSDelayJobConfig
+    public class DNSDelayJobConfig : BaseConfig
     {
         public string API_Key { get; set; }
         public string ZoneId { get; set; }
@@ -98,7 +113,7 @@
 
     }
 
-    public class CustomRuleUpdateConfig
+    public class CustomRuleUpdateConfig : BaseConfig
     {
         public string API_Key { get; set; }
         public string ZoneId { get; set; }
@@ -110,7 +125,7 @@
 
     }
 
-    public class CacheDelayJobConfig
+    public class CacheDelayJobConfig : BaseConfig
     {
         public string API_Key { get; set; }
         public string ZoneId { get; set; }
@@ -121,5 +136,10 @@
 
         public string ProxyAPIKey { get; set; }
 
+    }
+
+    public class BaseConfig
+    {
+        public bool? Enabled { get; set; }
     }
 }

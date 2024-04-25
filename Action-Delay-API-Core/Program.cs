@@ -1,8 +1,13 @@
+using System.Net;
+using System.Net.Security;
 using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
+using System.Security.Authentication;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Broker.ColoData;
+using Action_Delay_API_Core.Jobs.AI;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
@@ -42,6 +47,10 @@ public class Program
 #if !DEBUG
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
 #endif
+            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+            .MinimumLevel.Override("System", LogEventLevel.Warning)
+            .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .WriteTo.File("Logs/Log.log", outputTemplate: outputFormat,
                 restrictedToMinimumLevel: LogEventLevel.Information, retainedFileCountLimit: 10,
                 rollingInterval: RollingInterval.Day).WriteTo
@@ -120,6 +129,8 @@ public class Program
                     .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                     .AddPolicyHandler(GetRetryPolicy());
 
+
+
                 services.AddTransient<ICloudflareAPIBroker, CloudflareAPIBroker>();
 
 
@@ -129,7 +140,43 @@ public class Program
 
                 services.AddTransient<IColoDataBroker, ColoDataBroker>();
 
-                services.AddSingleton<IQueue, NATSQueue>();
+
+                if (baseConfiguration.UsingNATS == false)
+                {
+                    services.AddHttpClient("HttpQueueClient")
+                        .ConfigureHttpClient(httpClient =>
+                        {
+                            httpClient.DefaultRequestVersion = HttpVersion.Version11;
+                            httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+                            httpClient.DefaultRequestHeaders.ConnectionClose = false;
+                        })
+                        .ConfigurePrimaryHttpMessageHandler((sp) =>
+                        {
+                            return new SocketsHttpHandler
+                            {
+                                PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+                                EnableMultipleHttp2Connections = true,
+                                AllowAutoRedirect = false,
+                                MaxConnectionsPerServer = Int32.MaxValue,
+                                SslOptions = new SslClientAuthenticationOptions
+                                {
+                                    // internal certs are self-signed, all going over tailscale though (and if you were to deploy this, the same would be recommended, wireguard/headscale/tailscale/encryption)
+
+                                    RemoteCertificateValidationCallback = (sender, certificate, chain, errors) => true
+                                }
+                            };
+                        })
+                        .AddPolicyHandler(GetRetryPolicy());
+
+                    services.AddTransient<IQueue, HttpQueue>();
+                }
+
+                else
+                {
+                    services.AddSingleton<IQueue, NATSQueue>();
+                }
+
+                services.AddSingleton<IAIJobConfigs, AIJobConfigs>();
 
                 services.AddScoped<IColoDataUpdateService, ColoDataUpdateService>();
 

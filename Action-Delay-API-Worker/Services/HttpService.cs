@@ -8,6 +8,7 @@ using Action_Deplay_API_Worker.Models.API.Request;
 using Action_Deplay_API_Worker.Models;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 using System.Diagnostics.Tracing;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
 
@@ -60,12 +61,44 @@ namespace Action_Deplay_API_Worker.Services;
                         httpVersion = HttpVersion.Version30;
                 }
 
+                bool wantsBody = incomingRequest.ReturnBody == null || incomingRequest.ReturnBody.Value;
+
                 string perfInfo = string.Empty;
                 double responseTimeMs = -1;
+                bool couldGetBody = true;
                 var response =
                     await httpRetryPolicy.ExecuteAsync(async () =>
                     {
-                        var request = new HttpRequestMessage(HttpMethod.Get, url);
+                        HttpMethod method = HttpMethod.Get;
+                        if (incomingRequest.Method != null)
+                            switch (incomingRequest.Method)
+                            {
+                                case MethodType.GET:
+                                    method = HttpMethod.Get;
+                                    break;
+                                case MethodType.POST:
+                                    method = HttpMethod.Post;
+                                    break;
+                                case MethodType.PUT:
+                                    method = HttpMethod.Put;
+                                    break;
+                                case MethodType.PATCH:
+                                    method = HttpMethod.Patch;
+                                    break;
+                                case MethodType.DELETE:
+                                    method = HttpMethod.Delete;
+                                    break;
+                                case MethodType.OPTIONS:
+                                    method = HttpMethod.Options;
+                                    break;
+                                case MethodType.HEAD:
+                                    method = HttpMethod.Head;
+                                    break;
+                                default:
+                                    method = HttpMethod.Get;
+                                    break;
+                            }
+                        var request = new HttpRequestMessage(method, url);
                         request.Version = httpVersion;
                         request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
                         if (incomingRequest.EnableConnectionReuse is null or false)
@@ -78,16 +111,43 @@ namespace Action_Deplay_API_Worker.Services;
                         request.Headers.Add("X-Action-Delay-API-Worker-Version", Assembly.GetCallingAssembly().GetName().Version.ToString());
 
 
+                        if (incomingRequest.Body != null)
+                        {
+                            // buffer in and over...
+                            var bytes = incomingRequest.Body;
+                            request.Content = new ByteArrayContent(bytes);
+                            _logger.LogWarning($"We got a request for {incomingRequest.URL}, it was {bytes.Length} bytes length from the body of the request itself.");
+                            if (MediaTypeHeaderValue.TryParse(incomingRequest.ContentType, out var contentType))
+                                request.Content.Headers.ContentType = contentType;
+                        }
 
+
+                        if (String.IsNullOrWhiteSpace(incomingRequest.Base64Body) == false)
+                        {
+                            var decodedBody = Convert.FromBase64String(incomingRequest.Base64Body);
+
+                            request.Content = new ByteArrayContent(decodedBody);
+                            if (MediaTypeHeaderValue.TryParse(incomingRequest.ContentType, out var contentType))
+                                request.Content.Headers.ContentType = contentType;
+                        }
+
+                 
+
+
+                        MemoryStream content = null;
                         HttpClient newClient = null;
                         try
                         {
                             newClient = NewHttpClient(incomingRequest.EnableConnectionReuse ?? false);
                             newClient.Timeout = TimeSpan.FromMilliseconds(incomingRequest.TimeoutMs ?? 10_000);
+                            var newCancellationToken = new CancellationTokenSource();
+                            newCancellationToken.CancelAfter(incomingRequest.TimeoutMs ?? 10_000);
                             request.Options.Set(new HttpRequestOptionsKey<NetType>("IPVersion"),
                                 incomingRequest.NetType ?? NetType.Either);
                             using var listener = new HttpEventListener();
-                            var response = await newClient.SendAsync(request);
+                            var response = await newClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                            var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token);
+      
                             var timings = listener.GetTimings();
                             if (timings is { Request: not null, Dns: not null })
                                 responseTimeMs = timings.Request.Value.TotalMilliseconds -
@@ -96,6 +156,8 @@ namespace Action_Deplay_API_Worker.Services;
                                 responseTimeMs = timings.Request.Value.TotalMilliseconds;
                             perfInfo =
                                 $"DNS: {timings.Dns?.TotalMilliseconds ?? 0}ms, Connect: {timings.SocketConnect?.TotalMilliseconds ?? 0}ms, SSL: {timings.SslHandshake?.TotalMilliseconds ?? 0}ms, Request: {timings.Request?.TotalMilliseconds ?? 0}ms, Response Headers: {timings.ResponseHeaders?.TotalMilliseconds ?? 0}ms, Response Content: {timings.ResponseContent?.TotalMilliseconds ?? 0}ms.";
+                            response.Content = new StreamContent(responseContent.Item1);
+                            couldGetBody = responseContent.Item2;
                             return response;
                         }
                         finally
@@ -103,6 +165,24 @@ namespace Action_Deplay_API_Worker.Services;
                             newClient?.Dispose();
                         }
                     });
+
+                if (couldGetBody == false && wantsBody)
+                {
+                    _logger.LogWarning(
+                        "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, the return body was too large, Http Status Code: {httpErrorStatus}",
+                        incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs,
+                        incomingRequest.NetType, incomingRequest.EnableConnectionReuse, response.StatusCode);
+                    return new SerializableHttpResponse
+                    {
+                        WasSuccess = false,
+                        StatusCode = HttpStatusCode.BadGateway,
+                        ProxyFailure = true,
+                        Headers = response.Headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value)),
+                        Body = string.Empty,
+                        Info = $"The Response Body was too large",
+                        ResponseTimeMs = Math.Round(responseTimeMs, 3),
+                    };
+                }
 
                 _logger.LogInformation(
                     "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, we got back {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}. Timings: {perfInfo}",
@@ -161,8 +241,39 @@ namespace Action_Deplay_API_Worker.Services;
         }
 
 
+ 
 
-        private static readonly IAsyncPolicy<HttpResponseMessage> httpRetryPolicy =
+    public async Task<(MemoryStream, bool)> ReadResponseWithLimit(HttpResponseMessage msg, CancellationToken token)
+        {
+            var byteLimit = 10 * 1024 * 1024; // 10 MB
+            var totalBytesRead = 0L;
+            var memStream = new MemoryStream();
+
+            using (var stream = await msg.Content.ReadAsStreamAsync(token))
+            {
+                var buffer = new byte[8192];
+                var bytesRead = 0;
+
+                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, token)) > 0)
+                {
+                    totalBytesRead += bytesRead;
+
+                    if (totalBytesRead > byteLimit)
+                    {
+                        return (null, false);
+                    }
+
+                    await memStream.WriteAsync(buffer, 0, bytesRead, token);
+                }
+            }
+
+            memStream.Position = 0;
+            return (memStream, true);
+        }
+
+
+
+    private static readonly IAsyncPolicy<HttpResponseMessage> httpRetryPolicy =
             HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
