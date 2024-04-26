@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Services;
 using Action_Delay_API_Core.Models.Services.ClickHouse;
 using System;
+using Action_Delay_API_Core.Models.API.CompatAPI;
 
 namespace Action_Delay_API.Services.v2;
 
@@ -70,6 +71,41 @@ public class AnalyticsService : IAnalyticsService
         return Result.Ok();
     }
 
+    public NormalJobAnalyticsPoint JobDataFromOptions(JobData jobData, JobAnalyticsRequestOptions options)
+    {
+        var newJobAnalyticsPoint = new NormalJobAnalyticsPoint();
+
+        newJobAnalyticsPoint.Undeployed = true;
+        newJobAnalyticsPoint.TimePeriod = jobData.CurrentRunTime!.Value;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.MinRunLength))
+            newJobAnalyticsPoint.MinRunLength = jobData.CurrentRunLengthMs;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.MaxRunLength))
+            newJobAnalyticsPoint.MaxRunLength = jobData.CurrentRunLengthMs;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.AvgRunLength))
+            newJobAnalyticsPoint.AvgRunLength = jobData.CurrentRunLengthMs;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.MedianRunLength))
+            newJobAnalyticsPoint.MedianRunLength = jobData.CurrentRunLengthMs;
+
+        /*
+        if (options.HasFlag(JobAnalyticsRequestOptions.MinResponseLatency))
+            newJobAnalyticsPoint.MinResponseLatency = jobData.APIResponseTimeUtc;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.MaxResponseLatency))
+            newJobAnalyticsPoint.MaxResponseLatency = jobData.APIResponseTimeUtc;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.AvgResponseLatency))
+            newJobAnalyticsPoint.AvgResponseLatency = jobData.APIResponseTimeUtc;
+
+        if (options.HasFlag(JobAnalyticsRequestOptions.MedianResponseLatency))
+            newJobAnalyticsPoint.MedianResponseLatency = jobData.APIResponseTimeUtc;
+        */
+        return newJobAnalyticsPoint;
+    }
+
     public async Task<Result<DataResponse<NormalJobAnalyticsDTO>>> GetJobAnalytics(string jobName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
     {
         var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);
@@ -81,8 +117,18 @@ public class AnalyticsService : IAnalyticsService
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
+        var getCurrentJobStatusTask = _genericServersContext.JobData.FirstOrDefaultAsync(job => job.InternalJobName == tryGetJobInternalName, token);
+    
+        var getAnalyticsTask =  _clickhouseService.GetNormalJobAnalytics(jobName, startDateTime, endDateTime, maxPoints, options, token);
+        await Task.WhenAll(getAnalyticsTask, getCurrentJobStatusTask);
+        var getCurrentJobStatus = getCurrentJobStatusTask.Result;
+        var getAnalytics = getAnalyticsTask.Result;
 
-        var getAnalytics =  await _clickhouseService.GetNormalJobAnalytics(jobName, startDateTime, endDateTime, maxPoints, options, token);
+
+        if (getCurrentJobStatus is { CurrentRunStatus: not null } and { CurrentRunStatus: "Undeployed", CurrentRunLengthMs: not null, CurrentRunTime: not null } && endDateTime > getCurrentJobStatus.CurrentRunTime)
+        {
+            getAnalytics.Points.Add(JobDataFromOptions(getCurrentJobStatus, options));
+        }
         return new DataResponse<NormalJobAnalyticsDTO>(new NormalJobAnalyticsDTO(getAnalytics, jobName));
 
     }

@@ -46,6 +46,7 @@ namespace Action_Delay_API.Models.API.Responses.DTOs.v2.Analytics
                     MaxApiResponseLatency = normalJobAnalyticsPoint.MaxResponseLatency,
                     AvgApiResponseLatency = normalJobAnalyticsPoint.AvgResponseLatency,
                     MedianApiResponseLatency = normalJobAnalyticsPoint.MedianResponseLatency,
+                    Undeployed = normalJobAnalyticsPoint.Undeployed,
                 });
             }
         }
@@ -63,6 +64,11 @@ namespace Action_Delay_API.Models.API.Responses.DTOs.v2.Analytics
     {
         [JsonPropertyName("timePeriod")]
         public DateTime TimePeriod { get; set; }
+
+        [JsonPropertyName("undeployed")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? Undeployed { get; set; }
+
 
         [JsonPropertyName("minRunLength")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
