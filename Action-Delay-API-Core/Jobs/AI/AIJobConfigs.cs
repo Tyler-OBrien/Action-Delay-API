@@ -69,19 +69,15 @@ namespace Action_Delay_API_Core.Jobs.AI
             // Automatic Speech Recognition / dfce1c48-2a81-462e-a7fd-de97ce985207 
             if (model.Task.Name.Equals("Automatic Speech Recognition", StringComparison.OrdinalIgnoreCase) || model.Task.Id.Equals("dfce1c48-2a81-462e-a7fd-de97ce985207", StringComparison.Ordinal))
             {
-                // whisper
-                if (model.Name.Equals("@cf/openai/whisper", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("c1c12ce4-c36a-4aa6-8da4-f63ba4b8984d", StringComparison.Ordinal))
+                // global for now
+                return new AIJobConfig()
                 {
-                    return new AIJobConfig()
-                    {
-                        ModelName = model.Name,
-                        Input = "uint8array",
-                        InputField = "audio",
-                        OutputType = "json",
-                        Content = GetNewAudio(),
-                    };
-                }
-                // no fallback for this type.
+                    ModelName = model.Name,
+                    Input = "uint8array",
+                    InputField = "audio",
+                    OutputType = "json",
+                    Content = GetNewAudio(),
+                };
             }
             // Image Classification / 00cd182b-bf30-4fc4-8481-84a3ab349657
             else if (model.Task.Name.Equals("Image Classification", StringComparison.OrdinalIgnoreCase) || model.Task.Id.Equals("00cd182b-bf30-4fc4-8481-84a3ab349657", StringComparison.Ordinal))
@@ -104,7 +100,8 @@ namespace Action_Delay_API_Core.Jobs.AI
             else if (model.Task.Name.Equals("Image-to-Text", StringComparison.OrdinalIgnoreCase) || model.Task.Id.Equals("882a91d1-c331-4eec-bdad-834c919942a8", StringComparison.Ordinal))
             {
                 // 
-                if (model.Name.Equals("@cf/unum/uform-gen2-qwen-500m", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("3dca5889-db3e-4973-aa0c-3a4a6bd22d29", StringComparison.Ordinal))
+                if ((model.Name.Equals("@cf/unum/uform-gen2-qwen-500m", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("3dca5889-db3e-4973-aa0c-3a4a6bd22d29", StringComparison.Ordinal)) ||
+                    (model.Name.Equals("@cf/llava-hf/llava-1.5-7b-hf", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("3dca5889-db3e-4973-aa0c-3a4a6bd22d29", StringComparison.Ordinal)))
                 {
                     return new AIJobConfig()
                     {
