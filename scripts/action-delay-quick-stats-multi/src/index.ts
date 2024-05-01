@@ -239,7 +239,7 @@ ${!job.cron ? `
 </body>
 <script>
 // Auto call function on load
-
+medianTime1d = {}
 
 var jobs = [
 {
@@ -281,7 +281,8 @@ short: "waf"
 {
     display: "Workers CRON Delay",
     internalName: "CRON Delay Job",
-    short: "cron"
+    short: "cron",
+    cron: true
 },
 {
     display: "Zone Analytics Delay",
@@ -316,10 +317,12 @@ try
 
 let delay = document.getElementById('delay' + job.short);
 let pending = document.getElementById('pending' + job.short);
+var getJobMedian = medianTime1d[job.short]
+var runTimeToUse = currentInfoData.currentRunTime;
 if (currentInfoData.currentRunStatus === "Deployed") {
     if (job.short === "cron") {
         let cronId = document.getElementById('cron' + job.short);
-        delay.textContent = formatTime(currentInfoData.currentRunLengthMs) + " ago";
+        delay.textContent = "Last Event: " + formatTime(new Date() - new Date(currentInfoData.currentRunTime)) + " ago"
         if (currentInfoData.currentRunLengthMs < 120000) {
             cronId.textContent = "Healthy";
             cronId.className = 'sub-header highlightGreen';
@@ -334,9 +337,9 @@ if (currentInfoData.currentRunStatus === "Deployed") {
     }
     pending.className = '';
     pending.textContent = '';
-} else if (currentInfoData.currentRunStatus === "Undeployed" && currentInfoData.currentRunLengthMs > 5000) {
+} else if (currentInfoData.currentRunStatus === "Undeployed" && ((!getJobMedian || currentInfoData.currentRunLengthMs  > getJobMedian * 1.2) && currentInfoData.currentRunLengthMs > 5000)) {
     delay.textContent = formatTime(currentInfoData.currentRunLengthMs);
-    if (currentInfoData.currentRunLengthMs > 60000)
+    if ((!getJobMedian || (currentInfoData.currentRunLengthMs * 3) > getJobMedian) && currentInfoData.currentRunLengthMs > 30000)
     {
         pending.textContent = 'IN PROGRESS';
         pending.className = 'highlightRed';
@@ -356,12 +359,13 @@ else
     delay.textContent = formatTime(currentInfoData.lastRunLengthMs);
     pending.className = '';
     pending.textContent = '';
+    runTimeToUse = currentInfoData.lastRunTime;
 }
 
-document.getElementById('lastUpdated' + job.short).textContent = "Last Updated: " + new Date(currentInfoData.currentRunTime).toLocaleTimeString();
+document.getElementById('lastUpdated' + job.short).textContent = "Last Update: " + formatTime(new Date() - new Date(runTimeToUse)) + " ago";
 
 } catch (error) {
-console.error(\`Fetch failed: \${error}\`);
+console.error(\`Fetch failed: \${error}\, \${error.lineNumber\}\`);
 }
 }
 
@@ -378,6 +382,8 @@ quickAnalyticsData.forEach((item) => {
 switch (item.period) {
 case "Last 1 Day":
     dailyMedian = formatTime(parseInt(item.median_run_length));
+    if (item.median_run_length && (parseInt(item.median_run_length)) > 0)
+        medianTime1d[job.short] = parseInt(item.median_run_length);
     break;
 case "Last 30 Days":
     monthlyMedian = formatTime(parseInt(item.median_run_length));
@@ -386,19 +392,20 @@ case "Last 90 Days":
     quarterlyMedian = formatTime(parseInt(item.median_run_length));
     break;
 default:
-    peakPeriod = formatTime(parseInt(item.median_run_length));;
+    peakPeriod = formatTime(parseInt(item.median_run_length));
     document.getElementById('peak-period' + job.short).textContent = \`From \${new Date(item.period + "Z").toLocaleTimeString()} - \${new Date(new Date(item.period + "Z").getTime() + parseInt(item.median_run_length)).toLocaleTimeString()} \`
 }
 })
 
 document.getElementById('peak' + job.short).textContent = "Last 24H Peak of " + peakPeriod;
+if (job.cron) continue;
 document.getElementById('median1' + job.short).textContent = "1 Day Median: " + dailyMedian;
 document.getElementById('median2' + job.short).textContent = "30 Days Median: " + monthlyMedian;
 document.getElementById('median3' + job.short).textContent = "90 Days Median: " + quarterlyMedian;
 
 
 } catch (error) {
-console.error(\`Fetch failed: \${error}\`);
+    console.error(\`Fetch failed: \${error}\, \${error.lineNumber\}\`);
 }
 }
 
