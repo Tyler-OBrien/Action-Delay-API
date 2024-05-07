@@ -79,7 +79,7 @@ namespace Action_Delay_API_Core.Models.Jobs
 
         public abstract Task RunRepeatableAction();
 
-        public virtual TimeSpan RepeatActionAfter => TimeSpan.FromMinutes(15);
+        public virtual TimeSpan RepeatActionAfter => TimeSpan.FromMinutes(10);
         public abstract Task<RunLocationResult> RunLocation(Location location, CancellationToken token);
         public abstract Task HandleCompletion();
 
@@ -558,10 +558,10 @@ namespace Action_Delay_API_Core.Models.Jobs
                 > 1800 => 30,
                 > 600 => 15,
                 > 120 => 10,
-                > 60 => 4,
-                > 30 => 2,
-                > 5 => 1,
-                > 2 => 0.5,
+                > 60 => 2,
+                > 30 => 0.5,
+                > 5 => 0.5,
+                > 2 => 0.25,
                 _ => 0.1,
             };
             return TimeSpan.FromSeconds(secondsUntilNextAlarm);
