@@ -11,7 +11,7 @@ namespace Action_Delay_API_Core.Broker
         public async Task<Result<ApiResponse<GetCertificatePacksResponse.CertificatePack[]>>> ListCertificatePacks(string zoneId, string apiToken, CancellationToken token)
         {
             var request = new HttpRequestMessage(HttpMethod.Get,
-                $"{BasePath}/zones/{zoneId}/ssl/certificate_packs?status=active&per_page=1000");
+                $"{BasePath}/zones/{zoneId}/ssl/certificate_packs?status=all&per_page=1000");
             request.Headers.Add("Authorization", $"Bearer {apiToken}");
             var tryPut = await _httpClient.ProcessHttpRequestAsync<GetCertificatePacksResponse.CertificatePack[]>(request, $"Getting Certificate Packs",
                 _logger);
