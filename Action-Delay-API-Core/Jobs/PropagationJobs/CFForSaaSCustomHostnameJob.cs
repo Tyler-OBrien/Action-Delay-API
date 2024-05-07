@@ -32,6 +32,21 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         {
         }
 
+        public override TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
+        {
+            double secondsUntilNextAlarm = totalWaitTimeInSeconds switch
+            {
+                > 1800 => 30,
+                > 600 => 15,
+                > 120 => 10,
+                > 60 => 4,
+                > 30 => 2,
+                > 5 => 0.5,
+                > 2 => 0.5,
+                _ => 0.5,
+            };
+            return TimeSpan.FromSeconds(secondsUntilNextAlarm);
+        }
         public override string Name => "CF for SaaS Delay Job";
         public override string InternalName => "customhostnames";
 
