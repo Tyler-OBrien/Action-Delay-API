@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Extensions;
+﻿using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Models.CloudflareAPI;
 using FluentResults;
 using System.Net.Http.Headers;

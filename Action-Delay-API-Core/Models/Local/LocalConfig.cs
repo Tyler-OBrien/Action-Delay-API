@@ -42,6 +42,45 @@
         public PageRuleUpdateConfig? PageRuleJob { get; set; }
         public AIConfig? AI { get; set; }
 
+
+        public WorkerAnalyticDelayJob? WorkerAnalyticsDelayJob { get; set; }
+
+        public CustomHostnamesDelayJob? CustomHostnamesDelayJob { get; set; }
+        public CertificateRenewalDelayJob? CertRenewalDelayJob { get; set; }
+
+
+    }
+
+    public class CertificateRenewalDelayJob : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string ZoneId { get; set; }
+
+        public string TargetHostname { get; set; }
+
+        public string[] OtherCertificateHostnames { get; set; }
+
+    }
+
+    public class CustomHostnamesDelayJob : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string ZoneId { get; set; }
+
+        public string TargetHostname { get; set; }
+
+    }
+
+    public class WorkerAnalyticDelayJob : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string ScriptName { get; set; }
+
+        public string AccountId { get; set; }
+
     }
 
     public class AIConfig : BaseConfig

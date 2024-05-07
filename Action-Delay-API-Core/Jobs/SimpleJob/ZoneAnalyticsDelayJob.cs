@@ -20,7 +20,7 @@ public class ZoneAnalyticsDelayJob : BaseJob
     public ZoneAnalyticsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<ZoneAnalyticsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
     {
     }
-    public override int TargetExecutionSecond => 25;
+    public override int TargetExecutionSecond => 28;
 
     public override bool Enabled => _config.ZoneAnalyticsDelayJob != null && (_config.ZoneAnalyticsDelayJob.Enabled.HasValue == false || _config.ZoneAnalyticsDelayJob is { Enabled: true });
 
