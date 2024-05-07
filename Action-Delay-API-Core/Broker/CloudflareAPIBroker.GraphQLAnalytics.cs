@@ -1,16 +1,9 @@
-﻿using Action_Delay_API_Core.Extensions;
-using Action_Delay_API_Core.Models.CloudflareAPI.PurgeCache;
+using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Models.CloudflareAPI;
 using FluentResults;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.CloudflareAPI.GraphQL;
 using GraphQL.Client.Http;
 using GraphQL.Client.Serializer.SystemTextJson;
-using GraphQL;
 using static Action_Delay_API_Core.Models.CloudflareAPI.GraphQL.ZoneAnalyticsDateTime;
 
 namespace Action_Delay_API_Core.Broker

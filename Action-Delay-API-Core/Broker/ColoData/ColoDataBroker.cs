@@ -1,16 +1,6 @@
 ﻿using Action_Delay_API_Core.Extensions;
-using Action_Delay_API_Core.Models.CloudflareAPI.PurgeCache;
-using Action_Delay_API_Core.Models.CloudflareAPI;
 using FluentResults;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.Errors;
-using Sentry.Extensibility;
-using static Action_Delay_API_Core.Models.CloudflareAPI.WAF.UpdateCustomRuleResponse;
 using System.Text.Json;
 using Action_Delay_API_Core.Models.API.ColoAPI;
 using Result = FluentResults.Result;

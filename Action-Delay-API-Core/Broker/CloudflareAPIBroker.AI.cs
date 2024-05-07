@@ -1,13 +1,6 @@
 ﻿using Action_Delay_API_Core.Extensions;
-using Action_Delay_API_Core.Models.CloudflareAPI.PageRules;
 using Action_Delay_API_Core.Models.CloudflareAPI;
 using FluentResults;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.CloudflareAPI.AI;
 
 namespace Action_Delay_API_Core.Broker
