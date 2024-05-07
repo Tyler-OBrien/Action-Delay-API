@@ -20,7 +20,6 @@ using Action_Delay_API_Core.Models.Services;
 using FluentResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using static Action_Delay_API_Core.Jobs.AI.WorkersAIJob;
 
 namespace Action_Delay_API_Core.Jobs.AI
 {
@@ -34,6 +33,7 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         [JsonPropertyName("tokens")]
         public int? Tokens { get; set; }
+
     }
 
     public partial class AiError
@@ -134,19 +134,22 @@ namespace Action_Delay_API_Core.Jobs.AI
             }
             runningJobs.Add(Task.Delay(5000));
             await Task.WhenAll(runningJobs);
+            _logger.LogInformation($"Models with no config: {string.Join(", ", modelswithNoConfigs)}");
             try
             {
                 if (Runs.Any())
                 {
                     await _clickHouseService.InsertRunAI(Runs, Locations, Errors);
                 }
+                Runs.Clear();
+                Locations.Clear();
+                Errors.Clear();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error inserting into Clickhouse");
             }
             _logger.LogInformation($"AI Run over");
-            _logger.LogInformation($"Models with no config: {string.Join(", ", modelswithNoConfigs)}");
         }
 
         public class AILocationReturn
