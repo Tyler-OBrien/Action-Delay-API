@@ -16,7 +16,7 @@ public partial class CloudflareAPIBroker : ICloudflareAPIBroker
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri("https://api.cloudflare.com");
             _httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
-            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _httpClient.Timeout = TimeSpan.FromSeconds(60);
         }
 
 
