@@ -18,7 +18,9 @@ namespace Action_Delay_API_Core.Jobs
         private string _generatedValue { get; set; }
         private int _repeatedRunCount = 1;
 
-        public override bool Enabled => _config.DelayJob != null && (_config.DelayJob.Enabled.HasValue == false || _config.DelayJob is { Enabled: true });
+        internal WorkerDelayJobConfig? _jobConfig;
+
+        public override bool Enabled => _jobConfig != null && (_jobConfig.Enabled.HasValue == false || _jobConfig is { Enabled: true });
 
 
         public override int TargetExecutionSecond => 30;
@@ -27,6 +29,8 @@ namespace Action_Delay_API_Core.Jobs
 
         public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
         {
+            if (_jobConfig == null)
+                _jobConfig = _config.DelayJob;
         }
 
         public override string Name => "Worker Script Delay Job";
@@ -60,8 +64,8 @@ namespace Action_Delay_API_Core.Jobs
             });
 
 
-            var tryPutAPI = await _apiBroker.UploadWorkerScript(workerJsContent, metadataContent, _config.DelayJob.AccountId,
-                _config.DelayJob.ScriptName, _config.DelayJob.API_Key, CancellationToken.None);
+            var tryPutAPI = await _apiBroker.UploadWorkerScript(workerJsContent, metadataContent, _jobConfig.AccountId,
+                _jobConfig.ScriptName, _jobConfig.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)
             {
                 _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
@@ -83,7 +87,7 @@ namespace Action_Delay_API_Core.Jobs
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
                     { "Worker", location.DisplayName ?? location.Name }
                 },
-                URL = _config.DelayJob.ScriptUrl,
+                URL = _jobConfig.ScriptUrl,
                 NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = false

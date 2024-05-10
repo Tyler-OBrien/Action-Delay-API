@@ -29,6 +29,7 @@
         public int Min_Locations { get; set; }
 
         public WorkerDelayJobConfig? DelayJob { get; set; }
+        public WorkerDelayJobConfig? WorkerDelayJobTesting { get; set; }
 
         public WfPDelayJobConfig? WfPJob { get; set; }
 
