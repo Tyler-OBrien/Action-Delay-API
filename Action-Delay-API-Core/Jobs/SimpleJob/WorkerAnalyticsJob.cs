@@ -22,7 +22,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
         public override async Task RunAction()
         {
             // depends on plan, maybe shouldn't be hardcoded?
-            var datetimeGreaterThan = DateTime.UtcNow.AddDays(-25);
+            var datetimeGreaterThan = DateTime.UtcNow.AddDays(-5);
 
 
             var tryGetAnalytic = await _apiBroker.GetLastWorkerAnalytic(_config.WorkerAnalyticsDelayJob.ScriptName, _config.WorkerAnalyticsDelayJob.AccountId, datetimeGreaterThan.ToString("O"), _config.WorkerAnalyticsDelayJob.API_Key, CancellationToken.None);

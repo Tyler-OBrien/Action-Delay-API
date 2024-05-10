@@ -27,7 +27,7 @@ public class ZoneAnalyticsDelayJob : BaseJob
     public override async Task RunAction()
     {
         // depends on plan, maybe shouldn't be hardcoded?
-        var datetimeGreaterThan = DateTime.UtcNow.AddDays(-25);
+        var datetimeGreaterThan = DateTime.UtcNow.AddDays(-7);
 
 
         var tryGetAnalytic = await _apiBroker.GetLastZoneAnalytic(_config.ZoneAnalyticsDelayJob.ZoneId, datetimeGreaterThan.ToString("O"), _config.ZoneAnalyticsDelayJob.API_Key, CancellationToken.None);
