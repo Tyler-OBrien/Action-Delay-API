@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.Local;
+using System.Runtime.ConstrainedExecution;
 
 namespace Action_Delay_API_Core.Jobs.SimpleJob
 {
@@ -39,9 +40,18 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
             var getAutomatedCertificatePacks = listCertificatePacks.Value.Result.Where(cert =>
                 cert.Hosts.Any(host =>
                     host.EndsWith(_config.CertRenewalDelayJob.TargetHostname, StringComparison.OrdinalIgnoreCase))).ToList();
+            var groupByDayCreatedOn =
+                getAutomatedCertificatePacks.GroupBy(cert =>
+                    new DateTime(cert.CreatedOn.UtcDateTime.Date.Ticks +
+                                 (cert.CreatedOn.UtcDateTime.Hour >= 12 ? TimeSpan.FromHours(12).Ticks : 0))).ToList();
             var groupByDay =
-                getAutomatedCertificatePacks.GroupBy(cert => cert.GetPrimaryCertificate?.ExpiresOn.UtcDateTime.Date).Where(dayGrouping => dayGrouping.Count() > 1);
-            foreach (var groupedByDay in groupByDay)
+                getAutomatedCertificatePacks.GroupBy(cert =>
+                    new DateTime(cert.GetPrimaryCertificate?.ExpiresOn.UtcDateTime.Date.Ticks ?? 0 +
+                        (cert.GetPrimaryCertificate != null &&
+                         cert.GetPrimaryCertificate.ExpiresOn.UtcDateTime.Hour >= 12
+                            ? TimeSpan.FromHours(12).Ticks
+                            : 0))).ToList();
+            foreach (var groupedByDay in groupByDay.Where(grp => grp.Count() > 1))
             {
                 var certsGroupedByDay = groupedByDay.ToList();
                 var firstCert = certsGroupedByDay.OrderBy(cert => cert.CreatedOn).First();
@@ -61,20 +71,31 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 }
             }
 
-            var FourTeenDaysFromNow = DateTime.UtcNow.AddDays(14).Date;
-            if (getAutomatedCertificatePacks.Any(cert =>
-                    cert.GetPrimaryCertificate?.ExpiresOn.Date == FourTeenDaysFromNow) == false)
+            var adjustedNow =
+                new DateTime(
+                    DateTime.UtcNow.Date.Ticks +
+                    (DateTime.UtcNow.Hour >= 12
+                        ? TimeSpan.FromHours(12).Ticks
+                        : 0));
+            var fourTeenDaysFromNow = 
+                new DateTime(
+                    DateTime.UtcNow.AddDays(14).Date.Ticks +
+                   (DateTime.UtcNow.Hour >= 12
+                        ? TimeSpan.FromHours(12).Ticks
+                        : 0));
+            if (groupByDay.Any(cert =>
+                    cert.Key == fourTeenDaysFromNow) == false)
             {
-                var getCertsIssuedToday = (getAutomatedCertificatePacks.Any(cert =>
-                    cert.GetPrimaryCertificate?.UploadedOn.Date == DateTime.UtcNow.Date));
-                if (getCertsIssuedToday)
+                var certcreatedToday = (groupByDayCreatedOn.Any(cert =>
+                    cert.Key == adjustedNow));
+                if (certcreatedToday)
                 {
-                    _logger.LogInformation($"No current certificate for 14 days from today {FourTeenDaysFromNow}, but we've already issued a certificate today...");
+                    _logger.LogInformation($"No current certificate for 14 days from today {fourTeenDaysFromNow}, but we've already issued a certificate today...");
                 }
                 else
                 {
                     _logger.LogInformation(
-                        $"No Cert expiring 14 days from now on {FourTeenDaysFromNow}, creating certificate now");
+                        $"No Cert expiring 14 days from now on {fourTeenDaysFromNow}, creating certificate now");
                     var certificateArrayToUse = _config.CertRenewalDelayJob.OtherCertificateHostnames.ToList() ??
                                                 new List<string>();
 
@@ -100,15 +121,24 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 {
                     // renewal is 3 days before expiration
                     var renewalDate = automatedCertPack.GetPrimaryCertificate.ExpiresOn.AddDays(-3);
-                    if (renewalDate > DateTimeOffset.UtcNow)
+                    if (DateTimeOffset.UtcNow > renewalDate)
                     {
-                        var timeOver = renewalDate - DateTimeOffset.UtcNow;
+                        var timeOver = DateTimeOffset.UtcNow - renewalDate;
                         if (timeOver > maxSpan)
                         { maxSpan = timeOver; }
                     }
                 }
             }
-            _logger.LogInformation($"Found max certificate delay of {maxSpan.TotalHours.ToString("F")} hours");
+
+            if (TimeSpan.MinValue == maxSpan)
+            {
+                _logger.LogInformation($"Couldn't get max cert delay");
+
+            }
+            else
+            {
+                _logger.LogInformation($"Found max certificate delay of {maxSpan.TotalHours.ToString("F")} hours");
+            }
             /*
             var data = tryGetAnalytic.Value!.Result!.Viewer.Accounts.First().WorkersInvocationsAdaptive.First().Dimensions.Datetime;
 
@@ -122,7 +152,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
 
 
 
-        public override string Name => "Worker Analytics Delay Job";
-        public override string InternalName => "workeranalytics";
+        public override string Name => "Certificate Renewal Delay Job";
+        public override string InternalName => "cert";
     }
 }
