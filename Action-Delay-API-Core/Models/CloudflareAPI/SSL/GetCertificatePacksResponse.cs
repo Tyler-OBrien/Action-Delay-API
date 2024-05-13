@@ -36,7 +36,7 @@ namespace Action_Delay_API_Core.Models.CloudflareAPI.SSL
             public Certificate[]? Certificates { get; set; }
 
             [JsonPropertyName("created_on")]
-            public DateTimeOffset CreatedOn { get; set; }
+            public DateTime CreatedOn { get; set; }
 
             [JsonPropertyName("validity_days")]
             public long ValidityDays { get; set; }
@@ -72,13 +72,13 @@ namespace Action_Delay_API_Core.Models.CloudflareAPI.SSL
             public string ZoneId { get; set; }
 
             [JsonPropertyName("uploaded_on")]
-            public DateTimeOffset UploadedOn { get; set; }
+            public DateTime UploadedOn { get; set; }
 
             [JsonPropertyName("modified_on")]
-            public DateTimeOffset ModifiedOn { get; set; }
+            public DateTime ModifiedOn { get; set; }
 
             [JsonPropertyName("expires_on")]
-            public DateTimeOffset ExpiresOn { get; set; }
+            public DateTime ExpiresOn { get; set; }
         }
     }
 }

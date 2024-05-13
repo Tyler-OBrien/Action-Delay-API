@@ -37,26 +37,50 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 return;
             }
 
+
             var getAutomatedCertificatePacks = listCertificatePacks.Value.Result.Where(cert =>
                 cert.Hosts.Any(host =>
                     host.EndsWith(_config.CertRenewalDelayJob.TargetHostname, StringComparison.OrdinalIgnoreCase))).ToList();
+
+            var certsWithoutPrimaryCert = getAutomatedCertificatePacks.Count(cert => cert.GetPrimaryCertificate == null);
+            if (certsWithoutPrimaryCert > 0) 
+                _logger.LogWarning($"{certsWithoutPrimaryCert} certs without primary cert, ex: {String.Join(",", getAutomatedCertificatePacks.Where(cert => cert.GetPrimaryCertificate == null).Select(cert => cert.Id))}");
+
             var groupByDayCreatedOn =
                 getAutomatedCertificatePacks.GroupBy(cert =>
-                    new DateTime(cert.CreatedOn.UtcDateTime.Date.Ticks +
-                                 (cert.CreatedOn.UtcDateTime.Hour >= 12 ? TimeSpan.FromHours(12).Ticks : 0))).ToList();
+                    new DateTime(cert.CreatedOn.Date.Ticks +
+                                 (cert.CreatedOn.Hour >= 12 ? TimeSpan.FromHours(12).Ticks : 0))).ToList();
             var groupByDay =
                 getAutomatedCertificatePacks.GroupBy(cert =>
-                    new DateTime(cert.GetPrimaryCertificate?.ExpiresOn.UtcDateTime.Date.Ticks ?? 0 +
-                        (cert.GetPrimaryCertificate != null &&
-                         cert.GetPrimaryCertificate.ExpiresOn.UtcDateTime.Hour >= 12
+                    new DateTime((cert.GetPrimaryCertificate?.ExpiresOn.Date.Ticks ?? 0) +
+                        (cert.GetPrimaryCertificate?.ExpiresOn.Hour >= 12
                             ? TimeSpan.FromHours(12).Ticks
                             : 0))).ToList();
             foreach (var groupedByDay in groupByDay.Where(grp => grp.Count() > 1))
             {
                 var certsGroupedByDay = groupedByDay.ToList();
+
+                var certsTooFar = certsGroupedByDay.Where(cert =>
+                    (cert.GetPrimaryCertificate?.ExpiresOn - groupedByDay.Key ?? TimeSpan.Zero).TotalHours > 12).ToList();
+                if (certsTooFar.Any())
+                {
+                    _logger.LogWarning(
+                        $"Found {String.Join(", ", certsTooFar.Select(cert => cert.Id))} certs too far from key {groupedByDay.Key}, {String.Join(", ", certsTooFar.Select(cert => cert.GetPrimaryCertificate?.ExpiresOn))}, removing");
+                    foreach (var certToRemove in certsTooFar)
+                    {
+                        certsGroupedByDay.Remove(certToRemove);
+                    }
+
+                    if (certsGroupedByDay.Any())
+                    {
+                        _logger.LogWarning($"Not enough certs to delete to continue, aborting");
+                        continue;
+                    }
+                }
+
                 var firstCert = certsGroupedByDay.OrderBy(cert => cert.CreatedOn).First();
                 _logger.LogWarning(
-                    $"Found {String.Join(", ", certsGroupedByDay.Select(cert => cert.Id))} certs expiring on same day of {groupedByDay.Key}, keeping {firstCert.Id} since it was newest");
+                    $"Found {String.Join(", ", certsGroupedByDay.Select(cert => cert.Id))} certs expiring on same day of {groupedByDay.Key}, {String.Join(", ", certsGroupedByDay.Select(cert => cert.GetPrimaryCertificate?.ExpiresOn))}, keeping {firstCert.Id} since it was newest");
                 foreach (var certToDelete in certsGroupedByDay.Except(new[] { firstCert }))
                 {
                     var deleteCertificatePack = await _apiBroker.DeleteCertificatePack(certToDelete.Id,
@@ -110,6 +134,10 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                     }
                 }
 
+            }
+            else
+            {
+                _logger.LogInformation($"Found certificate expiring 14 days from now {fourTeenDaysFromNow}, not going to create another.");
             }
 
             // calculate delay
