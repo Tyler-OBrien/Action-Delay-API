@@ -69,9 +69,19 @@ var handler = {
 		}
 		const start: number = performance.now();
 		try {
-			env.AI.debug = true;
 			const response = await env.AI.run(modelToUse, inputObj);
 			if (outputType.toUpperCase() === "JSON") {
+				var getRateLimitingMessage = checkForRateLimitMessage(response); // some models do this
+				if (getRateLimitingMessage != null) {
+					return new Response(JSON.stringify({
+						success: false,
+						error: {
+							code: "Custom RL",
+							message: `RL Response: ${getRateLimitingMessage}`,
+							logs: JSON.stringify(env.AI.getLogs())
+						}
+					}), { status: 200 });
+				}
 				var resp = JSON.stringify({
 					success: true,
 					result: response
@@ -91,9 +101,19 @@ var handler = {
 				for (const key of result) {
 					resultString += key.token;
 				}
+				if (resultString.toLowerCase().includes("too many requests in") || resultString.toLowerCase().includes("try again later")) { // some models do this
+					return new Response(JSON.stringify({
+						success: false,
+						error: {
+							code: "Custom RL Stream",
+							message: `RL Response: ${resultString}`,
+							logs: JSON.stringify(env.AI.getLogs())
+						}
+					}), { status: 200 });
+				}
 				return new Response(JSON.stringify({
 					success: true,
-					result: { response: resultString},
+					result: { response: resultString },
 					tokens: result.length
 				}));
 			}
@@ -103,8 +123,8 @@ var handler = {
 					return new Response(JSON.stringify({
 						success: false,
 						error: {
-							code: error.name ?? Unknown,
-							message: error.message ?? error.toString(),
+							code: 'EmptyStreamResponse',
+							message: 'Empty Stream Response, length 0',
 							logs: JSON.stringify(env.AI.getLogs())
 						}
 					}), { status: 200 });
@@ -116,27 +136,36 @@ var handler = {
 					}
 				}));
 			}
-		} catch (error) {
+		} catch (error:any) {
 			console.log(`We think this request for ${modelToUse} took ${performance.now() - start}`)
 			console.log(JSON.stringify(env.AI))
-			console.log(JSON.stringify(env.AI.getLogs()))
-			console.log(error);
 			console.log(JSON.stringify(error))
-
-			if (error.message.startsWith(""))
-
-				return new Response(JSON.stringify({
-					success: false,
-					error: {
-						code: error.name ?? Unknown,
-						message: error.message ?? error.toString(),
-						logs: JSON.stringify(env.AI.getLogs())
-					}
-				}), { status: 200 });
+			console.log(error.message)
+			return new Response(JSON.stringify({
+				success: false,
+				error: {
+					code: error.name ?? 'Unknown',
+					message: error.message ?? error.toString(),
+					logs: JSON.stringify(env.AI.getLogs())
+				}
+			}), { status: 200 });
 		}
 		return new Response("Unknown Internal Error", { status: 504 });
 	},
 };
+
+function checkForRateLimitMessage(obj: any) {
+	for (const key in obj) {
+	  const value = obj[key];
+	  if (typeof value === "string") {
+		if (value.toLowerCase().includes("too many requests in") || value.toLowerCase().includes("try again later")) {
+		  console.log(`"${key}" contains a rate limit message: "${value}"`);
+		  return value;
+		}
+	  }
+	}
+	return null;
+}
 
 function base64ToUint8Array(base64: string) {
 	const base64WithoutPrefix = base64.replace("$base64touint8array:", "");
