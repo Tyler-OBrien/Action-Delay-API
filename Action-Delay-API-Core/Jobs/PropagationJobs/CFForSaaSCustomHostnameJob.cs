@@ -127,9 +127,10 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = "https://" + _config.CustomHostnamesDelayJob.TargetHostname + $"/",
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000
             };
+            newRequest.SetDefaultsFromLocation(location);
+
             return await _queue.HTTP(newRequest, location, token);
         }
 

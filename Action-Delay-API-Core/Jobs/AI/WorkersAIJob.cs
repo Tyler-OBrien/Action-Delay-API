@@ -407,10 +407,10 @@ namespace Action_Delay_API_Core.Jobs.AI
                     { "APIKEY", _config.AI.AIWorkerSecret}
                 },
                 URL = "https://" + _config.AI.AIWorkerHostname,
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true,
             };
+            newRequest.SetDefaultsFromLocation(location);
             return await _queue.HTTP(newRequest, location, token);
         }
 
@@ -430,7 +430,6 @@ namespace Action_Delay_API_Core.Jobs.AI
                     { "outputType", config.OutputType},
                 },
                 URL = "https://" + _config.AI.AIWorkerHostname + $"/{config.ModelName}",
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 40_000,
                 EnableConnectionReuse = true,
                 ReturnBody = true,
@@ -438,6 +437,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                 BodyBytes = config.Content,
                 Method = MethodType.POST
             };
+            newRequest.SetDefaultsFromLocation(location);
             if (config.MaxTokens.HasValue && config.MaxTokens.Value > 0)
                 newRequest.Headers.Add("maxTokens", config.MaxTokens.Value.ToString());
             return await _queue.HTTP(newRequest, location, token, 60);

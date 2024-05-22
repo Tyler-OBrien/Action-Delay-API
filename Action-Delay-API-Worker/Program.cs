@@ -163,6 +163,7 @@ namespace Action_Deplay_API_Worker
                  newHttpRequest.Method = (MethodType)((HeaderToValueInt(request, "Action-Delay-Proxy-Method")) ?? 0);
                  newHttpRequest.ContentType = HeaderToValue(request, "Action-Delay-Proxy-ContentType");
                  newHttpRequest.ReturnBody = HeaderToValueBool(request, "Action-Delay-Proxy-ReturnBody");
+                 newHttpRequest.DNSResolveOverride = HeaderToValue(request, "Action-Delay-Proxy-DNS-Override");
                  request.EnableBuffering();
                  newHttpRequest.Body = await ReadAllBytes(request.Body);
                  request.Body.Position = 0;
@@ -276,20 +277,29 @@ namespace Action_Deplay_API_Worker
         public static async ValueTask<Stream> ConnectCallBackTask(SocketsHttpConnectionContext context,
             CancellationToken cancellationToken)
         {
+
+            string hostName = context.DnsEndPoint.Host;
+            if (context.InitialRequestMessage.Options.TryGetValue(
+                    new HttpRequestOptionsKey<string>("DNSResolveOverride"),
+                    out var resolveOverride))
+            {
+                hostName = resolveOverride;
+            }
+
             IPHostEntry entry = null;
             if (context.InitialRequestMessage.Options.TryGetValue(new HttpRequestOptionsKey<NetType>("IPVersion"),
                     out var version) &&
                 version != NetType.Either)
             {
                 if (version == NetType.IPv4)
-                    entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, AddressFamily.InterNetwork,
+                    entry = await Dns.GetHostEntryAsync(hostName, AddressFamily.InterNetwork,
                         cancellationToken);
                 else if (version == NetType.IPv6)
-                    entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, AddressFamily.InterNetworkV6,
+                    entry = await Dns.GetHostEntryAsync(hostName, AddressFamily.InterNetworkV6,
                         cancellationToken);
             }
             else
-                entry = await Dns.GetHostEntryAsync(context.DnsEndPoint.Host, AddressFamily.Unspecified,
+                entry = await Dns.GetHostEntryAsync(hostName, AddressFamily.Unspecified,
                     cancellationToken);
 
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);

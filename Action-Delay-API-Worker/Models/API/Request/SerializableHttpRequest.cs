@@ -30,6 +30,8 @@ namespace Action_Deplay_API_Worker.Models.API.Request
 
         public bool? ReturnBody { get; set; }
 
+        public string? DNSResolveOverride { get; set; }
+
     }
 
 }

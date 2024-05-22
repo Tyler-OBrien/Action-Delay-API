@@ -13,7 +13,7 @@
 	  <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
 	  <AssemblyVersion>2.4.0</AssemblyVersion>
 	  <FileVersion>2.4.0</FileVersion>
-	  <Version>2.4.0</Version>
+	  <Version>2.4.1</Version>
   </PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">

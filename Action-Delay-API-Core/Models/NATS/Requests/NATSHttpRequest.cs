@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Action_Delay_API_Core.Models.Local;
 
 namespace Action_Delay_API_Core.Models.NATS.Requests
 {
@@ -36,8 +37,18 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? ContentType { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-
         public bool? ReturnBody { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? DNSResolveOverride { get; set; }
+
+        public void SetDefaultsFromLocation(Location location)
+        {
+            NetType = location.NetType ?? NATS.NetType.Either;
+            if (String.IsNullOrWhiteSpace(location.DNSResolveOverride) == false)
+                DNSResolveOverride = location.DNSResolveOverride;
+        }
+
 
     }
 }

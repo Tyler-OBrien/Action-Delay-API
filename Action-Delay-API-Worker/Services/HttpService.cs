@@ -144,6 +144,9 @@ namespace Action_Deplay_API_Worker.Services;
                             newCancellationToken.CancelAfter(incomingRequest.TimeoutMs ?? 10_000);
                             request.Options.Set(new HttpRequestOptionsKey<NetType>("IPVersion"),
                                 incomingRequest.NetType ?? NetType.Either);
+                            if (String.IsNullOrWhiteSpace(incomingRequest.DNSResolveOverride) == false)
+                                request.Options.Set(new HttpRequestOptionsKey<string>("DNSResolveOverride"),
+                                    incomingRequest.DNSResolveOverride);
                             using var listener = new HttpEventListener();
                             var response = await newClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                             var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token);
@@ -185,8 +188,8 @@ namespace Action_Deplay_API_Worker.Services;
                 }
 
                 _logger.LogInformation(
-                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, we got back {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}. Timings: {perfInfo}",
-                    url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType,
+                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, dns override {dnsOverride}, we got back {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}. Timings: {perfInfo}",
+                    url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.DNSResolveOverride,
                     response.StatusCode, response.Version, incomingRequest.EnableConnectionReuse, perfInfo);
 
                 return new SerializableHttpResponse

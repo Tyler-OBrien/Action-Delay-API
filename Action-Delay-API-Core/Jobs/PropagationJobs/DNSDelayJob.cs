@@ -105,9 +105,9 @@ namespace Action_Delay_API_Core.Jobs
                 QueryName = _jobConfig.Name,
                 QueryType = "TXT",
                 DnsServer = _jobConfig.NameServers,
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 5000
-            }; 
+            };
+            newRequest.SetDefaultsFromLocation(location);
             return await _queue.DNS(newRequest, location, token);
         }
 

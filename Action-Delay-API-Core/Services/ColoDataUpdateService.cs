@@ -164,10 +164,11 @@ namespace Action_Delay_API_Core.Services
 
                 },
                 URL = "https://debug.chaika.me",
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true
             };
+            newRequest.SetDefaultsFromLocation(location);
+
             return _queue.HTTP(newRequest, location, token);
         }
 

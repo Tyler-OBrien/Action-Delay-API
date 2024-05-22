@@ -16,5 +16,6 @@ namespace Action_Delay_API_Core.Models.Local
 
 
         public NetType? NetType { get; set; }
+        public string? DNSResolveOverride { get; set; }
     }
 }

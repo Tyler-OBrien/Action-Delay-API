@@ -88,10 +88,11 @@ namespace Action_Delay_API_Core.Jobs
                     { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = _jobConfig.ScriptUrl,
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = false
             };
+            newRequest.SetDefaultsFromLocation(location);
+
             return await _queue.HTTP(newRequest, location, token);
         }
 

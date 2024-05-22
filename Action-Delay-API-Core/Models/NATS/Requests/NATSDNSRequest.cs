@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using Action_Delay_API_Core.Models.Local;
+using System.Text.Json.Serialization;
 
 namespace Action_Delay_API_Core.Models.NATS.Requests
 {
@@ -12,5 +13,10 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 
         public NetType? NetType { get; set; }
+
+        public void SetDefaultsFromLocation(Location location)
+        {
+            NetType = location.NetType ?? NATS.NetType.Either;
+        }
     }
 }

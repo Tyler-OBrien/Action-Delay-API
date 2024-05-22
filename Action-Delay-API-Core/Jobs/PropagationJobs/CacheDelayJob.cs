@@ -174,10 +174,11 @@ namespace Action_Delay_API_Core.Jobs
                     { "Worker", location.DisplayName ?? location.Name }
                 }, 
                 URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}", // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true
             };
+            newRequest.SetDefaultsFromLocation(location);
+
             if (String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false &&
                 String.IsNullOrEmpty(_config.CacheJob.ProxyAPIKey) == false)
             {

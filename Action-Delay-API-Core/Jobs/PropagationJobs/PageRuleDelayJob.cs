@@ -126,10 +126,11 @@ public class PageRuleDelayJob : BasePropagationJob
                 { "Worker", location.DisplayName ?? location.Name }
             },
             URL = $"https://{_config.PageRuleJob.PageRuleHostname}/",
-            NetType = location.NetType ?? NetType.Either,
             TimeoutMs = 10_000,
             EnableConnectionReuse = false
         };
+        newRequest.SetDefaultsFromLocation(location);
+
         return await _queue.HTTP(newRequest, location, token);
     }
 

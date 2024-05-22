@@ -117,9 +117,10 @@ namespace Action_Delay_API_Core.Jobs
                     { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = "https://" + _config.WAFJob.HostName + $"/{_specialPath}",
-                NetType = location.NetType ?? NetType.Either,
                 TimeoutMs = 10_000
-            }; 
+            };
+            newRequest.SetDefaultsFromLocation(location);
+
             return await _queue.HTTP(newRequest, location, token);
         }
 
