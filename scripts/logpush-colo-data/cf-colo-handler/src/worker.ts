@@ -263,7 +263,13 @@ export default {
       var tryMatch = await caches.default.match(newUrlMatch);
       if (tryMatch != null) return tryMatch;
 
-      var getColos = await env.DB.prepare('SELECT coloId as ID, coloName as IATA from colos order by coloId asc;').all();
+      var getColos = null;
+      try {
+        getColos = await env.DB.prepare('SELECT coloId as ID, coloName as IATA from colos order by coloId asc;').all();
+      }
+      catch {
+        getColos = await env.DB2.prepare('SELECT coloId as ID, coloName as IATA from colos order by coloId asc;').all();
+      }
       var coloInfo = getColos.results;
       var newResponse = new Response(JSON.stringify(coloInfo), { status: 200, headers: { "Content-Type": "application/json" } });
       newResponse.headers.append('Cache-Control', 'public, max-age=600, immutable');
@@ -296,9 +302,17 @@ export default {
       var tryMatch = await caches.default.match(newUrlMatch);
       if (tryMatch != null) return tryMatch;
 
-      var getColos = await env.DB.prepare(
-        `SELECT ${selectColumns} from colos order by coloId asc;`
-      ).all();
+      var getColos =  null;
+      try {
+        getColos = await env.DB.prepare(
+          `SELECT ${selectColumns} from colos order by coloId asc;`
+        ).all();
+      }
+      catch {
+        getColos = await env.DB2.prepare(
+          `SELECT ${selectColumns} from colos order by coloId asc;`
+        ).all();
+      }
       var coloInfo = getColos.results;
       this.GetDORegions(coloInfo)
 
@@ -322,9 +336,17 @@ export default {
         results.results = coloInfo;
       }
       if (noMeta == false) {
-        var getMeta = await env.DB.prepare(
-          'SELECT Key, Value from meta where Type = "colometa";'
-        ).all();
+        var getMeta = null;
+        try {
+          getMeta = await env.DB.prepare(
+            'SELECT Key, Value from meta where Type = "colometa";'
+          ).all();
+        }
+        catch {
+          var getMeta = await env.DB2.prepare(
+            'SELECT Key, Value from meta where Type = "colometa";'
+          ).all();
+        }
         results.meta = {}
         for (const result of getMeta.results) {
           results.meta[result.Key] = result.Value;
