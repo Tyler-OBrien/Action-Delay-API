@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Models.Local;
 using System.Runtime.ConstrainedExecution;
+using Microsoft.EntityFrameworkCore;
 
 namespace Action_Delay_API_Core.Jobs.SimpleJob
 {
@@ -21,6 +22,70 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
         }
         public override int TargetExecutionSecond => 25;
         public override bool Enabled => _config.CertRenewalDelayJob != null && (_config.CertRenewalDelayJob.Enabled.HasValue == false || _config.CertRenewalDelayJob is { Enabled: true });
+
+        public async override Task BaseRun()
+        {
+            using var scope = _logger.BeginScope(Name);
+            using var sentryScope = SentrySdk.PushScope();
+            SentrySdk.AddBreadcrumb($"Starting Job {Name}");
+            try
+            {
+                var cancellationTokenSource = new CancellationTokenSource();
+                // Pre-init job and locations in database
+                _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
+                JobData = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.InternalJobName == InternalName);
+                if (JobData == null)
+                {
+                    var newJobData = new JobData()
+                    {
+                        JobName = Name,
+                        InternalJobName = InternalName,
+                    };
+                    _dbContext.JobData.Add(newJobData);
+                    await TrySave(true);
+                    JobData = await _dbContext.JobData.AsTracking().FirstAsync(job => job.InternalJobName == InternalName);
+                    JobData.CurrentRunStatus = Status.STATUS_PENDING;
+                    JobData.CurrentRunLengthMs = null;
+                    JobData.CurrentRunTime = DateTime.UtcNow;
+                }
+                /*
+                else
+                {
+                    JobData.LastRunStatus = JobData.CurrentRunStatus;
+                    JobData.LastRunLengthMs = JobData.CurrentRunLengthMs;
+                    JobData.LastRunTime = JobData.CurrentRunTime;
+                }
+                */
+
+                SentrySdk.AddBreadcrumb($"Got Job Data: {JobData.CurrentRunStatus}");
+
+                // Execute the action for this Job
+                try
+                {
+                    await RunAction();
+                }
+                catch (CustomAPIError ex)
+                {
+                    _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", this.Name, ex.Message);
+                    this.JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
+                    await InsertRunFailure(Status.STATUS_API_ERROR, ex);
+                    throw;
+                }
+                catch (Exception)
+                {
+                    this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                    await InsertRunFailure(Status.STATUS_ERRORED, null);
+                    throw;
+                }
+
+            }
+            finally
+            {
+                await TrySave(true);
+                // await _queue.DisposeAsync();
+            }
+        }
+
         public override async Task RunAction()
         {
 
@@ -157,25 +222,36 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                     }
                 }
             }
+            this.JobData.APIResponseTimeUtc = listCertificatePacks.Value.ResponseTimeMs;
 
             if (TimeSpan.MinValue == maxSpan)
             {
                 _logger.LogInformation($"Couldn't get max cert delay");
+                if (this.JobData.CurrentRunStatus == Status.STATUS_UNDEPLOYED)
+                {
+                    this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
+                    await InsertRunResult();
+                    this.JobData.LastRunLengthMs = this.JobData.CurrentRunLengthMs;
+                    this.JobData.LastRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
+                    this.JobData.LastRunTime = DateTime.UtcNow;
+                    JobData.CurrentRunStatus = Status.STATUS_PENDING;
+                    JobData.CurrentRunLengthMs = null;
+                    JobData.CurrentRunTime = DateTime.UtcNow;
+                    await TrySave(true);
 
+                }
             }
             else
             {
                 _logger.LogInformation($"Found max certificate delay of {maxSpan.TotalHours.ToString("F")} hours");
-            }
-            /*
-            var data = tryGetAnalytic.Value!.Result!.Viewer.Accounts.First().WorkersInvocationsAdaptive.First().Dimensions.Datetime;
 
-            this.JobData.CurrentRunLengthMs = (DateTime.UtcNow - data).TotalMilliseconds > 0 ? (ulong)(DateTime.UtcNow - data).TotalMilliseconds : 0;
-            this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
-            this.JobData.APIResponseTimeUtc = tryGetAnalytic.Value.ResponseTimeMs;
-            await InsertRunResult();
-            await TrySave(true);
-            */
+                this.JobData.CurrentRunLengthMs = (ulong?)maxSpan.TotalMilliseconds;
+                this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_UNDEPLOYED;
+                this.JobData.CurrentRunTime = DateTime.UtcNow;
+                await TrySave(true);
+            }
+            
+            
         }
 
 
