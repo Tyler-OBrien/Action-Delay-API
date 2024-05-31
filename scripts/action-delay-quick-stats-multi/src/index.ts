@@ -62,6 +62,21 @@ const jobs = [
         internalName: "Zone Analytics Delay Job",
         short: "analytics"
     },
+    {
+        display: "Workers Analytics Delay",
+        internalName: "Worker Analytics Delay Job",
+        short: "workeranalytics"
+    },
+    {
+        display: "Custom Hostnames Delay Job",
+        internalName: "CF for SaaS Delay Job",
+        short: "customhostnames"
+    },
+    {
+        display: "Certificate Renewal Delay",
+        internalName: "Certificate Renewal Delay Job",
+        short: "cert"
+    },
 ]
 
 const HTML = `
@@ -288,6 +303,21 @@ short: "waf"
     display: "Zone Analytics Delay",
     internalName: "Zone Analytics Delay Job",
     short: "analytics"
+},
+{
+    display: "Workers Analytics Delay",
+    internalName: "Worker Analytics Delay Job",
+    short: "workeranalytics"
+},
+{
+    display: "Custom Hostnames Delay Job",
+    internalName: "CF for SaaS Delay Job",
+    short: "customhostnames"
+},
+{
+    display: "Certificate Renewal Delay",
+    internalName: "Certificate Renewal Delay Job",
+    short: "cert"
 },
 ]
 

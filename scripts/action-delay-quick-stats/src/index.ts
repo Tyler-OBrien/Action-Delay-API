@@ -30,7 +30,12 @@ export default {
 			internalName = "DNS Delay Job";
             apiName = "dns";
 		}
-		else if (newUrl.hostname.startsWith("worker")) {
+        else if (newUrl.hostname.startsWith("workeranalytics")) {
+			display = "Workers Analytics Delay";
+			internalName = "Worker Analytics Delay Job";
+            apiName = "workeranalytics";
+		}
+		else if (newUrl.hostname.startsWith("worker") || newUrl.hostname == '127.0.0.1') {
 			display = "Worker Deployment Delay";
 			internalName = "Worker Script Delay Job";
             apiName = "worker";
@@ -55,7 +60,7 @@ export default {
 			internalName = "Page Rules Update Delay";
             apiName = "pagerule";
 		}
-        else if (newUrl.hostname.startsWith("cron") || newUrl.hostname == '127.0.0.1') {
+        else if (newUrl.hostname.startsWith("cron") ) {
 			display = "Workers CRON Delay";
 			internalName = "Workers CRON Delay";
             apiName = "cron";
@@ -65,6 +70,18 @@ export default {
 			internalName = "Zone Analytics Delay";
             apiName = "analytics";
 		}
+        else if (newUrl.hostname.startsWith("customhostnames")) {
+			display = "Custom Hostnames Delay Job";
+			internalName = "CF for SaaS Delay Job";
+            apiName = "customhostnames";
+		}
+        else if (newUrl.hostname.startsWith("cert")) {
+			display = "Certificate Renewal Delay";
+			internalName = "Certificate Renewal Delay Job";
+            apiName = "cert";
+		}
+
+		
 		
 
 		if (newUrl.pathname == "/") {
@@ -170,6 +187,9 @@ export default {
 		<a href="https://pagerules.cloudflare.chaika.me">Page Rule Update Delay</a><br>
 		<a href="https://cron.cloudflare.chaika.me">Workers Cron Delay</a><br>
 		<a href="https://analytics.cloudflare.chaika.me">Zone Analytics Delay</a><br>
+        <a href="https://workeranalytics.cloudflare.chaika.me">Worker Analytics Delay</a><br>
+		<a href="https://customhostnames.cloudflare.chaika.me">Custom Hostnames Delay</a><br>
+		<a href="https://cert.cloudflare.chaika.me">Certificate Update Delay</a><br>
 		<a href="https://all.cloudflare.chaika.me">Overview of All</a><br>
 	</div>
     </div>
