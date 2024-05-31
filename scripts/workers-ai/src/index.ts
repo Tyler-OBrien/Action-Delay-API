@@ -71,6 +71,7 @@ var handler = {
 		try {
 			const response = await env.AI.run(modelToUse, inputObj);
 			if (outputType.toUpperCase() === "JSON") {
+				/*
 				var getRateLimitingMessage = checkForRateLimitMessage(response); // some models do this
 				if (getRateLimitingMessage != null) {
 					return new Response(JSON.stringify({
@@ -82,6 +83,7 @@ var handler = {
 						}
 					}), { status: 200 });
 				}
+				*/
 				var resp = JSON.stringify({
 					success: true,
 					result: response
@@ -101,6 +103,7 @@ var handler = {
 				for (const key of result) {
 					resultString += key.token;
 				}
+				/*
 				if (resultString.toLowerCase().includes("too many requests in") || resultString.toLowerCase().includes("try again later")) { // some models do this
 					return new Response(JSON.stringify({
 						success: false,
@@ -111,6 +114,7 @@ var handler = {
 						}
 					}), { status: 200 });
 				}
+				*/
 				return new Response(JSON.stringify({
 					success: true,
 					result: { response: resultString },
@@ -136,7 +140,7 @@ var handler = {
 					}
 				}));
 			}
-		} catch (error:any) {
+		} catch (error: any) {
 			console.log(`We think this request for ${modelToUse} took ${performance.now() - start}`)
 			console.log(JSON.stringify(env.AI))
 			console.log(JSON.stringify(error))
@@ -156,13 +160,13 @@ var handler = {
 
 function checkForRateLimitMessage(obj: any) {
 	for (const key in obj) {
-	  const value = obj[key];
-	  if (typeof value === "string") {
-		if (value.toLowerCase().includes("too many requests in") || value.toLowerCase().includes("try again later")) {
-		  console.log(`"${key}" contains a rate limit message: "${value}"`);
-		  return value;
+		const value = obj[key];
+		if (typeof value === "string") {
+			if (value.toLowerCase().includes("too many requests in") || value.toLowerCase().includes("try again later")) {
+				console.log(`"${key}" contains a rate limit message: "${value}"`);
+				return value;
+			}
 		}
-	  }
 	}
 	return null;
 }
