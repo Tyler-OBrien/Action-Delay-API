@@ -168,10 +168,6 @@ namespace Action_Deplay_API_Worker
                  newHttpRequest.Body = await ReadAllBytes(request.Body);
                  request.Body.Position = 0;
 
-                 if (request.ContentLength == 0 || newHttpRequest.Body.Length == 0)
-                 {
-                     logger.LogWarning($"Request for {newHttpRequest.URL} has content-length of {request.ContentLength}, protocol: {request.Protocol}, but our byte stream has {newHttpRequest.Body.Length}");
-                 }
                  var tryGetResponse = await httpService.PerformRequestAsync(newHttpRequest);
                  return tryGetResponse;
              }
@@ -203,6 +199,9 @@ namespace Action_Deplay_API_Worker
 
                  newDnsRequest.TimeoutMs = HeaderToValueInt(request, "Action-Delay-Proxy-TimeoutMs");
                  newDnsRequest.NetType = (NetType)((HeaderToValueInt(request, "Action-Delay-Proxy-NetType")) ?? 0);
+                 newDnsRequest.NetType = (NetType)((HeaderToValueInt(request, "Action-Delay-Proxy-NetType")) ?? 0);
+                 newDnsRequest.RequestNSID = HeaderToValueBool(request, "Action-Delay-Proxy-RequestNSID");
+
 
                  var tryGetResponse = await dnsService.PerformDnsLookupAsync(newDnsRequest);
                  return tryGetResponse;

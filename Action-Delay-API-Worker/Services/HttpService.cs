@@ -116,7 +116,6 @@ namespace Action_Deplay_API_Worker.Services;
                             // buffer in and over...
                             var bytes = incomingRequest.Body;
                             request.Content = new ByteArrayContent(bytes);
-                            _logger.LogWarning($"We got a request for {incomingRequest.URL}, it was {bytes.Length} bytes length from the body of the request itself.");
                             if (MediaTypeHeaderValue.TryParse(incomingRequest.ContentType, out var contentType))
                                 request.Content.Headers.ContentType = contentType;
                         }

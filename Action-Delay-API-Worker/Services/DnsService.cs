@@ -7,6 +7,8 @@ using Action_Deplay_API_Worker.Models.API.Response;
 using Action_Deplay_API_Worker.Models.Services;
 using DnsClient;
 using DnsClient.Protocol;
+using DnsClient.Protocol.Options;
+using DnsClient.Protocol.Options.OptOptions;
 using Polly;
 
 namespace Action_Deplay_API_Worker.Services
@@ -138,6 +140,7 @@ namespace Action_Deplay_API_Worker.Services
 
                 var lookupClientOptions = new LookupClientOptions(dnsServerAddresses);
                 lookupClientOptions.UseCache = false;
+                lookupClientOptions.RequestNSID = request.RequestNSID ?? true;
                 var lookupClient = new LookupClient(lookupClientOptions);
                 double latencyMs = -1;
                 var response =
@@ -211,9 +214,27 @@ namespace Action_Deplay_API_Worker.Services
                     dnsResponse.Answers.Add(dnsAnswer);
                 }
 
+                foreach (var additional in response.Additionals)
+                {
+                    if (additional is OptRecord optRecord)
+                    {
+                        foreach (var option in optRecord.Options)
+                        {
+                            if (option is NSIDOption nsidOption && nsidOption.UTF8Data != null)
+                            {
+                                dnsResponse.NSID = nsidOption.UTF8Data;
+                            }
+                            else if (option is EDEOption edeOption)
+                            {
+                                dnsResponse.Info = edeOption.ToString();
+                            }
+                        }
+                    }
+                }
+
                 _logger.LogInformation(
-                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers, first Answer: {firstAnswer}, error message: {error}, latency: {latencyMs}",
-                    queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count, response.Answers.Any() ? response.Answers.FirstOrDefault() : "", response.ErrorMessage, latencyMs);
+                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers, first Answer: {firstAnswer}, error message: {error}, latency: {latencyMs}, NSID: {nsid}",
+                    queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count, response.Answers.Any() ? response.Answers.FirstOrDefault() : "", response.ErrorMessage, latencyMs, dnsResponse.NSID);
                 return dnsResponse;
             }
             catch (DnsClient.DnsResponseException dnsResponseException)

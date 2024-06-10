@@ -7,9 +7,24 @@
         public string ResponseCode { get; set; }
         public bool ProxyFailure { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
+
+        public string? NSID { get; set; }
         public string? Info { get; set; }
         public DateTime? ResponseUTC { get; set; }
         public double? ResponseTimeMs { get; set; }
+
+        public int? TryGetColoId()
+        {
+            if (String.IsNullOrEmpty(NSID)) return -1;
+            var trimmedInput = NSID.Trim().Trim('"');
+            if (trimmedInput.Contains("m") == false) return -1;
+            var trySplit = trimmedInput.Split("m");
+            if (trySplit.Any() && String.IsNullOrEmpty(trySplit.First()) == false &&
+                int.TryParse(trySplit.First().Trim(), out var parsedColoId) && parsedColoId > 0)
+                return parsedColoId;
+            return -1;
+        }
+
 
     }
     public class SerializableDnsAnswer

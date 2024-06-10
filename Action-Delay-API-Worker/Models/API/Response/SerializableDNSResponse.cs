@@ -12,6 +12,8 @@
         public string ResponseCode { get; set; }
         public bool ProxyFailure { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
+
+        public string? NSID { get; set; }
         public string? Info { get; set; }
         public DateTime? ResponseUTC { get; set; }
         public double? ResponseTimeMs { get; set; }

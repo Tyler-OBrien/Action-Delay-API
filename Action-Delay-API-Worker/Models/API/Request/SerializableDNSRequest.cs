@@ -6,6 +6,8 @@
         public string QueryType { get; set; }
         public string DnsServer { get; set; }
 
+        public bool? RequestNSID { get; set; } = true;
+
         public int? TimeoutMs { get; set; }
 
         public NetType? NetType { get; set; }
