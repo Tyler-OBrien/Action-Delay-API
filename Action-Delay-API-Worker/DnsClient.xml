@@ -973,18 +973,224 @@
             <param name="anything">Anything.</param>
             <exception cref="T:System.ArgumentNullException">If <paramref name="info"/> or <paramref name="anything"/> is null.</exception>
         </member>
+        <member name="T:DnsClient.Protocol.Options.OptOptions.EDEOption">
+            <summary>
+            A <see cref="T:DnsClient.Protocol.Options.OptOptions.OptBaseOption"/> representing the Extended DNS Error (EDE) Option
+            <seealso href="https://datatracker.ietf.org/doc/rfc8914">RFC 8914</seealso>
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.EDEOption.Code">
+            <inheritdoc />
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.EDEOption.InfoCode">
+            <summary>
+            Info-Code returned for the Extended DNS Error
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.EDEOption.RawInfoCode">
+            <summary>
+            Raw Info-Code returned for the Extended DNS Error. Will be set even if the code is unknown/non-standard.
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.EDEOption.ExtraText">
+            <summary>
+            Extra-Text from Extended DNS Error
+            </summary>
+        </member>
+        <member name="M:DnsClient.Protocol.Options.OptOptions.EDEOption.ToString">
+            <inheritdoc />
+        </member>
+        <member name="M:DnsClient.Protocol.Options.OptOptions.EDEOption.RecordToString">
+            <inheritdoc />
+        </member>
+        <member name="T:DnsClient.Protocol.Options.OptOptions.EDECodes">
+            <summary>
+            Extended DNS Errors Codes as defined in <see href="https://datatracker.ietf.org/doc/rfc8914">RFC 8914</see>
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.Unknown">
+            <summary>
+            An unsupported/non-standard EDE Code.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.OtherError">
+            <summary>
+            The error does not match known extended error codes. Extra Text may include more information.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.UnsupportedDNSKEYAlgorithm">
+            <summary>
+            DNSKEY RRset contained only unsupported DNSSEC algorithms. 
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.UnsupportedDSDigestType">
+            <summary>
+            DS RRset contained only unsupported Digest Types.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.StaleAnswer">
+            <summary>
+            Stale Cached Response Returned, unable to get new data.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.ForgedAnswer">
+            <summary>
+            Answer provided but forged due to policy reasons.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.DNSSECIndeterminate">
+            <summary>
+            DNSSEC Validation ended in indeterminate state (RFC4035).
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.DNSSECBogus">
+            <summary>
+            DNSSEC validation returned BOGUS state.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.SignatureExpired">
+            <summary>
+            DNSSEC Validation failed due to no signatures being valid, and some are expired.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.SignatureNotYetValid">
+            <summary>
+            DNSSEC Validation failed due to no signatures being valid, and at least some are not yet valid.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.DNSKEYMissing">
+            <summary>
+            DNSSEC Validation failed due to no matching DNSKEY being found for the child.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.RRSIGsMissing">
+            <summary>
+            DNSSEC Validation failed due to no RRSIGs could be found for at least one RRset where RRSIGs were expected.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NoZoneKeyBitSet">
+            <summary>
+            DNSSEC Validation failed due to no Zone Key bit being set in a DNSKEY.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NSECMissing">
+            <summary>
+            DNSSEC Validation failed due to the requested data being missing and a covering NSEC/NSEC3 was not provided
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.CachedError">
+            <summary>
+            The resolver is returning SERVFAIL from its cache
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NotReady">
+            <summary>
+            The server is not ready to answer the query.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.Blocked">
+            <summary>
+            The server is unable to answer due to a blocklist imposed by the operator of the server resolving or forwarding the query
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.Censored">
+            <summary>
+            The server is unable to answer due to a blocklist due to an external requirement imposed by an entity other then the operator of the server resolving or forwarding the query (in-band DNS filtering, court order, etc.).
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.Filtered">
+            <summary>
+            The server is unable to answer because the domain is on a blocklist as requested by the client.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.Prohibited">
+            <summary>
+            Client is not authorized to use this DNS Server.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.StaleNXDomainAnswer">
+            <summary>
+            The resolver responded with a previously cached NXDomain due to being unable to get new data.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NotAuthoritative">
+            <summary>
+            Recursion Resired (RD) bit clear, and the request was sent to an Authoritative Server which it is not Authoritive for, or the request was sen to a resolver.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NotSupported">
+            <summary>
+            The requested operation or query is not supported.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NoReachableAuthority">
+            <summary>
+               The resolver could not reach any of the authoritative name servers (or they potentially refused to reply).
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.NetworkError">
+            <summary>
+             An unrecoverable error occurred while communicating with another server.
+            </summary>
+        </member>
+        <member name="F:DnsClient.Protocol.Options.OptOptions.EDECodes.InvalidData">
+            <summary>
+            The authoritative server cannot answer with data for a zone it isotherwise configured to support.  Examples of this include its most recent zone being too old or having expired.
+            </summary>
+        </member>
+        <member name="T:DnsClient.Protocol.Options.OptOptions.NSIDOption">
+            <summary>
+            A <see cref="T:DnsClient.Protocol.Options.OptOptions.OptBaseOption"/> representing the DNS Name Server Identifier  (NSID) Option
+            <seealso href="https://datatracker.ietf.org/doc/html/rfc5001.html">RFC 5001</seealso>
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.NSIDOption.Code">
+            <inheritdoc />
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.NSIDOption.Data">
+            <summary>
+            Raw Data in NSID Option-Data
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.NSIDOption.UTF8Data">
+            <summary>
+            If NSID Option-Data was a valid UTF8 String, UTF8Data will contain the parsed string. Otherwise, null.
+            </summary>
+        </member>
         <member name="M:DnsClient.Protocol.Options.OptOptions.NSIDOption.ToString">
             <inheritdoc />
+        </member>
+        <member name="M:DnsClient.Protocol.Options.OptOptions.NSIDOption.RecordToString">
+            <inheritdoc />
+        </member>
+        <member name="T:DnsClient.Protocol.Options.OptOptions.OptBaseOption">
+            <summary>
+            This type represents an Option Code
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.OptBaseOption.Code">
+            <summary>
+            Option Code for this Option
+            </summary>
+        </member>
+        <member name="P:DnsClient.Protocol.Options.OptOptions.OptBaseOption.Length">
+            <summary>
+            Length in Bytes for this Option's Data
+            </summary>
         </member>
         <member name="M:DnsClient.Protocol.Options.OptOptions.OptBaseOption.ToString">
             <inheritdoc />
         </member>
         <member name="M:DnsClient.Protocol.Options.OptOptions.OptBaseOption.RecordToString">
             <summary>
-            Returns a string representation of the record's value only.
-            <see cref="!:ToString(int)"/> uses this to compose the full string value of this instance.
+            Returns a string representation of the record.
             </summary>
             <returns>A string representing this record.</returns>
+        </member>
+        <member name="T:DnsClient.Protocol.Options.OptOptions.OptOption">
+            <summary>
+            Supported Option Codes
+            </summary>
         </member>
         <member name="F:DnsClient.Protocol.Options.OptOptions.OptOption.NSID">
             <summary>
