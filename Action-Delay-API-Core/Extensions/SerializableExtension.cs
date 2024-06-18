@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Action_Delay_API_Core.Extensions
 {
@@ -20,6 +21,26 @@ namespace Action_Delay_API_Core.Extensions
         public static string Truncate(this string value, int maxLength)
         {
             if (string.IsNullOrEmpty(value)) return value;
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
+        }
+
+        public static Regex HtmlTitleRegex = new Regex(@"<title>(.*?)<\/title>",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace);
+
+        public static string IntelligentCloudflareErrorsFriendlyTruncate(this string value, int maxLength)
+        {
+
+            if (string.IsNullOrEmpty(value)) return value;
+
+            if (value.TrimStart().StartsWith("<html>", StringComparison.OrdinalIgnoreCase) || value.TrimStart().StartsWith("<!DOCTYPE html>", StringComparison.OrdinalIgnoreCase))
+            {
+                var tryMatch = HtmlTitleRegex.Match(value);
+                if (tryMatch is { Success: true, Groups.Count: > 1 })
+                {
+                    value = tryMatch.Groups[1].Value;
+                }
+            }
+
             return value.Length <= maxLength ? value : value.Substring(0, maxLength);
         }
     }

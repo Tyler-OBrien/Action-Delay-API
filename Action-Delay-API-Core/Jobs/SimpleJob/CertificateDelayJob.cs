@@ -229,10 +229,10 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 _logger.LogInformation($"Couldn't get max cert delay");
                 if (this.JobData.CurrentRunStatus == Status.STATUS_UNDEPLOYED)
                 {
-                    this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
+                    this.JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
                     await InsertRunResult();
                     this.JobData.LastRunLengthMs = this.JobData.CurrentRunLengthMs;
-                    this.JobData.LastRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
+                    this.JobData.LastRunStatus = Status.STATUS_DEPLOYED;
                     this.JobData.LastRunTime = DateTime.UtcNow;
                     JobData.CurrentRunStatus = Status.STATUS_PENDING;
                     JobData.CurrentRunLengthMs = null;
@@ -246,7 +246,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 _logger.LogInformation($"Found max certificate delay of {maxSpan.TotalHours.ToString("F")} hours");
 
                 this.JobData.CurrentRunLengthMs = (ulong?)maxSpan.TotalMilliseconds;
-                this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_UNDEPLOYED;
+                this.JobData.CurrentRunStatus = Status.STATUS_UNDEPLOYED;
                 this.JobData.CurrentRunTime = DateTime.UtcNow;
                 await TrySave(true);
             }

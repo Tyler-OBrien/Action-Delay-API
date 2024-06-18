@@ -46,10 +46,10 @@ namespace Action_Delay_API_Core.Broker.ColoData
                 {
                     // Better messages for Deserialization errors
                     _logger.LogCritical(ex, "colo api: Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
-                        rawString.Truncate(25));
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError(
-                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.Truncate(50)}",
-                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.Truncate(25)}", "", null));
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null));
                 }
 
                 return response;
@@ -93,10 +93,10 @@ namespace Action_Delay_API_Core.Broker.ColoData
                 {
                     // Better messages for Deserialization errors
                     _logger.LogCritical(ex, "metal api: Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
-                        rawString.Truncate(25));
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError(
-                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.Truncate(50)}",
-                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.Truncate(25)}", "", null));
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null));
                 }
 
                 return response;

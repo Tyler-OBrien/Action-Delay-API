@@ -10,8 +10,9 @@ using Action_Delay_API_Core.Models.Errors;
 using Sentry;
 using Exception = System.Exception;
 using System.Diagnostics;
+using Action_Delay_API_Core.Models.Jobs;
 
-namespace Action_Delay_API_Core.Models.Jobs
+namespace Action_Delay_API_Core.Jobs.PropagationJobs
 {
 
     public class Status
@@ -35,7 +36,7 @@ namespace Action_Delay_API_Core.Models.Jobs
 
         protected BasePropagationJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BasePropagationJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(apiBroker, config, logger, clickhouseService, context, queue)
         {
-       
+
         }
 
 
@@ -65,7 +66,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                             $"{Name}: Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}");
                     }
                 }
-                _logger.LogInformation($"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {String.Join(", ",preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
+                _logger.LogInformation($"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {string.Join(", ", preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
             }
             catch (Exception ex)
             {
@@ -84,7 +85,7 @@ namespace Action_Delay_API_Core.Models.Jobs
         public abstract Task HandleCompletion();
 
         public virtual Task JobInit() => Task.CompletedTask;
-        
+
 
 
 
@@ -108,9 +109,9 @@ namespace Action_Delay_API_Core.Models.Jobs
                         JobName = Name,
                         InternalJobName = InternalName,
                     };
-                     _dbContext.JobData.Add(newJobData);
-                     await TrySave(true);
-                     JobData = await _dbContext.JobData.AsNoTracking().FirstAsync(job => job.InternalJobName == InternalName);
+                    _dbContext.JobData.Add(newJobData);
+                    await TrySave(true);
+                    JobData = await _dbContext.JobData.AsNoTracking().FirstAsync(job => job.InternalJobName == InternalName);
                 }
                 else
                 {
@@ -135,8 +136,8 @@ namespace Action_Delay_API_Core.Models.Jobs
                             InternalJobName = InternalName,
                             LocationName = location.Name,
                         };
-                       _dbContext.JobLocations.Add(newLocation);
-                       await TrySave(true);
+                        _dbContext.JobLocations.Add(newLocation);
+                        await TrySave(true);
                         tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
                            dbLocation.InternalJobName == InternalName && dbLocation.LocationName == location.Name);
                     }
@@ -147,7 +148,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                         tryFindLocation.LastRunTime = tryFindLocation.CurrentRunTime;
                     }
 
-                    this.RunningLocationsData[location] = tryFindLocation;
+                    RunningLocationsData[location] = tryFindLocation;
                     tryFindLocation.CurrentRunTime = DateTime.UtcNow;
                 }
                 SentrySdk.AddBreadcrumb($"Set/Got Location Data");
@@ -167,14 +168,14 @@ namespace Action_Delay_API_Core.Models.Jobs
                 }
                 catch (CustomAPIError ex)
                 {
-                    _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", this.Name, ex.Message);
-                    this.JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
+                    _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", Name, ex.Message);
+                    JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
                     await InsertRunFailure(Status.STATUS_API_ERROR, ex);
                     throw;
                 }
                 catch (Exception)
                 {
-                    this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                    JobData.CurrentRunStatus = Status.STATUS_ERRORED;
                     await InsertRunFailure(Status.STATUS_ERRORED, null);
                     throw;
                 }
@@ -196,7 +197,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                 try
                 {
                     // Check the status of tasks continuously
-                    while (RunningLocations.Values.Count(task => task != null ) > 0)
+                    while (RunningLocations.Values.Count(task => task != null) > 0)
                     {
                         try
                         {
@@ -211,19 +212,19 @@ namespace Action_Delay_API_Core.Models.Jobs
                             }
                             catch (OperationCanceledException ex)
                             {
-                                _logger.LogWarning(ex, 
+                                _logger.LogWarning(ex,
                                     $"{JobData.JobName} had {completedLocation} time out.");
                                 taskResult = false;
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogWarning(ex, 
+                                _logger.LogWarning(ex,
                                     $"{JobData.JobName} had {completedLocation} error out.");
                                 taskResult = false;
                             }
 
                             var endTime = DateTime.UtcNow;
-                         
+
 
                             // Remove the completed task from the running tasks
                             RunningLocations.Remove(completedLocation);
@@ -233,34 +234,34 @@ namespace Action_Delay_API_Core.Models.Jobs
                             //  if more then half are done, we just say the entire job is.
 
                             if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                (_config.Locations.Count(location => location.Disabled == false) / 2) ||
+                                _config.Locations.Count(location => location.Disabled == false) / 2 ||
                                 RunningLocations.Count <= 0)
                             {
-                                if (this.JobData.CurrentRunStatus.Equals(Status.STATUS_UNDEPLOYED,
+                                if (JobData.CurrentRunStatus.Equals(Status.STATUS_UNDEPLOYED,
                                         StringComparison.OrdinalIgnoreCase))
                                 {
                                     // Success, at least half are success
                                     if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                        (_config.Locations.Count(location => location.Disabled == false) / 2))
+                                        _config.Locations.Count(location => location.Disabled == false) / 2)
                                     {
                                         _logger.LogInformation(
-                                            $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
+                                            $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
                                         cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
-                                        this.JobData.CurrentRunStatus = Status.STATUS_PENDING;
-                                        this.JobData.CurrentRunLengthMs =
+                                        JobData.CurrentRunStatus = Status.STATUS_PENDING;
+                                        JobData.CurrentRunLengthMs =
                                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
 
                                         await TrySave(true);
-                                        this.JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
+                                        JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
                                     }
                                     else
                                     {
                                         _logger.LogInformation(
-                                            $"FAILURE: {JobData.JobName} is considered failed, it has {RunningLocations.Count} running locations: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
+                                            $"FAILURE: {JobData.JobName} is considered failed, it has {RunningLocations.Count} running locations: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
                                         cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
-                                        this.JobData.CurrentRunLengthMs =
+                                        JobData.CurrentRunLengthMs =
                                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-                                        this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                                        JobData.CurrentRunStatus = Status.STATUS_ERRORED;
                                         await TrySave(true);
                                     }
                                 }
@@ -269,14 +270,14 @@ namespace Action_Delay_API_Core.Models.Jobs
                         catch (OperationCanceledException)
                         {
                             _logger.LogInformation(
-                                $"{JobData.JobName} had {RunningLocations.Count} locations, namely: {String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))} timed out.");
+                                $"{JobData.JobName} had {RunningLocations.Count} locations, namely: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))} timed out.");
                             /* NOM NOM */
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error handling location runs for job {name}, aborting... Locations not finished yet: {locations}", Name, String.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name)));
+                    _logger.LogError(ex, "Error handling location runs for job {name}, aborting... Locations not finished yet: {locations}", Name, string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name)));
                 }
                 finally
                 {
@@ -298,9 +299,12 @@ namespace Action_Delay_API_Core.Models.Jobs
                     await _clickHouseService.InsertRun(
                         new ClickhouseJobRun()
                         {
-                            JobName = JobData.InternalJobName, RunStatus = JobData.CurrentRunStatus!,
-                            RunLength = JobData.CurrentRunLengthMs!.Value, RunTime = JobData.CurrentRunTime.Value, ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
-                        }, this.RunningLocationsData.ToList()
+                            JobName = JobData.InternalJobName,
+                            RunStatus = JobData.CurrentRunStatus!,
+                            RunLength = JobData.CurrentRunLengthMs!.Value,
+                            RunTime = JobData.CurrentRunTime.Value,
+                            ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
+                        }, RunningLocationsData.ToList()
                             .Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null).Select(
                                 locationDataKv => new ClickhouseJobLocationRun()
                                 {
@@ -329,8 +333,8 @@ namespace Action_Delay_API_Core.Models.Jobs
 
             }
             finally
-            { 
-              // await _queue.DisposeAsync();
+            {
+                // await _queue.DisposeAsync();
             }
         }
 
@@ -344,32 +348,32 @@ namespace Action_Delay_API_Core.Models.Jobs
                     try
                     {
                         await Task.Delay(RepeatActionAfter, token);
-                        _logger.LogInformation("Running Repeatable Action for {jobName} due to timeSpan over of {timeSpan}", this.Name, RepeatActionAfter);
+                        _logger.LogInformation("Running Repeatable Action for {jobName} due to timeSpan over of {timeSpan}", Name, RepeatActionAfter);
                         if (token.IsCancellationRequested) return;
                         await RunRepeatableAction();
                     }
                     catch (OperationCanceledException)
                     {
-                        _logger.LogInformation("Job {jobName} over, stopping RepeatableActionBackground", this.Name);
+                        _logger.LogInformation("Job {jobName} over, stopping RepeatableActionBackground", Name);
                     }
                     catch (CustomAPIError ex)
                     {
                         _logger.LogWarning(ex, "Repeatable Run for {jobName} failed due to API Issues: {err}",
-                            this.Name,
+                            Name,
                             ex.Message);
 
                     }
                     catch (Exception exc)
                     {
                         _logger.LogWarning(exc, "Repeatable Run for {jobName} failed due to API Issues: {err}",
-                            this.Name, exc.Message);
+                            Name, exc.Message);
                     }
-               
+
                 }
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("Job {jobName} over, stopping RepeatableActionBackground", this.Name);
+                _logger.LogInformation("Job {jobName} over, stopping RepeatableActionBackground", Name);
             }
             catch (Exception ex)
             {
@@ -389,11 +393,11 @@ namespace Action_Delay_API_Core.Models.Jobs
                         RunLength = JobData.CurrentRunLengthMs ?? 0,
                         RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
                         ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
-                    }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.InternalName, customApiError));
+                    }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(InternalName, customApiError));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "{jobName}: Error inserting run failure for error cause: {errorCause}", Name,  errorCause);
+                _logger.LogError(ex, "{jobName}: Error inserting run failure for error cause: {errorCause}", Name, errorCause);
             }
             try
             {
@@ -421,18 +425,18 @@ namespace Action_Delay_API_Core.Models.Jobs
                     var elapsedTimeRunning = timer.Elapsed;
                     if (token.IsCancellationRequested) throw new OperationCanceledException();
 
-                    this.RunningLocationsData[location].ResponseTimeUtc = response.ResponseTimeMs;
-                    this.RunningLocationsData[location].ColoId = response.ColoId;
+                    RunningLocationsData[location].ResponseTimeUtc = response.ResponseTimeMs;
+                    RunningLocationsData[location].ColoId = response.ColoId;
 
 
                     if (response.Errored)
                     {
-                        this.RunningLocationsData[location].CurrentRunLengthMs = 0;
-                        this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                        RunningLocationsData[location].CurrentRunLengthMs = 0;
+                        RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
                         _ = TrySave();
                         return false;
                     }
-                    
+
 
                     var endTime = DateTime.UtcNow;
 
@@ -456,19 +460,19 @@ namespace Action_Delay_API_Core.Models.Jobs
                     }
 
                     // modifying inmemory jobdata
-                    this.RunningLocationsData[location].CurrentRunLengthMs =
+                    RunningLocationsData[location].CurrentRunLengthMs =
                         (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
 
-                    if (this.JobData.CurrentRunStatus?.Equals(Status.STATUS_UNDEPLOYED, StringComparison.OrdinalIgnoreCase) ?? false)
+                    if (JobData.CurrentRunStatus?.Equals(Status.STATUS_UNDEPLOYED, StringComparison.OrdinalIgnoreCase) ?? false)
                     {
-                        this.JobData.CurrentRunLengthMs =
+                        JobData.CurrentRunLengthMs =
                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
                         //_logger.LogInformation($"{Name} Run Still {this.JobData.CurrentRunStatus}, updating time, new time: {this.JobData.CurrentRunLengthMs}. took {elapsedTimeRunning.TotalMilliseconds}ms to check.");
                     }
 
                     if (response.Done == false)
                     {
-                        this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_UNDEPLOYED;
+                        RunningLocationsData[location].CurrentRunStatus = Status.STATUS_UNDEPLOYED;
                         _ = TrySave();
                         // Use a backoff strategy for the delay between retries
                         var delay = CalculateBackoff((DateTime.UtcNow - utcStart).TotalSeconds) - elapsedTimeRunning;
@@ -477,7 +481,7 @@ namespace Action_Delay_API_Core.Models.Jobs
                     }
                     else
                     {
-                        this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_DEPLOYED;
+                        RunningLocationsData[location].CurrentRunStatus = Status.STATUS_DEPLOYED;
                         _ = TrySave();
                         return true;
                     }
@@ -485,13 +489,13 @@ namespace Action_Delay_API_Core.Models.Jobs
             }
             catch (OperationCanceledException ex)
             {
-                this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
                 _logger.LogError(ex, $"Location {location.Name} timed out");
                 return false;
             }
             catch (Exception ex)
             {
-                this.RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
                 _logger.LogError(ex, $"Error running location {location.Name}");
                 return false;
             }
@@ -528,12 +532,12 @@ namespace Action_Delay_API_Core.Models.Jobs
                     var getjobLocations = await _dbContext.JobLocations.AsTracking().Where(dbLocation =>
                         dbLocation.InternalJobName == InternalName).ToListAsync();
 
-                    foreach (var dataKvp in this.RunningLocationsData)
+                    foreach (var dataKvp in RunningLocationsData)
                     {
                         var getTrackedLocation = getjobLocations.FirstOrDefault(dbLocation =>
                             dbLocation.InternalJobName == InternalName && dbLocation.LocationName == dataKvp.Value.LocationName);
-                       if (getTrackedLocation != null)
-                        getTrackedLocation.Update(dataKvp.Value);
+                        if (getTrackedLocation != null)
+                            getTrackedLocation.Update(dataKvp.Value);
                     }
 
                     await _dbContext.SaveChangesAsync();

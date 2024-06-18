@@ -38,7 +38,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
             var data = tryGetAnalytic.Value!.Result!.Viewer.Accounts.First().WorkersInvocationsAdaptive.First().Dimensions.Datetime;
 
             this.JobData.CurrentRunLengthMs = (DateTime.UtcNow - data).TotalMilliseconds > 0 ? (ulong)(DateTime.UtcNow - data).TotalMilliseconds : 0;
-            this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
+            this.JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
             this.JobData.APIResponseTimeUtc = tryGetAnalytic.Value.ResponseTimeMs;
             await InsertRunResult();
             await TrySave(true);

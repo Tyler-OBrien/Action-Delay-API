@@ -39,10 +39,10 @@ namespace Action_Delay_API_Core.Extensions
                 {
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
-                        rawString.Truncate(25));
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError(
-                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.Truncate(50)}",
-                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.Truncate(25)}", "",
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "",
                         listener.GetTime()));
                 }
 
@@ -51,8 +51,8 @@ namespace Action_Delay_API_Core.Extensions
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
                     return Result.Fail((new CustomAPIError(
-                        $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.Truncate(50)}",
-                        (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.Truncate(25)}",
+                        $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
                         "", listener.GetTime())));
                 }
 
@@ -144,10 +144,10 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 {
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
-                        rawString.Truncate(25));
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError(
-                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.Truncate(50)}",
-                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.Truncate(25)}", "",
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "",
                         listener.GetTime()));
                 }
 
@@ -156,8 +156,8 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
                     return Result.Fail((new CustomAPIError(
-                        $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.Truncate(50)}",
-                        (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.Truncate(25)}",
+                        $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
                         "", listener.GetTime())));
                 }
 
@@ -262,14 +262,14 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 catch (Exception ex)
                 {
                     // Better messages for Deserialization errors
-                    logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message, rawString.Truncate(25));
-                    return Result.Fail(new CustomAPIError($"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.Truncate(50)}", (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.Truncate(25)}", "", listener.GetTime()));
+                    logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message, rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
+                    return Result.Fail(new CustomAPIError($"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime()));
                 }
 
                 if (response == null)
                 {
                     logger.LogCritical($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
-                    return Result.Fail((new CustomAPIError($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.Truncate(50)}", (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.Truncate(25)}", "", listener.GetTime())));
+                    return Result.Fail((new CustomAPIError($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime())));
                 }
 
                 if (response.Errors != null && response.Errors.Any())

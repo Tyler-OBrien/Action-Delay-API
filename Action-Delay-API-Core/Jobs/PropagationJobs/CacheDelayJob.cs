@@ -12,6 +12,7 @@ using Action_Delay_API_Core.Models.NATS.Responses;
 using FluentResults;
 using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Errors;
+using Action_Delay_API_Core.Jobs.PropagationJobs;
 
 namespace Action_Delay_API_Core.Jobs
 {

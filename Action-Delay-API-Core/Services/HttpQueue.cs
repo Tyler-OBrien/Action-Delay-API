@@ -114,7 +114,7 @@ namespace Action_Delay_API_Core.Services
                 {
                     // Better messages for Deserialization errors
                     _logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}, Response: {rawString}", ex.Message,
-                        rawString.Truncate(25), rawString.Truncate(50));
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50), rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(
                         $"Issue reading response, Status Code: {sendRequest.StatusCode}: {sendRequest.ReasonPhrase}");
                 }
@@ -122,7 +122,7 @@ namespace Action_Delay_API_Core.Services
                 if (response == null)
                 {
                     _logger.LogCritical(
-                        $"Could not get response {request.URL} from API, status code: {sendRequest.StatusCode} Response: {rawString.Truncate(50)}");
+                        $"Could not get response {request.URL} from API, status code: {sendRequest.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}");
                     return Result.Fail($"Could not get response {request.URL} from API, status code: {sendRequest.StatusCode}");
                 }
 

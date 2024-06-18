@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.Errors;
+using Action_Delay_API_Core.Jobs.PropagationJobs;
 
 namespace Action_Delay_API_Core.Jobs
 {

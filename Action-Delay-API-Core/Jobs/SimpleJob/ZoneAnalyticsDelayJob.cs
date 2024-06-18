@@ -43,7 +43,7 @@ public class ZoneAnalyticsDelayJob : BaseJob
         var data = tryGetAnalytic.Value!.Result!.Viewer.Zones.First().HttpRequestsAdaptive.First().Datetime;
 
         this.JobData.CurrentRunLengthMs = (DateTime.UtcNow - data).TotalMilliseconds > 0 ? (ulong)(DateTime.UtcNow - data).TotalMilliseconds : 0;
-        this.JobData.CurrentRunStatus = Models.Jobs.Status.STATUS_DEPLOYED;
+        this.JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
         this.JobData.APIResponseTimeUtc = tryGetAnalytic.Value.ResponseTimeMs;
         await InsertRunResult();
         await TrySave(true);
