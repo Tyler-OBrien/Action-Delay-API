@@ -11,6 +11,8 @@ using System.Diagnostics.Tracing;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Action_Deplay_API_Worker.Services;
     public class HttpService : IHttpService
@@ -62,12 +64,14 @@ namespace Action_Deplay_API_Worker.Services;
                 }
 
                 bool wantsBody = incomingRequest.ReturnBody == null || incomingRequest.ReturnBody.Value;
+                bool wantsBodyOnError = incomingRequest.ReturnBodyOnError == null || incomingRequest.ReturnBodyOnError.Value;
+                bool wantsBodyHash = incomingRequest.ReturnBodySha256.HasValue && incomingRequest.ReturnBodySha256.Value;
 
                 string perfInfo = string.Empty;
                 double responseTimeMs = -1;
                 bool couldGetBody = true;
                 var response =
-                    await httpRetryPolicy.ExecuteAsync(async () =>
+                    await httpRetryPolicy(incomingRequest.RetriesCount ?? 6).ExecuteAsync(async () =>
                     {
                         HttpMethod method = HttpMethod.Get;
                         if (incomingRequest.Method != null)
@@ -146,6 +150,10 @@ namespace Action_Deplay_API_Worker.Services;
                             if (String.IsNullOrWhiteSpace(incomingRequest.DNSResolveOverride) == false)
                                 request.Options.Set(new HttpRequestOptionsKey<string>("DNSResolveOverride"),
                                     incomingRequest.DNSResolveOverride);
+
+                            if (String.IsNullOrWhiteSpace(incomingRequest.CustomDNSServerOverride) == false)
+                                request.Options.Set(new HttpRequestOptionsKey<string>("CustomDNSServerOverride"),
+                                    incomingRequest.CustomDNSServerOverride);
                             using var listener = new HttpEventListener();
                             var response = await newClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                             var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token);
@@ -168,6 +176,10 @@ namespace Action_Deplay_API_Worker.Services;
                         }
                     });
 
+
+                if (wantsBody == false && wantsBodyOnError && response.IsSuccessStatusCode == false)
+                    wantsBody = true;
+
                 if (couldGetBody == false && wantsBody)
                 {
                     _logger.LogWarning(
@@ -187,17 +199,33 @@ namespace Action_Deplay_API_Worker.Services;
                 }
 
                 _logger.LogInformation(
-                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, dns override {dnsOverride}, we got back {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}. Timings: {perfInfo}",
-                    url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.DNSResolveOverride,
+                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, dns override {dnsOverride}, ns override {nameserverOverride}, we got back {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}. Timings: {perfInfo}",
+                    url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.DNSResolveOverride, incomingRequest.CustomDNSServerOverride,
                     response.StatusCode, response.Version, incomingRequest.EnableConnectionReuse, perfInfo);
+
+                string? output = null;
+                string? hash = null;
+                if (wantsBody)
+                {
+                    output = await response.Content.ReadAsStringAsync();
+                    if (wantsBodyHash) hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(output)));
+
+                }
+                else
+                {
+                    var outputStream = await response.Content.ReadAsStreamAsync();
+                    if (wantsBodyHash) hash = Convert.ToHexString(await SHA256.HashDataAsync(outputStream));
+                    await outputStream.CopyToAsync(Stream.Null);
+                }
 
                 return new SerializableHttpResponse
                 {
                     WasSuccess = response.IsSuccessStatusCode,
                     StatusCode = response.StatusCode,
                     Headers = response.Headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value)),
-                    Body = await response.Content.ReadAsStringAsync(),
+                    Body = output,
                     ResponseTimeMs = Math.Round(responseTimeMs, 3),
+                    BodySha256 = hash,
                 };
             }
             catch (HttpRequestException ex)
@@ -275,10 +303,11 @@ namespace Action_Deplay_API_Worker.Services;
 
 
 
-    private static readonly IAsyncPolicy<HttpResponseMessage> httpRetryPolicy =
+    private static  IAsyncPolicy<HttpResponseMessage> httpRetryPolicy(int retries) =>
             HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
+                .Or<HttpIOException>()
+                .WaitAndRetryAsync(retries, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
 
   
     }

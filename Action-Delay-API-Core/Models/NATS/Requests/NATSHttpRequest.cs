@@ -15,7 +15,9 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? TimeoutMs { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? RetriesCount { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public NetType? NetType { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
 
@@ -40,7 +42,18 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
         public bool? ReturnBody { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? ReturnBodySha256 { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? ReturnBodyOnError { get; set; }
+
+
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? DNSResolveOverride { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? CustomDNSServerOverride { get; set; }
 
         public void SetDefaultsFromLocation(Location location)
         {

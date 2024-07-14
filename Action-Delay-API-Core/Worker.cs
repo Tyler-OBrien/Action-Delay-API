@@ -144,6 +144,7 @@ namespace Action_Delay_API_Core
             catch (Exception ex)
             {
                 _logger.LogCritical(ex, "Error in Execute");
+                SentrySdk.CaptureException(ex);
             }
         }
 
@@ -159,6 +160,7 @@ namespace Action_Delay_API_Core
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"{job.Name} failed");
+                SentrySdk.CaptureException(ex);
             }
             finally
             {

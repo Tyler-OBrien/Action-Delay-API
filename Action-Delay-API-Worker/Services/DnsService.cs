@@ -24,7 +24,8 @@ namespace Action_Deplay_API_Worker.Services
 
 
         private static readonly IAsyncPolicy nameServerqueryRetryPolicy =
-            Policy.Handle<TimeoutException>()
+  Policy.Handle<DnsResponseException>()
+                .Or<TimeoutException>()
                 .Or<System.Net.Sockets.SocketException>()
                 .Or<OperationCanceledException>()
                 .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
@@ -66,14 +67,10 @@ namespace Action_Deplay_API_Worker.Services
                 try
                 {
                     dnsServerAddresses =
-                        await nameServerqueryRetryPolicy.ExecuteAsync(() =>
+                        await nameServerqueryRetryPolicy.ExecuteAsync(async () =>
                         {
-                            AddressFamily addressFamily = AddressFamily.Unspecified;
-                            if (request.NetType == NetType.IPv4)
-                                addressFamily = AddressFamily.InterNetwork;
-                            else if (request.NetType == NetType.IPv6)
-                                addressFamily = AddressFamily.InterNetworkV6;
-                            return Dns.GetHostAddressesAsync(dnsServer, addressFamily, token);
+                            var getAddresses = await Program.NetTypeSpecificLookup(dnsServer, request.NetType ?? NetType.Either, token);
+                            return getAddresses.AddressList;
                         });
                 }
                 catch (Exception ex) when (ex is SocketException or ArgumentOutOfRangeException or ArgumentException)

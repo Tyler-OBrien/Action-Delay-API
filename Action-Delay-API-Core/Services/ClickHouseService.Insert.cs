@@ -182,5 +182,93 @@ namespace Action_Delay_API_Core.Services
             }
         }
 
+
+        public async Task InsertRunPerf(List<ClickhouseJobRunPerf> runs, List<ClickhouseJobLocationRunPerf>? locations,
+            List<ClickhouseAPIErrorPerf>? apiErrors = null, CancellationToken token = default)
+        {
+            try
+            {
+                await using var connection = CreateConnection();
+
+                try
+                {
+                    using var bulkCopyRun = new ClickHouseBulkCopy(connection)
+                    {
+                        DestinationTableName = "job_runs_perf",
+                        BatchSize = 100000
+                    };
+                    await bulkCopyRun.InitAsync();
+                    await bulkCopyRun.WriteToServerAsync(
+                        runs.Select(run => new object[]
+                            {
+                                run.JobName, run.RunTime, run.RunStatus, run.ResponseLatency
+                            })
+                            .ToArray(), token);
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs");
+                    throw;
+                }
+                try
+                {
+                    if (locations != null && locations.Any())
+                    {
+                        using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
+                        {
+                            DestinationTableName = "job_runs_locations_perf",
+                            BatchSize = 100000
+                        };
+                        await bulkCopyInterface.InitAsync();
+                        await bulkCopyInterface.WriteToServerAsync(
+                            locations.Select(server => new object[]
+                                {
+                                    server.JobName, server.LocationName, server.RunTime,
+                                    server.RunStatus, server.ResponseLatency, server.LocationId
+                                })
+                                .ToArray(), token);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs_locations_perf");
+                    _logger.LogCritical($"Attempted input: {System.Text.Json.JsonSerializer.Serialize(locations)}");
+                    throw;
+                }
+
+
+     
+                try
+                {
+                    if (apiErrors != null && apiErrors.Any())
+                    {
+                        using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
+                        {
+                            DestinationTableName = "api_errors_perf",
+                            BatchSize = 100000
+                        };
+                        await bulkCopyApiError.InitAsync();
+                        await bulkCopyApiError.WriteToServerAsync(
+                            apiErrors.Select(apiError => new object[]
+                                {
+                                    apiError.JobName, apiError.LocationName, apiError.RunTime, apiError.ErrorType, apiError.ErrorDescription,
+                                    apiError.ErrorHash, apiError.ResponseLatency, apiError.LocationName ?? string.Empty,
+                                })
+                                .ToArray(), token);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex, "Failure to write to Clickhouse api_errors_perf");
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Failure to write to Clickhouse perf");
+            }
+        }
+
     }
 }

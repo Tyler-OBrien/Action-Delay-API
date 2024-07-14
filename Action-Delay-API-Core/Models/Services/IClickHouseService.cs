@@ -13,6 +13,9 @@ namespace Action_Delay_API_Core.Models.Services
         Task InsertRunAI(List<ClickhouseJobRun> run, List<ClickhouseJobLocationRun>? locations,
             List<ClickhouseAPIError>? apiError = null, CancellationToken token = default);
 
+        Task InsertRunPerf(List<ClickhouseJobRunPerf> runs, List<ClickhouseJobLocationRunPerf>? locations,
+            List<ClickhouseAPIErrorPerf>? apiError = null, CancellationToken token = default);
+
 
         Task<List<DeploymentStatistic>> GetCompatibleDeploymentStatistics(CancellationToken token = default);
 

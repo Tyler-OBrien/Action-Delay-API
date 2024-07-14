@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Text.Json.Serialization;
 
 namespace Action_Deplay_API_Worker.Models.API.Response
 {
@@ -13,9 +14,18 @@ namespace Action_Deplay_API_Worker.Models.API.Response
         public HttpStatusCode StatusCode { get; set; }
         public bool ProxyFailure { get; set; }
         public Dictionary<string, string> Headers { get; set; }
-        public string Body { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Body { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Info { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? BodySha256 { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public DateTime? ResponseUTC { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public double? ResponseTimeMs { get; set; }
 
     }

@@ -17,7 +17,10 @@ namespace Action_Delay_API_Core.Models.NATS.Responses
         public Dictionary<string, string> Headers { get; set; }
 
         [JsonPropertyName("body")]
-        public string Body { get; set; }
+        public string? Body { get; set; }
+
+        [JsonPropertyName("bodysha256")]
+        public string? BodySha256 { get; set; }
 
         [JsonPropertyName("info")]
         public string? Info { get; set; }

@@ -1,4 +1,6 @@
-﻿namespace Action_Delay_API_Core.Models.Local
+﻿using Action_Delay_API_Core.Models.NATS;
+
+namespace Action_Delay_API_Core.Models.Local
 {
     public class LocalConfig
     {
@@ -48,8 +50,77 @@
 
         public CustomHostnamesDelayJob? CustomHostnamesDelayJob { get; set; }
         public CertificateRenewalDelayJob? CertRenewalDelayJob { get; set; }
+        public PerfConfig? PerfConfig { get; set; }
 
 
+    }
+
+
+    public class PerfConfig : BaseConfig
+    {
+        public List<DownloadJobGeneric> BasicDownloadJobList { get; set; }
+
+        public List<UploadS3Job> S3Jobs { get; set; }
+        public List<UploadJobGeneric> UploadJobs { get; set; }
+
+        // Sent with every request, just basic auth on endpoints
+        public string Secret { get; set; }
+    }
+
+    public class DownloadJobGeneric
+    {
+        public string Name { get; set; }
+
+        public string Endpoint { get; set; }
+
+        public Dictionary<string, string>? CustomHeaders { get; set; }
+
+        public string[]? AllowedEdgeLocations { get; set; }
+        public Dictionary<string, string>? EdgeLocationCustomDNSNameserverOverride { get; set; }
+
+        public string? CustomDNSNameserver { get; set; }
+        public string? DNSResolveOverride { get; set; }
+
+        public NetType? ForceNetType { get; set; }
+    }
+
+
+    public class UploadJobGeneric
+    {
+        public string Name { get; set; }
+
+        public string Endpoint { get; set; }
+
+        public Dictionary<string, string> CustomHeaders { get; set; }
+
+        public string[] AllowedEdgeLocations { get; set; }
+
+        public NetType? ForceNetType { get; set; }
+
+        public bool? CheckUploadedContentHash { get; set; }
+
+    }
+
+
+
+    public class UploadS3Job
+    {
+        public string Name { get; set; }
+
+        public string Endpoint { get; set; }
+
+        public string BucketName { get; set; }
+
+        public string Region { get; set; }
+
+        public string AccessKey { get; set; }
+
+        public string SecretKey { get; set; }
+
+        public string[] AllowedEdgeLocations { get; set; }
+
+        public NetType? ForceNetType { get; set; }
+        public bool? CheckUploadedContentHash { get; set; }
     }
 
     public class CertificateRenewalDelayJob : BaseConfig

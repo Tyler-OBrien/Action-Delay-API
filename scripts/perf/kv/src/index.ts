@@ -1,0 +1,123 @@
+import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
+
+
+export interface Env {
+	KV: KVNamespace;
+	API_KEY: string;
+}
+
+const handler = {
+	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		if ((req.headers.get('apikey') == env.API_KEY) == false) {
+			return new Response('Bad Human', { status: 403 });
+		}
+		if (req.method != "GET" && req.method != "PUT") {
+			return new Response("Method Not Allowed, Bad Human.", {
+				status: 405,
+			});
+		}
+		var url = new URL(req.url);
+		if (req.method === "PUT") {
+			if (req.body == null) {
+				return new Response("No Body but put", {
+					status: 400,
+				});
+			}
+			const key = url.pathname.slice(1);
+			if (key.startsWith("cached") || key.startsWith("uncached")) {
+				return new Response("cached and uncached dirs are protected.", {
+					status: 401,
+				});
+			}
+			try {
+				var startReq = performance.now();
+				await env.KV.put(key, req.body, {
+					expirationTtl: 60
+				});
+				var getDur = performance.now() - startReq;
+				return new Response(null, { status: 200, headers: { "x-dur": getDur.toString()} });
+			}
+			catch (exception) {
+				console.log(exception);
+				return new Response(`Error KV PUT: ${exception}`, { status: 500 });
+
+			}
+
+		}
+
+		if (url.pathname.startsWith('/cached/')) {
+			if (url.pathname === '/cached/500kb') {
+				return await getKeyResponse(env.KV, 'cached/500Kb-new', 31536001 );
+			} else if (url.pathname === '/cached/5mb') {
+				return await getKeyResponse(env.KV, 'cached/5mb', 31536001);
+			} else if (url.pathname === '/cached/10kb') {
+				return await getKeyResponse(env.KV, 'cached/10Kb-new', 31536001);
+			}
+		}
+		if (url.pathname.startsWith('/uncached/')) {
+			if (url.pathname === '/uncached/500kb') {
+				return await getKeyResponse(env.KV, 'uncached/500Kb', 60);
+			} else if (url.pathname === '/uncached/5mb') {
+				return await getKeyResponse(env.KV, 'uncached/5mb', 60);
+			} else if (url.pathname === '/uncached/10kb') {
+				return await getKeyResponse(env.KV, 'uncached/10Kb', 60);
+			}
+		}
+		return new Response('404, Bad Robot.', { status: 404 });
+	},
+};
+
+
+const getKeyResponse = async function(kv: KVNamespace, key: string, cacheTtl: number): Promise<Response> {
+	try {
+		var startReq = performance.now();
+		var tryGet = await kv.get(key, { cacheTtl: cacheTtl, type: 'stream' });
+		var getDur = performance.now() - startReq;
+		if (tryGet === null) {
+			return new Response("Could not get key: " + key, {
+				status: 404,
+				headers: {
+					"x-dur": getDur.toString()
+				}
+			});
+		}
+		return new Response(tryGet, {
+			headers: {
+				"x-dur": getDur.toString()
+			}
+		})
+	}
+	catch (exception) {
+		console.log(exception);
+		return new Response(`Error KV GET: ${exception}`, { status: 500 });
+	}
+}
+
+
+
+
+const config: ResolveConfigFn = (env: Env, _trigger: any) => {
+	// if null, we're not going to export any..
+	if (!env.BASELIME_API_KEY) {
+		const headSamplerConfig = {
+			acceptRemote: false, //Whether to accept incoming trace contexts
+			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
+		}
+		return {
+			sampling: {
+				headSampler: headSamplerConfig
+			},
+			exporter: {},
+			service: {}
+		}
+	}
+	return {
+		exporter: {
+			url: 'https://otel.baselime.io/v1',
+			headers: { 'x-api-key': env.BASELIME_API_KEY },
+		},
+		service: { name: env.SERVICE_NAME },
+	}
+}
+
+export default instrument(handler, config)

@@ -1,0 +1,32 @@
+name = "action-delay-api-r2-perf"
+main = "src/index.ts"
+compatibility_date = "2024-06-23"
+compatibility_flags = [ "nodejs_compat" ]
+
+
+
+[[r2_buckets]]
+binding = 'apac'
+bucket_name = 'action-delay-api-perf-apac'
+preview_bucket_name = 'action-delay-api-perf-apac'
+
+
+[[r2_buckets]]
+binding = 'eeur'
+bucket_name = 'action-delay-api-perf-eeur'
+preview_bucket_name = 'action-delay-api-perf-eeur'
+
+[[r2_buckets]]
+binding = 'enam'
+bucket_name = 'action-delay-api-perf-enam'
+preview_bucket_name = 'action-delay-api-perf-enam'
+
+[[r2_buckets]]
+binding = 'weur'
+bucket_name = 'action-delay-api-perf-weur'
+preview_bucket_name = 'action-delay-api-perf-weur'
+
+[[r2_buckets]]
+binding = 'wnam'
+bucket_name = 'action-delay-api-perf-wnam'
+preview_bucket_name = 'action-delay-api-perf-wnam'

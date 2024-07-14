@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,6 +9,7 @@ using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Models.CloudflareAPI.AI;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -143,7 +145,7 @@ namespace Action_Delay_API_Core.Jobs.AI
             {
                 if (Runs.Any())
                 {
-                    await _clickHouseService.InsertRunAI(Runs, Locations, Errors);
+                    await _clickHouseService.InsertRunAI(Runs.ToList(), Locations.ToList(), Errors.ToList());
                 }
                 Runs.Clear();
                 Locations.Clear();
@@ -207,7 +209,7 @@ namespace Action_Delay_API_Core.Jobs.AI
 
                         var completedTask = await Task.WhenAny(RunningLocations.Values);
                         var completedLocation = RunningLocations.First(x => x.Value == completedTask).Key;
-                        Result<SerializableHttpResponse> taskResult = null;
+                        Result<SerializableHttpResponse>? taskResult = null;
                         try
                         {
                             taskResult = await completedTask;
@@ -230,12 +232,12 @@ namespace Action_Delay_API_Core.Jobs.AI
                         RunningLocations.Remove(completedLocation);
 
 
-                        if (taskResult?.IsFailed ?? false)
+                        if (taskResult == null || (taskResult?.IsFailed ?? true) || taskResult.ValueOrDefault == null)
                         {
                             FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1));
-
+                            continue;
                         }
-                        var tryGetValue = taskResult.Value!;
+                        var tryGetValue = taskResult!.Value!;
 
                         if (String.IsNullOrWhiteSpace(tryGetValue.Body))
                         {
@@ -345,9 +347,9 @@ namespace Action_Delay_API_Core.Jobs.AI
             _logger.LogInformation($"{model.Name} done: We got {FinishedLocationStatus.Count(pair => pair.Value.Success)} successful locations and {errors.Count} errors.");
         }
 
-        public List<ClickhouseJobRun> Runs = new List<ClickhouseJobRun>();
-        public List<ClickhouseJobLocationRun> Locations = new List<ClickhouseJobLocationRun>();
-        public List<ClickhouseAPIError> Errors = new List<ClickhouseAPIError>();
+        public ConcurrentBag<ClickhouseJobRun> Runs = new ConcurrentBag<ClickhouseJobRun>();
+        public ConcurrentBag<ClickhouseJobLocationRun> Locations = new ConcurrentBag<ClickhouseJobLocationRun>();
+        public ConcurrentBag<ClickhouseAPIError> Errors = new ConcurrentBag<ClickhouseAPIError>();
 
         public void FinishedRunInsertLater(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations,
             List<ClickhouseAPIError>? apiError = null)
@@ -439,7 +441,8 @@ namespace Action_Delay_API_Core.Jobs.AI
                 ReturnBody = true,
                 ContentType = "application/octet-stream",
                 BodyBytes = config.Content,
-                Method = MethodType.POST
+                Method = MethodType.POST,
+                RetriesCount = 0,
             };
             newRequest.SetDefaultsFromLocation(location);
             if (config.MaxTokens.HasValue && config.MaxTokens.Value > 0)

@@ -1,0 +1,29 @@
+# This file describes a Fastly Compute package. To learn more visit:
+# https://www.fastly.com/documentation/reference/compute/fastly-toml
+
+authors = [""]
+cloned_from = "https://github.com/fastly/compute-starter-kit-rust-kv-store"
+description = ""
+language = "rust"
+manifest_version = 2
+name = "action-delay-api-kv"
+service_id = "cS2Jl9RGARtKWHrkTmaMA4"
+
+[local_server]
+
+  [local_server.backends]
+
+  [local_server.kv_stores]
+
+    [[local_server.kv_stores.my-store]]
+      key = "readme"
+
+[scripts]
+  build = "cargo build --bin fastly-compute-project --release --target wasm32-wasi --color always"
+
+[setup]
+
+  [setup.kv_stores]
+
+    [setup.kv_stores.my-store]
+      description = "My first kv store"

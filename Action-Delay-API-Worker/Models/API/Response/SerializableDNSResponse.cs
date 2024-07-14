@@ -1,4 +1,6 @@
-﻿namespace Action_Deplay_API_Worker.Models.API.Response
+﻿using System.Text.Json.Serialization;
+
+namespace Action_Deplay_API_Worker.Models.API.Response
 {
     public class SerializableDNSResponse
     {
@@ -12,10 +14,13 @@
         public string ResponseCode { get; set; }
         public bool ProxyFailure { get; set; }
         public List<SerializableDnsAnswer> Answers { get; set; }
-
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? NSID { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Info { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public DateTime? ResponseUTC { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public double? ResponseTimeMs { get; set; }
 
     }

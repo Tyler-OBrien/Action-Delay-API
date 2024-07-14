@@ -13,6 +13,7 @@ namespace Action_Deplay_API_Worker.Models.API.Request
             set;
         }
         public int? TimeoutMs { get; set; }
+        public int? RetriesCount { get; set; }
 
         public NetType? NetType { get; set; }
 
@@ -30,7 +31,13 @@ namespace Action_Deplay_API_Worker.Models.API.Request
 
         public bool? ReturnBody { get; set; }
 
+        public bool? ReturnBodySha256 { get; set; }
+        public bool? ReturnBodyOnError { get; set; }
+
+
+
         public string? DNSResolveOverride { get; set; }
+        public string? CustomDNSServerOverride { get; set; }
 
     }
 

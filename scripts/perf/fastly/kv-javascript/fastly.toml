@@ -1,0 +1,37 @@
+# This file describes a Fastly Compute package. To learn more visit:
+# https://www.fastly.com/documentation/reference/compute/fastly-toml
+
+authors = []
+cloned_from = "CMo2xKaQr2gEgn2r2sYje1"
+description = "A basic starter kit that demonstrates routing, simple synthetic responses and overriding caching rules."
+language = "javascript"
+manifest_version = 3
+name = "Default starter for TypeScript"
+service_id = "CMo2xKaQr2gEgn2r2sYje1"
+
+
+
+[local_server]
+
+  [local_server.backends]
+
+  [local_server.kv_stores]
+
+    [[local_server.kv_stores.action-delay-api]]
+      data = "placeholder"
+      key = "placeholder"
+
+    [[local_server.kv_stores.action-delay-api]]
+      key = "readme"
+      path = "./README.md"
+
+[scripts]
+  build = "npm run build"
+  post_init = "npm install"
+
+[setup]
+
+  [setup.kv_stores]
+
+    [setup.kv_stores.action-delay-api]
+      description = "My first kv store"
