@@ -34,7 +34,7 @@ namespace Action_Delay_API_Core.Broker.ColoData
                 {
                     _logger.LogCritical(
                         $"Could not get response colos from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
-                    return Result.Fail(new CustomAPIError($"Could not get response colos from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null));
+                    return Result.Fail(new CustomAPIError($"Could not get response colos from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null, httpResponse.GetColoId()));
                 }
 
                 ColoApiData? response = null;
@@ -49,7 +49,7 @@ namespace Action_Delay_API_Core.Broker.ColoData
                         rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError(
                         $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
-                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null));
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null, httpResponse.GetColoId()));
                 }
 
                 return response;
@@ -81,7 +81,7 @@ namespace Action_Delay_API_Core.Broker.ColoData
                 {
                     _logger.LogCritical(
                         $"Could not get response metal from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
-                    return Result.Fail(new CustomAPIError($"Could not get response metal from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null));
+                    return Result.Fail(new CustomAPIError($"Could not get response metal from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null, httpResponse.GetColoId()));
                 }
 
                 MetalAPIData[]? response = null;
@@ -96,7 +96,7 @@ namespace Action_Delay_API_Core.Broker.ColoData
                         rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError(
                         $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
-                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null));
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null, httpResponse.GetColoId()));
                 }
 
                 return response;

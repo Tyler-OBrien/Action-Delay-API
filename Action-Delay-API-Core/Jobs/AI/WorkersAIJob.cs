@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -267,7 +267,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                                 {
                                     var newError = new CustomAPIError(parsedResult.Error.Message,
                                         (int)tryGetValue.StatusCode, parsedResult.Error.Message,
-                                        parsedResult.Error.Code, tryGetValue.ResponseTimeMs);
+                                        parsedResult.Error.Code, tryGetValue.ResponseTimeMs, GetColoId(tryGetValue.Headers));
                                     newError.LocationName = completedLocation.Name;
                                     errors.Add(newError);
                                     FinishedLocationStatus.Add(completedLocation,

@@ -43,5 +43,34 @@ namespace Action_Delay_API_Core.Extensions
 
             return value.Length <= maxLength ? value : value.Substring(0, maxLength);
         }
+
+        public static Regex S3MessageRegex = new Regex(@"<Message>(.*?)<\/Message>",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace);
+
+        public static string IntelligentCloudflareErrorsS3FriendlyTruncate(this string value, int maxLength)
+        {
+
+            if (string.IsNullOrEmpty(value)) return value;
+
+            if (value.TrimStart().StartsWith("<?xml", StringComparison.OrdinalIgnoreCase))
+            {
+                var tryMatch = S3MessageRegex.Match(value);
+                if (tryMatch is { Success: true, Groups.Count: > 1 })
+                {
+                    value = tryMatch.Groups[1].Value;
+                }
+            }
+
+            if (value.TrimStart().StartsWith("<html>", StringComparison.OrdinalIgnoreCase) || value.TrimStart().StartsWith("<!DOCTYPE html>", StringComparison.OrdinalIgnoreCase))
+            {
+                var tryMatch = HtmlTitleRegex.Match(value);
+                if (tryMatch is { Success: true, Groups.Count: > 1 })
+                {
+                    value = tryMatch.Groups[1].Value;
+                }
+            }
+
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
+        }
     }
 }

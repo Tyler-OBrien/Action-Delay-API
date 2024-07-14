@@ -48,7 +48,6 @@ public static class GraphQLExtensions
                     listener.GetTime()));
             }
 
-
             response.ResponseTimeMs = listener.GetTime();
             return response;
         }

@@ -24,7 +24,8 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
                     ? error.StatusCode.ToString()
                     : error.WorkerStatusCode,
                 ResponseLatency = (uint)(error.ResponseTimeMs ?? 0),
-                LocationName = error.LocationName
+                LocationName = error.LocationName,
+                ColoId = error.ColoId,
             };
             newClickhouseError.ErrorHash =
                 Sha256Hash(newClickhouseError.ErrorDescription, newClickhouseError.ErrorType);
@@ -64,5 +65,7 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
         public string ErrorHash { get; set; }
 
         public UInt64 ResponseLatency { get; set; }
+
+        public int? ColoId { get; set; }
     }
 }

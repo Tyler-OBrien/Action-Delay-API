@@ -27,7 +27,7 @@ namespace Action_Delay_API_Core.Extensions
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}",
-                        (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime()));
+                        (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 ApiResponse<TResult>? response = null;
@@ -43,7 +43,7 @@ namespace Action_Delay_API_Core.Extensions
                     return Result.Fail(new CustomAPIError(
                         $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
                         (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "",
-                        listener.GetTime()));
+                        listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 if (response == null)
@@ -53,7 +53,7 @@ namespace Action_Delay_API_Core.Extensions
                     return Result.Fail((new CustomAPIError(
                         $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
                         (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
-                        "", listener.GetTime())));
+                        "", listener.GetTime(), httpResponse.GetColoId())));
                 }
 
                 if (response.Errors != null && response.Errors.Any())
@@ -68,7 +68,7 @@ namespace Action_Delay_API_Core.Extensions
                         (int)httpResponse.StatusCode,
                         $"Error: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}",
                         response.Errors?.FirstOrDefault(error => error.Code != null)?.Code.ToString() ?? "",
-                        listener.GetTime()));
+                        listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 if (response.Messages != null && response.Messages.Any())
@@ -86,7 +86,7 @@ namespace Action_Delay_API_Core.Extensions
                     return Result.Fail(new CustomAPIError(
                         $"Response Success did not indicate success but returned no errors, status code: {httpResponse.StatusCode}",
                         (int)httpResponse.StatusCode, $"Non-Success with no errors, response body: {rawString}", "",
-                        listener.GetTime()));
+                        listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 response.ResponseTimeMs = listener.GetTime();
@@ -132,7 +132,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}",
-                        (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime()));
+                        (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 ApiResponsePaginated<TResult>? response = null;
@@ -148,7 +148,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     return Result.Fail(new CustomAPIError(
                         $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
                         (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "",
-                        listener.GetTime()));
+                        listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 if (response == null)
@@ -158,7 +158,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     return Result.Fail((new CustomAPIError(
                         $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
                         (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
-                        "", listener.GetTime())));
+                        "", listener.GetTime(), httpResponse.GetColoId())));
                 }
 
                 if (response.Errors != null && response.Errors.Any())
@@ -173,7 +173,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                         (int)httpResponse.StatusCode,
                         $"Error: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}",
                         response.Errors?.FirstOrDefault(error => error.Code != null)?.Code.ToString() ?? "",
-                        listener.GetTime()));
+                        listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 if (response.Messages != null && response.Messages.Any())
@@ -191,7 +191,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     return Result.Fail(new CustomAPIError(
                         $"Response Success did not indicate success but returned no errors, status code: {httpResponse.StatusCode}",
                         (int)httpResponse.StatusCode, $"Non-Success with no errors, response body: {rawString}", "",
-                        listener.GetTime()));
+                        listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 response.ResponseTimeMs = listener.GetTime();
@@ -251,7 +251,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 {
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
-                    return Result.Fail(new CustomAPIError($"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime()));
+                    return Result.Fail(new CustomAPIError($"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 ApiResponse? response = null;
@@ -263,13 +263,13 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 {
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message, rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
-                    return Result.Fail(new CustomAPIError($"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime()));
+                    return Result.Fail(new CustomAPIError($"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 if (response == null)
                 {
                     logger.LogCritical($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
-                    return Result.Fail((new CustomAPIError($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime())));
+                    return Result.Fail((new CustomAPIError($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime(), httpResponse.GetColoId())));
                 }
 
                 if (response.Errors != null && response.Errors.Any())
@@ -279,7 +279,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                         logger.LogCritical($"Error with {assetName}: {error}");
                     }
 
-                    return Result.Fail(new CustomAPIError($"Error with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Error: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}", response.Errors?.FirstOrDefault(error => error.Code != null)?.Code.ToString() ?? "", listener.GetTime()));
+                    return Result.Fail(new CustomAPIError($"Error with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Error: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}", response.Errors?.FirstOrDefault(error => error.Code != null)?.Code.ToString() ?? "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
                 if (response.Messages != null && response.Messages.Any())
@@ -293,7 +293,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 if (response.Success == false)
                 {
                     logger.LogCritical($"Response Success did not indicate success, status code: {httpResponse.StatusCode}");
-                    return Result.Fail(new CustomAPIError($"Response Success did not indicate success but returned no errors, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Non-Success with no errors, response body: {rawString}", "", listener.GetTime()));
+                    return Result.Fail(new CustomAPIError($"Response Success did not indicate success but returned no errors, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Non-Success with no errors, response body: {rawString}", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
                 response.ResponseTimeMs = listener.GetTime();
                 response.ColoId = httpResponse.GetColoId();
