@@ -53,6 +53,8 @@ public abstract class BaseJob
     public abstract string Name { get; }
 
     public abstract string InternalName { get; }
+    public abstract string JobType { get; }
+    public abstract string JobDescription { get; }
 
 
     public abstract int TargetExecutionSecond { get; }

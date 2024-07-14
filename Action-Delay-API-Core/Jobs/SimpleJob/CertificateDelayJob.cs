@@ -258,5 +258,10 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
 
         public override string Name => "Certificate Renewal Delay Job";
         public override string InternalName => "cert";
+
+        public override string JobType => "CloudflareDelay";
+
+        public override string JobDescription => "Tracking delay of certificates being renewed";
+
     }
 }

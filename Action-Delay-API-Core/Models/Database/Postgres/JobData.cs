@@ -12,6 +12,12 @@ public class JobData
 
     public string JobName { get; set; }
 
+    public string JobType { get; set; }
+
+    public string JobDescription { get; set; }
+
+    public string? Locations { get; set; }
+
 
     [Required]
     [Key]

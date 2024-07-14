@@ -50,6 +50,11 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         public override string Name => "CF for SaaS Delay Job";
         public override string InternalName => "customhostnames";
 
+        public override string JobType => "CloudflareDelay";
+
+        public override string JobDescription => "Delay of setting up a new Custom Hostname Without TLS";
+
+
         public override TimeSpan RepeatActionAfter => TimeSpan.FromDays(30);
 
         public override async Task PreWarmRunLocation(Location location)

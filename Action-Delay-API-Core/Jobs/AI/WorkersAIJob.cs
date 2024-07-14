@@ -58,6 +58,10 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         public override string Name => "Workers AI";
         public override string InternalName => "ai";
+
+        public override string JobType => "AI";
+
+        public override string JobDescription => "AI Perf Job";
         public override int TargetExecutionSecond => 32;
 
         public override bool Enabled => _config.AI != null && (_config.AI.Enabled.HasValue == false || _config.AI is { Enabled: true });

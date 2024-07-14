@@ -34,6 +34,11 @@ public class PageRuleDelayJob : BasePropagationJob
 
     public override string InternalName => "pagerule";
 
+    public override string JobType => "CloudflareDelay";
+
+    public override string JobDescription => "Delay of a Page Rule Update being reflected on Edge";
+
+
 
 
     // This job is always slow, so doing tons of requests in the first second when it's never been that fast in its entire life is just a waste.

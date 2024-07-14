@@ -33,6 +33,11 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string Name => "WfP User Script Delay Job";
         public override string InternalName => "wfp";
+
+        public override string JobType => "CloudflareDelay";
+
+        public override string JobDescription => "Delay of a new user script being served on edge.";
+
         public override async Task PreWarmRunLocation(Location location)
         {
             await SendLocation(location, CancellationToken.None);

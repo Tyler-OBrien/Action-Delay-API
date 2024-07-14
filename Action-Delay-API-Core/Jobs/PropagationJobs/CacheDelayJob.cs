@@ -35,6 +35,10 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string InternalName => "purge";
 
+        public override string JobType => "CloudflareDelay";
+
+        public override string JobDescription => "Cache Purging Delay";
+
         public override int TargetExecutionSecond => 40;
 
         public override bool Enabled => _config.CacheJob != null && (_config.CacheJob.Enabled.HasValue == false || _config.CacheJob is { Enabled: true });

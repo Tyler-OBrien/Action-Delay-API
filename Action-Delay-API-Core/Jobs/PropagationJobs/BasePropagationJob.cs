@@ -278,6 +278,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error handling location runs for job {name}, aborting... Locations not finished yet: {locations}", Name, string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name)));
+                    SentrySdk.CaptureException(ex);
                 }
                 finally
                 {
@@ -320,6 +321,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error inserting run statistics into Clickhouse");
+                    SentrySdk.CaptureException(ex);
                 }
 
                 try
@@ -329,6 +331,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error saving run status");
+                    SentrySdk.CaptureException(ex);
                 }
 
             }

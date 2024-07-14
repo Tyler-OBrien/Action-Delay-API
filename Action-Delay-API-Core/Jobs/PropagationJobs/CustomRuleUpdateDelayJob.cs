@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
@@ -39,6 +39,11 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string InternalName => "waf";
 
+        public override string JobType => "CloudflareDelay";
+
+        public override string JobDescription => "Delay of Updating a Custom WAF Rule";
+
+
 
         // This job is always slow, so doing tons of requests in the first second when it's never been that fast in its entire life is just a waste.
         public override TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
@@ -50,7 +55,7 @@ namespace Action_Delay_API_Core.Jobs
                 > 120 => 10,
                 > 60 => 4,
                 > 30 => 2,
-                > 5 => 1,
+                > 5 => 0.5,
                 > 2 => 0.5,
                 _ => 0.5,
             };

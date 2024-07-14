@@ -39,6 +39,11 @@ namespace Action_Delay_API_Core.Jobs
         public override string Name => "DNS Delay Job";
         public override string InternalName => "dns";
 
+        public override string JobType => "CloudflareDelay";
+
+        public override string JobDescription => "Delay of an updated DNS Record being reflected on Edge on a paid zone";
+
+
 
 
         // This job is always slow, so doing tons of requests in the first second when it's never been that fast in its entire life is just a waste.
