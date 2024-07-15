@@ -4,7 +4,7 @@ use fastly::SecretStore;
 use fastly::{Error, Request, Response};
 
 #[fastly::main]
-pub async fn main(mut req: Request) -> Result<Response, Error> {
+pub fn main(mut req: Request) -> Result<Response, Error> {
     // Log out which version of the Fastly Service is responding to this request.
     // This is useful to know when debugging.
     // Uncomment the following line once the environment variable integration is supported
@@ -38,6 +38,15 @@ pub async fn main(mut req: Request) -> Result<Response, Error> {
         KVStore::open("action-delay-api").map(|store| store.expect("KVStore exists"))?;
 
     let path = req.get_path().trim_start_matches('/').to_string();
+
+    if path == "" || path == "." || path == ".." {
+        return Ok(Response::from_status(StatusCode::NOT_FOUND)
+            .with_body("nothing here, key is invalid...")
+            .with_header(
+                "x-fastly-pop",
+                std::env::var("FASTLY_POP").unwrap_or_default(),
+            ));
+        }
 
     if req.get_method() == Method::PUT {
         if path.starts_with("cached") || path.starts_with("uncached") {

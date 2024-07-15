@@ -1,5 +1,6 @@
 import { KVStore } from "fastly:kv-store";
 import { env } from "fastly:env";
+import { SecretStore } from "fastly:secret-store";
 
 export async function app(event: FetchEvent) {
   // Log out which version of the Fastly Service is responding to this request.
@@ -14,7 +15,11 @@ export async function app(event: FetchEvent) {
         [Documentation for the KVStore constuctor can be found here](https://js-compute-reference-docs.edgecompute.app/docs/fastly:kv-store/KVStore/)
     */
   var req = event.request;
-  if ((req.headers.get("apikey") == env("API_KEY")) == false) {
+  var getSecretStartReq = globalThis.performance.now();
+  const secrets = new SecretStore('action-delay-api-secrets')
+  const apiKey = (await secrets.get('APIKEY')).plaintext()
+  var getDurSecret = globalThis.performance.now() - getSecretStartReq;
+  if ((req.headers.get("apikey") === apiKey) == false) {
     return new Response("Bad Human", { status: 403 });
   }
   if (req.method != "GET" && req.method != "PUT") {
@@ -26,6 +31,15 @@ export async function app(event: FetchEvent) {
 
   var url = new URL(req.url);
   const key = url.pathname.slice(1);
+
+  if (key == "" || key == "." || key == "..") {
+    return new Response("nothing here, key is invalid...", {
+      status: 404,
+      headers: {
+        "x-fastly-pop": env("FASTLY_POP"),
+      },
+    });
+  }
 
   if (req.method === "PUT") {
     if (req.body == null) {
@@ -52,6 +66,7 @@ export async function app(event: FetchEvent) {
         status: 200,
         headers: {
           "x-dur": getDur.toString(),
+          "x-dur-secret": getDurSecret.toString(),
           "x-fastly-pop": env("FASTLY_POP"),
         },
       });
@@ -75,6 +90,7 @@ export async function app(event: FetchEvent) {
         status: 404,
         headers: {
           "x-dur": getDur.toString(),
+          "x-dur-secret": getDurSecret.toString(),
           "x-fastly-pop": env("FASTLY_POP"),
         },
       });
@@ -82,6 +98,7 @@ export async function app(event: FetchEvent) {
     return new Response(tryGet.body, {
       headers: {
         "x-dur": getDur.toString(),
+        "x-dur-secret": getDurSecret.toString(),
         "x-fastly-pop": env("FASTLY_POP"),
       },
     });
