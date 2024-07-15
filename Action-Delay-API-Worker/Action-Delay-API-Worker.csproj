@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -11,9 +11,10 @@
 	  <DebugType>embedded</DebugType>
 	  <NeutralLanguage>en</NeutralLanguage>
 	  <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
-	  <AssemblyVersion>2.5.0</AssemblyVersion>
-	  <FileVersion>2.5.0</FileVersion>
-	  <Version>2.5.0</Version>
+	  <AssemblyVersion>2.6.2</AssemblyVersion>
+	  <FileVersion>2.6.2</FileVersion>
+	  <Version>2.6.2</Version>
+	  <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 	<PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
