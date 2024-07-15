@@ -13,6 +13,7 @@ using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Jobs.AI;
+using System.Linq;
 
 namespace Action_Delay_API_Core.Jobs.Performance
 {
@@ -405,7 +406,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             tryPut.Value.WasSuccess = false;
                             tryPut.Value.StatusCode = HttpStatusCode.PreconditionFailed;
                             tryPut.Value.Body =
-                                $"Uploaded Content Hash: {getBytesSha256} was different then retrieved: {tryGet.Value.BodySha256}";
+                                $"Uploaded Content Hash was different then retrieved.";
+                            var tryGetHeader = tryGet.ValueOrDefault.Headers.FirstOrDefault(headerkvp =>
+                                headerkvp.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase));
+                            if (String.IsNullOrEmpty(tryGetHeader.Key) == false &&
+                                int.TryParse(tryGetHeader.Value, out var parsedContentLength) &&
+                                parsedContentLength != randomBytes.Length)
+                                tryPut.Value.Body += $" Content Length Different then expected: {parsedContentLength}";
                             return tryPut;
                         }
                     }

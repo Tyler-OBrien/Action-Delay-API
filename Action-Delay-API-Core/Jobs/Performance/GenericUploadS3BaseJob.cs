@@ -436,6 +436,12 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             tryPut.Value.StatusCode = HttpStatusCode.PreconditionFailed;
                             tryPut.Value.Body =
                                 $"Uploaded Content Hash: {getBytesSha256} was different then retrieved: {tryGet.Value.BodySha256}";
+                            var tryGetHeader = tryGet.ValueOrDefault.Headers.FirstOrDefault(headerkvp =>
+                                headerkvp.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase));
+                            if (String.IsNullOrEmpty(tryGetHeader.Key) == false &&
+                                int.TryParse(tryGetHeader.Value, out var parsedContentLength) &&
+                                parsedContentLength != randomBytes.Length)
+                                tryPut.Value.Body += $" Content Length Different then expected: {parsedContentLength}";
                             return tryPut;
                         }
                     }
