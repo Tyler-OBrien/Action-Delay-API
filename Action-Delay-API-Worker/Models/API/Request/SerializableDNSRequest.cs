@@ -1,4 +1,4 @@
-﻿namespace Action_Deplay_API_Worker.Models.API.Request
+﻿namespace Action_Delay_API_Worker.Models.API.Request
 {
     public class SerializableDNSRequest
     {

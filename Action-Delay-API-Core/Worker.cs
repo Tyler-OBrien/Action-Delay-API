@@ -2,6 +2,7 @@ using System.Reflection;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
+using Microsoft.Extensions.Options;
 
 namespace Action_Delay_API_Core
 {
@@ -9,6 +10,7 @@ namespace Action_Delay_API_Core
     {
         private readonly ILogger<Worker> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly LocalConfig _config;
 
 
         private List<MemoryJob> _jobs = new List<MemoryJob>();
@@ -17,11 +19,11 @@ namespace Action_Delay_API_Core
 
 
 
-        public Worker(ILogger<Worker> logger, IServiceScopeFactory scopeFactory)
+        public Worker(ILogger<Worker> logger, IServiceScopeFactory scopeFactory, IOptions<LocalConfig> config)
         {
             _logger = logger;
             _scopeFactory = scopeFactory;
-
+            _config = config.Value;
             var jobs =
                 Assembly.GetExecutingAssembly()
                     .GetExportedTypes()
@@ -40,7 +42,8 @@ namespace Action_Delay_API_Core
 
                 await Execute();
                 await Task.Delay(1000, stoppingToken);
-                _ = ExecuteColoData();
+                if (_config is { BackgroundLocationDataRefresh: true} )
+                    _ = ExecuteColoData();
             }
         }
 

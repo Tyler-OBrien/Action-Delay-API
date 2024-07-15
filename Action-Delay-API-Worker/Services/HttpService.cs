@@ -1,20 +1,18 @@
-﻿using Action_Deplay_API_Worker.Models.API.Response;
-using Polly.Extensions.Http;
-using Polly;
+﻿using System.Diagnostics.Tracing;
 using System.Net;
-using System.Net.Sockets;
-using Action_Deplay_API_Worker.Models.Services;
-using Action_Deplay_API_Worker.Models.API.Request;
-using Action_Deplay_API_Worker.Models;
-using ILogger = Microsoft.Extensions.Logging.ILogger;
-using System.Diagnostics.Tracing;
 using System.Net.Http.Headers;
 using System.Reflection;
-using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Text;
+using Action_Delay_API_Worker.Models;
+using Action_Delay_API_Worker.Models.API.Request;
+using Action_Delay_API_Worker.Models.API.Response;
+using Action_Delay_API_Worker.Models.Services;
+using Polly;
+using Polly.Extensions.Http;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace Action_Deplay_API_Worker.Services;
+namespace Action_Delay_API_Worker.Services;
     public class HttpService : IHttpService
     {
         private readonly ILogger _logger;

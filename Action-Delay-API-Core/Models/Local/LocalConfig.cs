@@ -12,6 +12,8 @@ namespace Action_Delay_API_Core.Models.Local
 
         public bool UsingNATS { get; set; }
 
+        public bool? BackgroundLocationDataRefresh { get; set; }
+
         public string PostgresConnectionString { get; set; }
 
         public string ClickhouseConnectionString { get; set; }

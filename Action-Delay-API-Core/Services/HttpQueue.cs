@@ -145,6 +145,10 @@ namespace Action_Delay_API_Core.Services
             }
         }
 
+        public Task<Result<SerializablePingResponse>> Ping(NATSPingRequest request, Location location, CancellationToken token)
+        {
+           return null;
+        }
 
 
         public void Dispose()

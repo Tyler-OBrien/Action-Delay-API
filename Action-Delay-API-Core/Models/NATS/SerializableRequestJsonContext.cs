@@ -11,8 +11,10 @@ namespace Action_Delay_API_Core.Models.NATS
 {
     [JsonSerializable(typeof(NATSHttpRequest))]
     [JsonSerializable(typeof(NATSDNSRequest))]
+    [JsonSerializable(typeof(NATSPingRequest))]
     [JsonSerializable(typeof(SerializableHttpResponse))]
     [JsonSerializable(typeof(SerializableDNSResponse))]
+    [JsonSerializable(typeof(SerializablePingResponse))]
     [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, AllowTrailingCommas = true)]
 
     internal partial class SerializableRequestJsonContext : JsonSerializerContext

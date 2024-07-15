@@ -1,17 +1,17 @@
 ﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
-using Action_Deplay_API_Worker.Models;
-using Action_Deplay_API_Worker.Models.API.Request;
-using Action_Deplay_API_Worker.Models.API.Response;
-using Action_Deplay_API_Worker.Models.Services;
+using Action_Delay_API_Worker.Models;
+using Action_Delay_API_Worker.Models.API.Request;
+using Action_Delay_API_Worker.Models.API.Response;
+using Action_Delay_API_Worker.Models.Services;
 using DnsClient;
 using DnsClient.Protocol;
 using DnsClient.Protocol.Options;
 using DnsClient.Protocol.Options.OptOptions;
 using Polly;
 
-namespace Action_Deplay_API_Worker.Services
+namespace Action_Delay_API_Worker.Services
 {
     public class DnsService : IDnsService
     {

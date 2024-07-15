@@ -1,15 +1,18 @@
-﻿using Action_Deplay_API_Worker.Models.API.Request;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
+using Action_Delay_API_Worker.Models.API.Request;
 using Action_Delay_API_Worker.Models.API.Request.Jobs;
+using Action_Delay_API_Worker.Models.API.Response;
 using Action_Delay_API_Worker.Models.API.Response.Jobs;
-using Action_Deplay_API_Worker.Models.API.Response;
 
 namespace Action_Delay_API_Worker.Models.API
 {
     [JsonSerializable(typeof(SerializableHttpRequest))]
     [JsonSerializable(typeof(SerializableDNSRequest))]
+    [JsonSerializable(typeof(SerializablePingRequest))]
     [JsonSerializable(typeof(SerializableHttpResponse))]
     [JsonSerializable(typeof(SerializableDNSResponse))]
+    [JsonSerializable(typeof(SerializablePingResponse))]
+
     [JsonSerializable(typeof(byte[]))]
     [JsonSerializable(typeof(string))]
 

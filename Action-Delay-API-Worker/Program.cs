@@ -1,26 +1,20 @@
 using System.Net;
 using System.Net.Sockets;
-using Action_Deplay_API_Worker.Models.Config;
-using Action_Deplay_API_Worker.Models.Services;
-using Action_Deplay_API_Worker.Services;
-using Microsoft.Extensions.DependencyInjection;
-using Polly;
+using Action_Delay_API_Worker.Models;
+using Action_Delay_API_Worker.Models.API.Request;
+using Action_Delay_API_Worker.Models.API.Response;
+using Action_Delay_API_Worker.Models.Config;
+using Action_Delay_API_Worker.Models.Services;
+using Action_Delay_API_Worker.Services;
+using DnsClient;
+using DnsClient.Protocol;
+using Microsoft.Extensions.Options;
 using Sentry.Extensions.Logging;
 using Sentry.Extensions.Logging.Extensions.DependencyInjection;
 using Serilog;
 using Serilog.Events;
-using System.Threading;
-using System.Xml;
-using Action_Delay_API_Worker.Services;
-using Action_Deplay_API_Worker.Models;
-using Action_Deplay_API_Worker.Models.API.Request;
-using Action_Deplay_API_Worker.Models.API.Response;
-using Microsoft.Extensions.Options;
-using DnsClient;
-using DnsClient.Protocol;
-using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
-namespace Action_Deplay_API_Worker
+namespace Action_Delay_API_Worker
 {
     public class Program
     {
@@ -141,6 +135,7 @@ namespace Action_Deplay_API_Worker
 
                     services.AddTransient<IHttpService, HttpService>();
                     services.AddTransient<IDnsService, DnsService>();
+                    services.AddTransient<IPingService, PingService>();
                     services.AddSingleton<JobService>();
 
                     services.AddHostedService<Worker>();
@@ -221,7 +216,6 @@ namespace Action_Deplay_API_Worker
 
                  newDnsRequest.TimeoutMs = HeaderToValueInt(request, "Action-Delay-Proxy-TimeoutMs");
                  newDnsRequest.NetType = (NetType)((HeaderToValueInt(request, "Action-Delay-Proxy-NetType")) ?? 0);
-                 newDnsRequest.NetType = (NetType)((HeaderToValueInt(request, "Action-Delay-Proxy-NetType")) ?? 0);
                  newDnsRequest.RequestNSID = HeaderToValueBool(request, "Action-Delay-Proxy-RequestNSID");
 
 
@@ -234,6 +228,38 @@ namespace Action_Deplay_API_Worker
                  return GeneratFailureResponseDNS("Critical Internal Error While handling request");
              }
          });
+
+            app.MapPost("/ICMP", async (HttpRequest request, IOptions<LocalConfig> probeConfiguration, IPingService pingService) =>
+            {
+                try
+                {
+                    var tryToGetAuthHeader = HeaderToValue(request, "Action-Delay-Proxy-Secret");
+                    if (String.IsNullOrWhiteSpace(tryToGetAuthHeader) || tryToGetAuthHeader.Equals(probeConfiguration.Value.HttpRequestSecret, StringComparison.Ordinal) == false)
+                        return GeneratFailureResponsePing("Invalid Proxy Secret");
+
+                    var newDnsRequest = new SerializablePingRequest();
+                    newDnsRequest.Hostname = HeaderToValue(request, "Action-Delay-Proxy-HostName");
+                    if (String.IsNullOrWhiteSpace(newDnsRequest.Hostname))
+                        return GeneratFailureResponsePing("Invalid Proxy Hostname");
+
+
+                    newDnsRequest.PingCount = HeaderToValueInt(request, "Action-Delay-Proxy-PingCount");
+                    newDnsRequest.CustomDNSServerOverride = HeaderToValue(request, "Action-Delay-Proxy-CustomDNSServerOverride");
+
+                    newDnsRequest.TimeoutMs = HeaderToValueInt(request, "Action-Delay-Proxy-TimeoutMs");
+                    newDnsRequest.NetType = (NetType)((HeaderToValueInt(request, "Action-Delay-Proxy-NetType")) ?? 0);
+                
+
+
+                    var tryGetResponse = await pingService.PerformRequestAsync(newDnsRequest);
+                    return tryGetResponse;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Critical error while handling PING request.");
+                    return GeneratFailureResponsePing("Critical Internal Error While handling request");
+                }
+            });
             return app;
         }
         // https://stackoverflow.com/a/33611922
@@ -276,6 +302,15 @@ namespace Action_Deplay_API_Worker
                 Info = reason,
             };
         }
+        public static SerializablePingResponse GeneratFailureResponsePing(string reason)
+        {
+            return new SerializablePingResponse()
+            {
+                ProxyFailure = true,
+                Info = reason
+            };
+        }
+
         public static bool? HeaderToValueBool(HttpRequest request, string key)
         {
             if (request.Headers.TryGetValue(key, out var value) && bool.TryParse(value.First(), out var parsedInt))

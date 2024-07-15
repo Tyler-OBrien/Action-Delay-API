@@ -1,4 +1,4 @@
-﻿namespace Action_Deplay_API_Worker.Models.Config
+﻿namespace Action_Delay_API_Worker.Models.Config
 {
     public class LocalConfig
     {

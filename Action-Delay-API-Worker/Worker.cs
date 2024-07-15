@@ -1,23 +1,20 @@
 using System.Net;
-using Action_Delay_API_Worker.Models.API;
-using Action_Deplay_API_Worker.Extensions;
-using Action_Deplay_API_Worker.Models.API.Response;
-using Action_Deplay_API_Worker.Models.Config;
-using Action_Deplay_API_Worker.Models.Services;
-using Microsoft.Extensions.Options;
-using Serilog;
-using Action_Deplay_API_Worker.Models.API.Request;
-using DnsClient;
-using NATS.Client.Core;
-using Sentry.Extensibility;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
+using Action_Delay_API_Worker.Models.API;
+using Action_Delay_API_Worker.Models.API.Request;
 using Action_Delay_API_Worker.Models.API.Request.Jobs;
+using Action_Delay_API_Worker.Models.API.Response;
 using Action_Delay_API_Worker.Models.API.Response.Jobs;
+using Action_Delay_API_Worker.Models.Config;
+using Action_Delay_API_Worker.Models.Services;
 using Action_Delay_API_Worker.Services;
-using Action_Deplay_API_Worker.Models;
+using DnsClient;
+using Microsoft.Extensions.Options;
+using NATS.Client.Core;
+using Serilog;
 
-namespace Action_Deplay_API_Worker
+namespace Action_Delay_API_Worker
 {
     public class Worker : BackgroundService
     {
@@ -26,19 +23,21 @@ namespace Action_Deplay_API_Worker
         private readonly LocalConfig _localConfig;
         private readonly IHttpService _httpService;
         private readonly IDnsService _dnsService;
+        private readonly IPingService _pingService;
         private readonly JobService _jobService;
 
 
 
 
 
-        public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IOptions<LocalConfig> probeConfiguration, IHttpService httpService, IDnsService dnsService, JobService jobService)
+        public Worker(ILogger<Worker> logger, ILoggerFactory loggerFactory, IOptions<LocalConfig> probeConfiguration, IHttpService httpService, IDnsService dnsService, IPingService pingService, JobService jobService)
         {
             _logger = logger;
             _loggerFactory = loggerFactory;
             _localConfig = probeConfiguration.Value;
             _httpService = httpService;
             _dnsService = dnsService;
+            _pingService = pingService;
             _jobService = jobService;
         }
 
@@ -86,6 +85,18 @@ namespace Action_Deplay_API_Worker
 
             }, stoppingToken);
 
+            var tryPing = Task.Run(async () =>
+            {
+                await foreach (var dnsRequest in natsConnection
+                                   .SubscribeAsync<byte[]>($"PING-{_localConfig.Location}",
+                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
+                {
+                    _ = ExecutePingRequest(dnsRequest, stoppingToken);
+                }
+
+            }, stoppingToken);
+
+            /*
             var tryJob = Task.Run(async () =>
             {
                 await foreach (var jobRequest in natsConnection
@@ -113,11 +124,11 @@ namespace Action_Deplay_API_Worker
                 await _jobService.StartJobLoop(stoppingToken);
 
             }, stoppingToken);
-
+            */
 
 
             _logger.LogInformation($"NATS Enabled, Connection State: {natsConnection.ConnectionState}");
-            await Task.WhenAll(tryDNS, tryHttp, tryJob, tryJobLoop);
+            await Task.WhenAll(tryDNS, tryHttp, tryPing);
             _logger.LogInformation($"NATS Done..");
         }
 
@@ -355,6 +366,46 @@ namespace Action_Deplay_API_Worker
                     StatusCode = HttpStatusCode.BadGateway,
                     ProxyFailure = true,
                     WasSuccess = false
+                }, cancellationToken: stoppingToken);
+            }
+        }
+        public async Task ExecutePingRequest(NatsMsg<byte[]> pingRequest, CancellationToken stoppingToken)
+        {
+            try
+            {
+                if (pingRequest.Data == null)
+                {
+                    await pingRequest.ReplyAsync(new SerializablePingResponse()
+                    {
+                        ProxyFailure = true,
+                        Info = "Failed due to Null Request"
+                    }, cancellationToken: stoppingToken);
+                    return;
+                }
+                var DATA = Encoding.UTF8.GetString(pingRequest.Data);
+                var serializablePingRequest = JsonSerializer.Deserialize<SerializablePingRequest>(DATA);
+
+                if (serializablePingRequest == null)
+                {
+                    await pingRequest.ReplyAsync(new SerializablePingResponse()
+                    {
+                        ProxyFailure = true,
+                        Info = "Failed due to Null/unparsable Request"
+                    }, cancellationToken: stoppingToken);
+                    return;
+                }
+
+
+                var reply = await _pingService.PerformRequestAsync(serializablePingRequest);
+                await pingRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Error with Ping Hook");
+                await pingRequest.ReplyAsync(new SerializablePingResponse()
+                {
+                    ProxyFailure = true,
+                    Info = "An error occured"
                 }, cancellationToken: stoppingToken);
             }
         }

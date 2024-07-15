@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Action_Deplay_API_Worker.Models.API.Response
+namespace Action_Delay_API_Worker.Models.API.Response
 {
     public class SerializableDNSResponse
     {

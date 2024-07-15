@@ -1,5 +1,4 @@
-﻿using Action_Deplay_API_Worker.Services;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,7 +6,6 @@ using System.Threading.Tasks;
 using Action_Delay_API_Worker.Models.API.Request.Jobs;
 using Action_Delay_API_Worker.Models.API.Response.Jobs;
 using Action_Delay_API_Worker.Models.Services;
-using Action_Deplay_API_Worker.Models.Services;
 using System.Net;
 using DnsClient;
 

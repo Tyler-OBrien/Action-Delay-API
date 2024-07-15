@@ -57,19 +57,24 @@ namespace Action_Delay_API_Core.Services
             foreach (var location in _config.Locations.Where(location => location.Disabled == false))
             {
                var tryGetColoId = await RunLocation(location, CancellationToken.None);
+               var tryGetLatency = await RunLatency(location, CancellationToken.None);
                var tryGetColoInfo = getAllCurrentColos.FirstOrDefault(colo => colo.ColoId == tryGetColoId);
+
                if (tryGetColoInfo == null)
                {
                     _logger.LogError($"Could not get info for coloid {tryGetColoId} for {location.DisplayName ?? location.Name}, aborting update");
                     continue;
                }
+
                if (tryGetColoId != null)
                {
                    var tryGetCurrentLocationData =
-                       getCurrentLocationData.FirstOrDefault(dbLocation => location.Name.Equals(dbLocation.LocationName, StringComparison.OrdinalIgnoreCase));
+                       getCurrentLocationData.FirstOrDefault(dbLocation =>
+                           location.Name.Equals(dbLocation.LocationName, StringComparison.OrdinalIgnoreCase));
                    if (tryGetCurrentLocationData == null)
                    {
-                       _logger.LogInformation($"We tried to get {location.Name}, but we couldn't find it, creating new..");
+                       _logger.LogInformation(
+                           $"We tried to get {location.Name}, but we couldn't find it, creating new..");
                        tryGetCurrentLocationData = new LocationData();
                        tryGetCurrentLocationData.LocationName = location.Name;
                        tryGetCurrentLocationData.FriendlyLocationName = tryGetColoInfo.FriendlyName;
@@ -77,12 +82,15 @@ namespace Action_Delay_API_Core.Services
                        tryGetCurrentLocationData.ASN = -1;
                        tryGetCurrentLocationData.Provider = "Unk";
                        tryGetCurrentLocationData.CfLatency = -1;
-                        _context.LocationData.Add(tryGetCurrentLocationData);
+                       _context.LocationData.Add(tryGetCurrentLocationData);
                    }
+
                    // changed!
-                   if (tryGetCurrentLocationData.IATA == null || tryGetCurrentLocationData.IATA.Equals(tryGetColoInfo.IATA, StringComparison.OrdinalIgnoreCase) == false)
+                   if (tryGetCurrentLocationData.IATA == null ||
+                       tryGetCurrentLocationData.IATA.Equals(tryGetColoInfo.IATA, StringComparison.OrdinalIgnoreCase) ==
+                       false)
                    {
-                        tryGetCurrentLocationData.LastChange = DateTime.UtcNow;
+                       tryGetCurrentLocationData.LastChange = DateTime.UtcNow;
                    }
 
                    tryGetCurrentLocationData.ColoId = tryGetColoId.Value;
@@ -91,7 +99,10 @@ namespace Action_Delay_API_Core.Services
                    tryGetCurrentLocationData.ColoLatitude = tryGetColoInfo.Latitude;
                    tryGetCurrentLocationData.ColoLongitude = tryGetColoInfo.Longitude;
                    tryGetCurrentLocationData.Enabled = !location.Disabled;
-                    tryGetCurrentLocationData.LastUpdate = DateTime.UtcNow;
+                   if (tryGetLatency is not null)
+                       tryGetCurrentLocationData.CfLatency = tryGetLatency.Value;
+                   tryGetCurrentLocationData.LastUpdate = DateTime.UtcNow;
+
                }
             }
 
@@ -109,6 +120,39 @@ namespace Action_Delay_API_Core.Services
             _logger.LogInformation($"Finished running colo data update..");
         }
 
+        public async Task<double?> RunLatency(Location location, CancellationToken token)
+        {
+            try
+            {
+                var newRequest = new NATSPingRequest()
+                {
+                    Hostname = "cloudflare.com",
+                    TimeoutMs = 10_000,
+                    PingCount = 10
+                };
+                newRequest.SetDefaultsFromLocation(location);
+
+                var tryGetResult = await _queue.Ping(newRequest, location, token);
+                if (tryGetResult.IsFailed || tryGetResult.ValueOrDefault == null)
+                {
+                    _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message} from {location.DisplayName ?? location.Name}, ignoring latency..");
+                    return null;
+                }
+                if (tryGetResult.Value.WasSuccess == false || tryGetResult.Value.ProxyFailure)
+                {
+                    _logger.LogInformation($"Error getting response {tryGetResult.ValueOrDefault.Info} from {location.DisplayName ?? location.Name}, ignoring latency..");
+                    return null;
+                }
+
+                return tryGetResult.ValueOrDefault.ResponseTimeMsAvg;
+            }
+            catch (Exception ex)
+            {
+                SentrySdk.CaptureException(ex);
+            }
+
+            return null;
+        }
 
 
         public async Task<int?> RunLocation(Location location, CancellationToken token)

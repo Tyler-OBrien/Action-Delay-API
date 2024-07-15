@@ -59,6 +59,18 @@ namespace Action_Delay_API_Core.Services
                 return Result.Fail("Failed to get result");
             return tryGetReply.ValueOrDefault;
         }
+        public async Task<Result<SerializablePingResponse>> Ping(NATSPingRequest request, Location location, CancellationToken token)
+        {
+            using var newCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(token);
+            newCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
+            var tryGetReply = await SendMessage<NATSPingRequest, SerializablePingResponse>($"PING-{location.NATSName ?? location.Name}", request, cancellationToken: newCancellationTokenSource.Token);
+            if (tryGetReply.IsFailed)
+                return Result.Fail(tryGetReply.Errors);
+            if (tryGetReply.ValueOrDefault == null)
+                return Result.Fail("Failed to get result");
+            return tryGetReply.ValueOrDefault;
+        }
+
 
         public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30)
         {
