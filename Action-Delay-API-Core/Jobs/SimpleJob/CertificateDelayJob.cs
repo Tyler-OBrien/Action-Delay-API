@@ -14,7 +14,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Action_Delay_API_Core.Jobs.SimpleJob
 {
-    /* WIP - Creating Certs currently */
     public class CertificateDelayJob : BaseJob
     {
         public CertificateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CertificateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
@@ -213,7 +212,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 if (automatedCertPack.GetPrimaryCertificate != null)
                 {
                     // renewal is 3 days before expiration
-                    var renewalDate = automatedCertPack.GetPrimaryCertificate.ExpiresOn.AddDays(-3);
+                    var renewalDate = automatedCertPack.GetPrimaryCertificate.ExpiresOn.AddDays(-4);
                     if (DateTimeOffset.UtcNow > renewalDate)
                     {
                         var timeOver = DateTimeOffset.UtcNow - renewalDate;
