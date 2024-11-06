@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Models.NATS;
+﻿using Action_Delay_API_Core.Models.NATS;
 
 namespace Action_Delay_API_Core.Models.Local
 {
@@ -57,6 +57,7 @@ namespace Action_Delay_API_Core.Models.Local
 
 
         public WorkerAnalyticDelayJob? WorkerAnalyticsDelayJob { get; set; }
+        public WorkerLogsDelayJob? WorkerLogsDelayJob { get; set; }
 
         public CustomHostnamesDelayJob? CustomHostnamesDelayJob { get; set; }
         public CertificateRenewalDelayJob? CertRenewalDelayJob { get; set; }
@@ -166,6 +167,17 @@ namespace Action_Delay_API_Core.Models.Local
         public string AccountId { get; set; }
 
     }
+
+    public class WorkerLogsDelayJob : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string ScriptName { get; set; }
+
+        public string AccountId { get; set; }
+
+    }
+
 
     public class AIConfig : BaseConfig
     {
