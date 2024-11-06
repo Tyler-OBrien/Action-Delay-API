@@ -1,0 +1,30 @@
+name = "action-delay-api-perf-do"
+main = "src/index.ts"
+compatibility_date = "2024-10-02"
+logpush = true
+account_id = "b9e510810e1e12fcd40826d266a1fb12"
+workers_dev = true
+
+
+
+
+
+analytics_engine_datasets = [
+    { binding = "PerfDO" }
+]
+
+
+
+[durable_objects]
+bindings = [{name = "DO", class_name = "PerfDO"}]
+
+
+
+[observability]
+enabled = true
+
+
+
+[[migrations]]
+tag = "v1" # Should be unique for each entry
+new_sqlite_classes  = ["PerfDO"]

@@ -4,7 +4,7 @@ import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
 export interface Env {
 	KV: KVNamespace;
 	API_KEY: string;
-
+	AE: AnalyticsEngineDataset;
 	BASELIME_API_KEY: string
 	SERVICE_NAME: string
 }
@@ -57,7 +57,7 @@ const handler = {
 		const cache = caches.default;
 		var cacheDur = -1;
 
-		console.log(`r${getBucketLocation.region},rr:${getBucketLocation.routing},c${isCachingEnabled},k${key}`)
+		//console.log(`r${getBucketLocation.region},rr:${getBucketLocation.routing},c${isCachingEnabled},k${key}`)
 		if (isCachingEnabled) {
 			try {
 				var cacheStart = performance.now();
@@ -67,6 +67,18 @@ const handler = {
 					var newHeaders = new Headers(getCacheMatch.headers);
 					newHeaders.set("routing", "cache");
 					newHeaders.set("x-cache-dur", cacheDur.toString());
+					try {
+
+						if (env.AE)
+							env.AE.writeDataPoint({
+								blobs: [getBucketLocation.region, getBucketLocation.routing],
+								doubles: [cacheDur],
+								indexes: [key + "-cache"],
+							  });
+					}
+					catch (exception) {
+						console.log(exception)
+					}
 					return new Response(getCacheMatch.body, { headers: newHeaders });
 				}
 			}
@@ -77,11 +89,23 @@ const handler = {
 		}
 
 		if (req.method == "PUT") {
+			var putStart = performance.now()
 			try {
 				var putStart = performance.now()
 				const putResult = await ((env[getBucketLocation.region] as R2Bucket).put(key, req.body));
 				var putEnd = performance.now() - putStart;
 				if (!putResult) {
+					try {
+						if (env.AE)
+							env.AE.writeDataPoint({
+								blobs: [getBucketLocation.region, getBucketLocation.routing],
+								doubles: [putEnd],
+								indexes: [key + "-failure"],
+							  });
+					}
+					catch (exception) {
+						console.log(exception)
+					}
 					return new Response('Failure Uploading', {
 						status: 500, headers: {
 							"region": getBucketLocation.region,
@@ -89,6 +113,18 @@ const handler = {
 							"x-put-dur": putEnd.toString(),
 						}
 					});
+				}
+
+				try {
+					if (env.AE)
+						env.AE.writeDataPoint({
+							blobs: [getBucketLocation.region, getBucketLocation.routing],
+							doubles: [putEnd],
+							indexes: [key],
+						  });
+				}
+				catch (exception) {
+					console.log(exception)
 				}
 				return new Response(null, {
 					status: 200, headers: {
@@ -99,18 +135,56 @@ const handler = {
 				})
 			}
 			catch (exception) {
+				var putEnd = performance.now() - putStart;
+				try {
+
+					if (env.AE)
+						env.AE.writeDataPoint({
+							blobs: [getBucketLocation.region, getBucketLocation.routing, exception],
+							doubles: [putEnd],
+							indexes: [key + "-failure"],
+						  });
+				}
+				catch (exception) {
+					console.log(exception)
+				}
 				console.log(exception);
 				return new Response(`Error R2 PUT: ${exception}`, { status: 500 });
 			}
 		}
 		var getDur = -1;
 		var object: R2ObjectBody | null = null;
+		var startGet = performance.now()
 		try {
-			var startGet = performance.now()
 			object = await ((env[getBucketLocation.region] as R2Bucket).get(key));
 			getDur = performance.now() - startGet;
+			try {
+
+				if (env.AE)
+					env.AE.writeDataPoint({
+						blobs: [getBucketLocation.region, getBucketLocation.routing],
+						doubles: [getDur, cacheDur],
+						indexes: [key],
+					  });
+			}
+			catch (exception) {
+				console.log(exception)
+			}
 		}
 		catch (exception) {
+			getDur = performance.now() - startGet;
+			try {
+
+				if (env.AE)
+					env.AE.writeDataPoint({
+						blobs: [getBucketLocation.region, getBucketLocation.routing, exception],
+						doubles: [getDur, cacheDur],
+						indexes: [key + "-failure"],
+					  });
+			}
+			catch (exception) {
+				console.log(exception)
+			}
 			console.log(exception);
 			return new Response(`Error R2 GET: ${exception}`, { status: 500 });
 		}

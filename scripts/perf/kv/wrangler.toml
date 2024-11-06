@@ -8,3 +8,11 @@ compatibility_flags = [ "nodejs_compat" ]
 kv_namespaces = [
   { binding = "KV", id = "c6a6c055efd741ccacee9916533e80da" }
 ]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[[analytics_engine_datasets]]
+binding = "AE"
+dataset = "action-delay-api-kv"

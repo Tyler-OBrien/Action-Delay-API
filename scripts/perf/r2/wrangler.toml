@@ -3,6 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2024-06-23"
 compatibility_flags = [ "nodejs_compat" ]
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 
 
 [[r2_buckets]]
@@ -30,3 +34,8 @@ preview_bucket_name = 'action-delay-api-perf-weur'
 binding = 'wnam'
 bucket_name = 'action-delay-api-perf-wnam'
 preview_bucket_name = 'action-delay-api-perf-wnam'
+
+
+[[analytics_engine_datasets]]
+binding = "AE"
+dataset = "action-delay-api-r2"

@@ -4,6 +4,7 @@ import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
 export interface Env {
 	KV: KVNamespace;
 	API_KEY: string;
+	AE: AnalyticsEngineDataset;
 }
 
 const handler = {
@@ -35,7 +36,18 @@ const handler = {
 					expirationTtl: 60
 				});
 				var getDur = performance.now() - startReq;
-				return new Response(null, { status: 200, headers: { "x-dur": getDur.toString()} });
+				try {
+					if (env.AE)
+						env.AE.writeDataPoint({
+							blobs: [],
+							doubles: [getDur],
+							indexes: [key],
+						  });
+				}
+				catch (exception) {
+					console.log(exception)
+				}
+				return new Response(null, { status: 200, headers: { "x-adp-dur": getDur.toString()} });
 			}
 			catch (exception) {
 				console.log(exception);
@@ -47,20 +59,20 @@ const handler = {
 
 		if (url.pathname.startsWith('/cached/')) {
 			if (url.pathname === '/cached/500kb') {
-				return await getKeyResponse(env.KV, 'cached/500Kb-new', 31536001 );
+				return await getKeyResponse(env.KV, 'cached/500Kb-new', 31536001, env.AE );
 			} else if (url.pathname === '/cached/5mb') {
-				return await getKeyResponse(env.KV, 'cached/5mb', 31536001);
+				return await getKeyResponse(env.KV, 'cached/5mb', 31536001, env.AE);
 			} else if (url.pathname === '/cached/10kb') {
-				return await getKeyResponse(env.KV, 'cached/10Kb-new', 31536001);
+				return await getKeyResponse(env.KV, 'cached/10Kb-new', 31536001, env.AE);
 			}
 		}
 		if (url.pathname.startsWith('/uncached/')) {
 			if (url.pathname === '/uncached/500kb') {
-				return await getKeyResponse(env.KV, 'uncached/500Kb', 60);
+				return await getKeyResponse(env.KV, 'uncached/500Kb', 60, env.AE);
 			} else if (url.pathname === '/uncached/5mb') {
-				return await getKeyResponse(env.KV, 'uncached/5mb', 60);
+				return await getKeyResponse(env.KV, 'uncached/5mb', 60, env.AE);
 			} else if (url.pathname === '/uncached/10kb') {
-				return await getKeyResponse(env.KV, 'uncached/10Kb', 60);
+				return await getKeyResponse(env.KV, 'uncached/10Kb', 60, env.AE);
 			}
 		}
 		return new Response('404, Bad Robot.', { status: 404 });
@@ -68,22 +80,33 @@ const handler = {
 };
 
 
-const getKeyResponse = async function(kv: KVNamespace, key: string, cacheTtl: number): Promise<Response> {
+const getKeyResponse = async function(kv: KVNamespace, key: string, cacheTtl: number, AE: AnalyticsEngineDataset): Promise<Response> {
 	try {
 		var startReq = performance.now();
 		var tryGet = await kv.get(key, { cacheTtl: cacheTtl, type: 'stream' });
 		var getDur = performance.now() - startReq;
+		try {
+			if (AE)
+				AE.writeDataPoint({
+					blobs: [],
+					doubles: [getDur, cacheTtl],
+					indexes: [key],
+				  });
+		}
+		catch (exception) {
+			console.log(exception)
+		}
 		if (tryGet === null) {
 			return new Response("Could not get key: " + key, {
 				status: 404,
 				headers: {
-					"x-dur": getDur.toString()
+					"x-adp-dur": getDur.toString()
 				}
 			});
 		}
 		return new Response(tryGet, {
 			headers: {
-				"x-dur": getDur.toString()
+				"x-adp-dur": getDur.toString()
 			}
 		})
 	}

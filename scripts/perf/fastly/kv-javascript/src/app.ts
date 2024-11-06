@@ -5,9 +5,7 @@ import { SecretStore } from "fastly:secret-store";
 export async function app(event: FetchEvent) {
   // Log out which version of the Fastly Service is responding to this request.
   // This is useful to know when debugging.
-  console.log(
-    `FASTLY_SERVICE_VERSION: ${env("FASTLY_SERVICE_VERSION") || "local"}`
-  );
+
 
   /**
         Construct an KVStore instance which is connected to the KV Store named `my-store`
@@ -17,7 +15,13 @@ export async function app(event: FetchEvent) {
   var req = event.request;
   var getSecretStartReq = globalThis.performance.now();
   const secrets = new SecretStore('action-delay-api-secrets')
-  const apiKey = (await secrets.get('APIKEY')).plaintext()
+  var tryGetApiKeySecret = await secrets.get('APIKEY');
+  if (!tryGetApiKeySecret) {
+    return new Response("Can't get API Key from Secret Store", {
+      status: 500,
+    });
+  }
+  const apiKey = tryGetApiKeySecret.plaintext()
   var getDurSecret = globalThis.performance.now() - getSecretStartReq;
   if ((req.headers.get("apikey") === apiKey) == false) {
     return new Response("Bad Human", { status: 403 });
@@ -34,7 +38,7 @@ export async function app(event: FetchEvent) {
 
   if (key == "" || key == "." || key == "..") {
     return new Response("nothing here, key is invalid...", {
-      status: 404,
+      status: 200,
       headers: {
         "x-fastly-pop": env("FASTLY_POP"),
       },
