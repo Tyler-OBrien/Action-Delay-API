@@ -1,10 +1,20 @@
+import { Crypto } from 'node:crypto';
+import {Buffer} from "node:buffer";
+
 export interface Env {
 	APIKEY: string;
 	AI: Ai
+	AE: AnalyticsEngineDataset;
 }
+
+
 
 var handler = {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+
+globalThis.crypto = crypto;
+
+
 		var url = new URL(request.url);
 		if (request.headers.get("APIKEY") !== env.APIKEY) {
 			console.log("Unauthorized")
@@ -35,6 +45,9 @@ var handler = {
 
 		var maxTokens = request.headers.get("maxTokens") as string;
 
+		var outputTypeCheck = request.headers.get("outputTypeCheck") as string;
+
+
 
 		var inputObj: object = {}
 
@@ -64,7 +77,7 @@ var handler = {
 			}
 		}
 
-		if (outputType.toLowerCase() === "buffereventstream") {
+		if (outputType.toLowerCase() === "buffereventstream" || outputType.toLowerCase() === "buffereventstreamdebug") {
 			inputObj["stream"] = true;
 		}
 		const start: number = performance.now();
@@ -88,9 +101,29 @@ var handler = {
 					success: true,
 					result: response
 				});
+				insertSuccess(env, modelToUse, -1);
+				return new Response(resp);
+			}
+			else if (outputType.toUpperCase() === "JSONCHECKFIELDSTR") {
+				if (request.headers.has("outputTypeCheck") == false || !outputTypeCheck) {
+					return new Response("no outputTypeCheck specified :(", { status: 404 });
+				}
+				var str = response[outputTypeCheck];
+				if (str == null) {
+					throw new CustomError(`Output Type Check for ${outputTypeCheck} field returned null`)
+				}
+				if (str.length === 0) {
+					throw new CustomError(`Output Type Check for ${outputTypeCheck} field returned 0 length`)
+				}
+				var resp = JSON.stringify({
+					success: true,
+					result: str.length
+				});
+				insertSuccess(env, modelToUse, -1);
 				return new Response(resp);
 			}
 			else if (outputType.toUpperCase() === "RAW") {
+				insertSuccess(env, modelToUse, -1);
 				return new Response(response, {
 					headers: {
 						"content-type": outputContentType ?? "text/event-stream",
@@ -103,6 +136,7 @@ var handler = {
 				for (const key of result) {
 					resultString += key.token;
 				}
+
 				/*
 				if (resultString.toLowerCase().includes("too many requests in") || resultString.toLowerCase().includes("try again later")) { // some models do this
 					return new Response(JSON.stringify({
@@ -115,15 +149,26 @@ var handler = {
 					}), { status: 200 });
 				}
 				*/
+				insertSuccess(env, modelToUse, result.length)
 				return new Response(JSON.stringify({
 					success: true,
 					result: { response: resultString },
 					tokens: result.length
 				}));
 			}
+			else if (outputType.toLowerCase() === "buffereventstreamdebug") {
+				console.log(`debug`)
+				var result = await processLineByLine(response);
+				return new Response(JSON.stringify({
+					success: true,
+					result: { response: result },
+					tokens: result.length
+				}));
+			}
 			else {
 				var tryGetSize = await getReadableStreamSizeAndCheckIfEmpty(response)
 				if (tryGetSize === 0) {
+					insertFailure(env, modelToUse, inputObj[inputField].toString(), "EmptyStreamResponse", "Empty Stream Response, length 0")
 					return new Response(JSON.stringify({
 						success: false,
 						error: {
@@ -133,6 +178,9 @@ var handler = {
 						}
 					}), { status: 200 });
 				}
+
+
+				insertSuccess(env, modelToUse, tryGetSize ?? "-1")
 				return new Response(JSON.stringify({
 					success: true,
 					result: {
@@ -142,21 +190,44 @@ var handler = {
 			}
 		} catch (error: any) {
 			console.log(`We think this request for ${modelToUse} took ${performance.now() - start}`)
-			console.log(JSON.stringify(env.AI))
 			console.log(JSON.stringify(error))
-			console.log(error.message)
+			insertFailure(env, modelToUse, '', error.name ?? "Unknown", error.message ?? error)
 			return new Response(JSON.stringify({
 				success: false,
 				error: {
-					code: error.name ?? 'Unknown',
-					message: error.message ?? error.toString(),
-					logs: JSON.stringify(env.AI.getLogs())
+					code: error?.name ?? 'Unknown',
+					message: error?.message ?? error,
 				}
 			}), { status: 200 });
 		}
 		return new Response("Unknown Internal Error", { status: 504 });
 	},
 };
+
+function insertSuccess(Env: Env, model: string | null, tokens: number) {
+	try {
+		if (Env.AE)
+			Env.AE.writeDataPoint({
+				'blobs': [], 
+				'doubles': [tokens],
+				'indexes': [`${model ?? "Unknown"}-error`]
+			  })
+	}
+	catch (e: any) { /* nom */ }
+}
+
+
+function insertFailure(Env: Env, model: string | null, input: string | any, errorType: string, errorReason: string) {
+	try {
+		if (Env.AE)
+			Env.AE.writeDataPoint({
+				'blobs': [input ?? "Unknown", errorType, errorReason], 
+				'doubles': [25, 0.5],
+				'indexes': [`${model ?? "Unknown"}-error`]
+			  })
+	}
+	catch (e: any) { /* nom */ }
+}
 
 function checkForRateLimitMessage(obj: any) {
 	for (const key in obj) {
@@ -182,13 +253,30 @@ function base64ToUint8Array(base64: string) {
 	return bytes;
 }
 
-async function processLineByLine(readableStream: ReadableStream) {
+interface StreamResponse {
+	token: string;
+	delay: number;
+}
+
+class CustomError extends Error {
+	constructor(message: string) {
+	  super(message);
+	  this.name = 'CustomError';
+	}
+  }
+
+
+async function processLineByLine(readableStream: ReadableStream): Promise<StreamResponse[]> {
 	let decoder = new TextDecoder('utf-8');
 	let reader = readableStream.getReader();
 	let { done, value } = await reader.read();
 	let line = '';
-	var output = [];
+	var output: StreamResponse[] = [];
 	var start = Date.now()
+	var lastError: string | null = null;
+	var errorParsingCount = 0;
+	var instantlyDone : boolean = done;
+	let startTime = Date.now()
 	while (!done) {
 		let segment = decoder.decode(value);
 
@@ -199,16 +287,20 @@ async function processLineByLine(readableStream: ReadableStream) {
 					break;
 				}
 				var findPosition = line.indexOf("{");
-				var findLastPosition = line.indexOf("}");
+				var findLastPosition = line.lastIndexOf("}");
 				if (findLastPosition == -1 || findLastPosition == -1) {
-					console.log(`Failed to parse json out of ${line}, got first pos ${findPosition}, last ${findLastPosition}`)
+					lastError = `Failed to parse json out of ${line}, got first pos ${findPosition}, last ${findLastPosition}`;
+					errorParsingCount++;
+					console.log(lastError)
 					break;
 				}
 				var jsonString = line.substring(findPosition, findLastPosition + 1);
 				try {
 					var parsedData = JSON.parse(jsonString);
 					if (parsedData.response == null) {
-						console.log(`Failed to parse ${jsonString} out of ${line}, nothing in response ${parsedData}`)
+						lastError = `Failed to parse ${jsonString} out of ${line}, nothing in response ${parsedData}`;
+						errorParsingCount++;
+						console.log(lastError)
 					}
 					output.push({
 						token: parsedData.response,
@@ -217,7 +309,9 @@ async function processLineByLine(readableStream: ReadableStream) {
 				}
 				catch (error) {
 					console.error(error)
-					console.log(`Failed to parse ${jsonString} out of ${line}, error: ${error}`)
+					lastError = (`Failed to parse ${jsonString} out of ${line}, error: ${error}`)
+					errorParsingCount++;
+					console.log(lastError)
 				}
 
 				line = '';
@@ -230,13 +324,20 @@ async function processLineByLine(readableStream: ReadableStream) {
 		done = result.done;
 		value = result.value;
 	}
+	if (output.length == 0) {
+		let extraErrorInfo = "";
+		if (lastError)
+			extraErrorInfo = " " + lastError + ` Error Count: ${errorParsingCount}`;
+		if (instantlyDone)
+			extraErrorInfo = " Instantly Done." 
+		throw new CustomError("Empty Stream Response, no tokens returned." + extraErrorInfo)
+	}
 	return output;
 }
 
 async function getReadableStreamSizeAndCheckIfEmpty(stream) {
 	// Get a lock on the stream:
 	const reader = stream.getReader();
-
 	let length = 0;
 	while (true) {
 		const { done, value } = await reader.read();
