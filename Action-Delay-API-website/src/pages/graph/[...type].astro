@@ -1,0 +1,15 @@
+---
+import SmartGraph from '../../components/graph/SmartGraph.js';
+
+
+const jobObj = {
+  jobName: Astro.params.type,
+  internalJobName: Astro.params.type,
+}
+
+const { type } = Astro.params;
+---
+<div>
+  <!-- @ts-ignore -->
+<SmartGraph job={jobObj} client:only="preact"/>
+</div>

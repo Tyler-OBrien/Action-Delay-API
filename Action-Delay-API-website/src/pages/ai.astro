@@ -1,0 +1,39 @@
+---
+import { getCollection } from 'astro:content';
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+import JobDisplay from '../components/JobDisplay.astro';
+import Hero from '../components/Hero.astro';
+import Grid from '../components/Grid.astro';
+import type { QuickStats } from '../../models/cloudflare/quickstat';
+import type { Job } from '../../models/cloudflare/job';
+
+const jobs: Job[] = (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/ai")).json()).data;
+const stats: QuickStats[] = (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/ai")).json());
+
+---
+
+<BaseLayout
+	title="Cloudflare Delay Monitoring"
+	description="See Cloudflare Delay Monitoring Jobs"
+>
+	<div class="stack gap-20">
+		<main class="wrapper stack gap-8">
+			<Hero
+				title="Cloudflare Delay Jobs"
+				tagline="See Cloudflare Delay Monitoring Jobs"
+				align="start"
+			/>
+			<Grid>
+				{
+					jobs.map((job: Job) => (
+						<li>
+							<JobDisplay type="ai" job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
+						</li>
+					))
+				}
+			</Grid>
+		</main>
+	</div>
+</BaseLayout>
