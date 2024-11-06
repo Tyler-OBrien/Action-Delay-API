@@ -14,5 +14,8 @@
         public string NodeName { get; set; }
 
         public string HttpRequestSecret { get; set; }
+
+        public bool DumpToDirectoryForDictionaryTraining { get; set; }
+
     }
 }

@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -128,16 +128,18 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             var locations = locationsToUse;
 
+            var newClient = new MinioClient()
+                .WithEndpoint(s3Job.Endpoint)
+                .WithCredentials(s3Job.AccessKey, s3Job.SecretKey)
+                .WithSSL(true)
+                .WithRegion(String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region)
+                .Build();
+
             // Start monitoring on each Location
             foreach (var location in locations)
             {
 
-                var newClient = new MinioClient()
-                    .WithEndpoint(s3Job.Endpoint)
-                    .WithCredentials(s3Job.AccessKey, s3Job.SecretKey)
-                    .WithSSL(true)
-                    .WithRegion(String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region)
-                    .Build();
+    
 
                 //https://github.com/minio/minio-dotnet/issues/861
                 // prevent async
@@ -146,24 +148,45 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
                 string getUrl = string.Empty;
 
+                var seed = Guid.NewGuid().GetHashCode();
+                var randomBytes = GenerateRandomBytes(10_000, seed);
+
+                string md5Hash = Convert.ToBase64String(MD5.HashData(randomBytes));
+
+
+                Dictionary<string, string> headers = new Dictionary<string, string>()
+                {
+                    {"Content-MD5", md5Hash},
+                };
+
+                string objectName = $"action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}";
+
+                if (s3Job.KeepOldAndDumpToDiskOnMisMatch.HasValue && s3Job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                {
+                    objectName = $"action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}-{Guid.NewGuid().ToString("N")}";
+                }
                 PresignedPutObjectArgs putObjectArgs = new PresignedPutObjectArgs()
                     .WithBucket(s3Job.BucketName)
-                    .WithObject($"action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}")
+                    .WithObject(objectName)
+                    .WithHeaders(headers)
                     .WithExpiry(900);
 
-                PresignedGetObjectArgs getObjectArgs = new PresignedGetObjectArgs()
-                    .WithBucket(s3Job.BucketName)
-                    .WithObject($"action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}")
-                    .WithExpiry(900);
+
 
 
 
                 var putUrl = await newClient.PresignedPutObjectAsync(putObjectArgs);
 
-                if (s3Job is { CheckUploadedContentHash: true})
+                if (s3Job is { CheckUploadedContentHash: true })
+                {
+                    PresignedGetObjectArgs getObjectArgs = new PresignedGetObjectArgs()
+                        .WithBucket(s3Job.BucketName)
+                        .WithObject(objectName)
+                        .WithExpiry(900);
                     getUrl = await newClient.PresignedGetObjectAsync(getObjectArgs);
+                }
 
-                var task = BaseRunLocation(location, cancellationTokenSource.Token, putUrl, getUrl, s3Job);
+                var task = BaseRunLocation(newClient, location, objectName, randomBytes, seed, md5Hash, putUrl, getUrl, s3Job, cancellationTokenSource.Token);
                 runningLocations[location] = task;
             }
 
@@ -225,13 +248,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         else if (tryGetValue.WasSuccess == false)
                         {
                             _logger.LogInformation(
-                                $"Non-Success for {name}, location: {completedLocation.DisplayName ?? completedLocation.Name}, status: {tryGetValue.StatusCode} and error looks like: {tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(75)}");
+                                $"Non-Success for {name}, location: {completedLocation.DisplayName ?? completedLocation.Name}, status: {tryGetValue.StatusCode} and error looks like: {tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(75)}, info: {tryGetValue.Info}");
                             if (tryGetValue.ProxyFailure == false)
                             {
                                 var newError = new CustomAPIErrorPerf(
-                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(75),
+                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(255),
                                     (int)(tryGetValue.StatusCode),
-                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(75),
+                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(255),
                                     tryGetValue.StatusCode.ToString(), tryGetValue.ResponseTimeMs,
                                     GetColoId(tryGetValue.Headers));
                                 newError.LocationName = completedLocation.Name;
@@ -375,13 +398,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
-                    { "Worker", location.DisplayName ?? location.Name },
                 },
                 URL = resolvedUrl.ToString(),
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true,
                 ReturnBody = false,
-                ReturnBodyOnError = true
+                ReturnBodyOnError = false,
+                NoResponseHeaders = true
             };
             newRequest.SetDefaultsFromLocation(location);
             if (job.ForceNetType.HasValue)
@@ -391,17 +414,16 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
 
 
-        public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(Location location,
-            CancellationToken token, string putUrl, string getUrl, UploadS3Job job)
+        public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(IMinioClient client, Location location,
+            string objectName, byte[] randomBytes, int seed,  string md5Hash, string putUrl, string getUrl, UploadS3Job job, CancellationToken token)
         {
 
-            var randomBytes = GenerateRandomBytes(10_000);
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
-                    { "Worker", location.DisplayName ?? location.Name },
+                    { "Content-MD5", md5Hash}
                 },
                 URL = putUrl,
                 TimeoutMs = 30_000,
@@ -410,8 +432,16 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 ReturnBody = false,
                 RetriesCount = 0,
                 ReturnBodyOnError = true,
-                Base64Body = System.Convert.ToBase64String(randomBytes),
+                ResponseHeaders = new List<string>()
+                {
+                    "content-length",
+                    "x-amz-version-id"
+                },
+                RandomSeed = seed,
+                RandomBytesBody = 10_000,
             };
+
+
             newRequest.SetDefaultsFromLocation(location);
             if (job.ForceNetType.HasValue)
                 newRequest.NetType = job.ForceNetType.Value;
@@ -457,10 +487,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
             return tryPut;
         }
 
-        public static byte[] GenerateRandomBytes(int sizeInBytes)
+        public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
         {
             byte[] randomBytes = new byte[sizeInBytes];
-            Random.Shared.NextBytes(randomBytes);
+            var random = new Random(seed);
+            random.NextBytes(randomBytes);
             return randomBytes;
         }
 

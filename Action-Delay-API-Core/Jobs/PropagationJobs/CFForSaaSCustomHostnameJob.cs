@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Jobs;
@@ -129,10 +129,10 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = "https://" + _config.CustomHostnamesDelayJob.TargetHostname + $"/",
-                TimeoutMs = 10_000
+                TimeoutMs = 10_000,
+                NoResponseHeaders = true,
             };
             newRequest.SetDefaultsFromLocation(location);
 

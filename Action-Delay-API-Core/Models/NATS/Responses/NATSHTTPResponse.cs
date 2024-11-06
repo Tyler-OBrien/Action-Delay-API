@@ -31,6 +31,9 @@ namespace Action_Delay_API_Core.Models.NATS.Responses
         [JsonPropertyName("responseTimeMs")]
         public double? ResponseTimeMs { get; set; }
 
+        [JsonPropertyName("generatedRandomBytesSha256")]
+        public string? GeneratedRandomBytesSha256 { get; set; }
+
         public int GetColoId()
         {
             if (Headers != null && Headers.TryGetValue("colo", out var coloStr) &&

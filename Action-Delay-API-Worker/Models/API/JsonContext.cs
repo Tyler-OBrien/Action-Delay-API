@@ -13,7 +13,6 @@ namespace Action_Delay_API_Worker.Models.API
     [JsonSerializable(typeof(SerializableDNSResponse))]
     [JsonSerializable(typeof(SerializablePingResponse))]
 
-    [JsonSerializable(typeof(byte[]))]
     [JsonSerializable(typeof(string))]
 
     [JsonSerializable(typeof(JobStartRequest))]
@@ -23,7 +22,7 @@ namespace Action_Delay_API_Worker.Models.API
     [JsonSerializable(typeof(JobStartRequestResponse))]
     [JsonSerializable(typeof(JobStatusRequestResponse))]
     [JsonSerializable(typeof(JobEndRequestResponse))]
-    [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, AllowTrailingCommas = true)]
+    [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, AllowTrailingCommas = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault)]
     internal partial class SerializableRequestJsonContext : JsonSerializerContext
     {
     }

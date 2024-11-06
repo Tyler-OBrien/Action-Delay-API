@@ -1,6 +1,10 @@
+using System.Buffers;
+using System.Collections.Concurrent;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Action_Delay_API_Worker.Models.API;
 using Action_Delay_API_Worker.Models.API.Request;
 using Action_Delay_API_Worker.Models.API.Request.Jobs;
@@ -10,12 +14,19 @@ using Action_Delay_API_Worker.Models.Config;
 using Action_Delay_API_Worker.Models.Services;
 using Action_Delay_API_Worker.Services;
 using DnsClient;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using NATS.Client.Core;
+using NATS.Client.Serializers.Json;
+using Sentry.Extensibility;
 using Serilog;
+using ZstdSharp;
+using ZstdSharp.Unsafe;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Action_Delay_API_Worker
 {
+
     public class Worker : BackgroundService
     {
         private readonly ILogger<Worker> _logger;
@@ -40,6 +51,50 @@ namespace Action_Delay_API_Worker
             _pingService = pingService;
             _jobService = jobService;
         }
+        // These are backed by the same instance type under the hood, we could go unsafe and not have to create 2x the contexts, but blehhh
+        private static readonly ConcurrentBag<Decompressor> _pool = new ConcurrentBag<Decompressor>();
+        private static readonly ConcurrentBag<Compressor> _poolComp = new ConcurrentBag<Compressor>();
+
+        public Decompressor GetDecompressor()
+        {
+            if (_pool.TryTake(out var dctx))
+            {
+                return dctx;
+            }
+            else
+            {
+                var newDecomp = new Decompressor();
+                newDecomp.LoadDictionary(EmbeddedZstdDict);
+                return newDecomp;
+            }
+        }
+
+        public void ReturnDecompressor(Decompressor dctx)
+        {
+            _pool.Add(dctx);
+        }
+
+        public Compressor GetCompressor()
+        {
+            if (_poolComp.TryTake(out var dctx))
+            {
+                return dctx;
+            }
+            else
+            {
+                var newComp = new Compressor();
+                newComp.LoadDictionary(EmbeddedZstdDict);
+                return newComp;
+            }
+        }
+
+        public void ReturnCompressor(Compressor dctx)
+        {
+            _poolComp.Add(dctx);
+        }
+
+        public static byte[] EmbeddedZstdDict;
+
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -50,8 +105,29 @@ namespace Action_Delay_API_Worker
                 _logger.LogInformation("NATS URL not setup or blank, aborting Queue Load");
                 return;
             }
-  
-            
+
+            if (_localConfig.DumpToDirectoryForDictionaryTraining)
+            {
+                if (Directory.Exists("Dump") == false)
+                    Directory.CreateDirectory("Dump");
+                DumpToFileForDictTraining = true;
+            }
+
+            try
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream("Action_Delay_API_Worker.EmbeddedResources.customdict.zstd"))
+                {
+                    using var memoryStream = new MemoryStream();
+                    await stream.CopyToAsync(memoryStream);
+                    EmbeddedZstdDict = memoryStream.ToArray();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Critical Issue loading embedded zstd dict, we won't be able to handle compressed requests");
+            }
+
 
 
             var myRegistry = new NatsJsonContextSerializerRegistry(SerializableRequestJsonContext.Default);
@@ -65,8 +141,8 @@ namespace Action_Delay_API_Worker
             var tryHttp = Task.Run(async () =>
             {
                 await foreach (var httpRequest in natsConnection
-                                   .SubscribeAsync<byte[]>($"HTTP-{_localConfig.Location}",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
+                                   .SubscribeAsync<NatsMemoryOwner<byte>>($"HTTP-{_localConfig.Location}",
+                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
                 {
                     _ = ExecuteHttpRequest(httpRequest, stoppingToken);
                 }
@@ -77,8 +153,8 @@ namespace Action_Delay_API_Worker
             var tryDNS = Task.Run(async () =>
             {
                 await foreach (var dnsRequest in natsConnection
-                                   .SubscribeAsync<byte[]>($"DNS-{_localConfig.Location}",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
+                                   .SubscribeAsync<NatsMemoryOwner<byte>>($"DNS-{_localConfig.Location}",
+                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
                 {
                     _ = ExecuteDNSRequest(dnsRequest, stoppingToken);
                 }
@@ -88,13 +164,14 @@ namespace Action_Delay_API_Worker
             var tryPing = Task.Run(async () =>
             {
                 await foreach (var dnsRequest in natsConnection
-                                   .SubscribeAsync<byte[]>($"PING-{_localConfig.Location}",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
+                                   .SubscribeAsync<NatsMemoryOwner<byte>>($"PING-{_localConfig.Location}",
+                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
                 {
                     _ = ExecutePingRequest(dnsRequest, stoppingToken);
                 }
 
             }, stoppingToken);
+
 
             /*
             var tryJob = Task.Run(async () =>
@@ -134,13 +211,13 @@ namespace Action_Delay_API_Worker
 
 
 
-        public async Task ExecuteEndJobRequest(NatsMsg<byte[]> jobRequest, CancellationToken stoppingToken)
+        public async Task ExecuteEndJobRequest(NatsMsg<NatsMemoryOwner<byte>> jobRequest, CancellationToken stoppingToken)
         {
             try
             {
-                if (jobRequest.Data == null)
+                if (jobRequest.Data.Length == 0)
                 {
-                    await jobRequest.ReplyAsync(new JobEndRequestResponse()
+                    await ReplyAsync(jobRequest, new JobEndRequestResponse()
                     {
                         Success = false,
                         Info = "Failed due to Null Request"
@@ -148,12 +225,12 @@ namespace Action_Delay_API_Worker
                     return;
                 }
 
-                var DATA = Encoding.UTF8.GetString(jobRequest.Data);
+                var DATA = Encoding.UTF8.GetString(jobRequest.Data.Span);
                 var jobEndRequest = JsonSerializer.Deserialize<JobEndRequest>(DATA);
 
                 if (jobEndRequest == null)
                 {
-                    await jobRequest.ReplyAsync(new JobEndRequestResponse()
+                    await ReplyAsync(jobRequest, new JobEndRequestResponse()
                     {
                         Success = false,
                         Info = "Failed due to Null/unparsable Request"
@@ -163,38 +240,42 @@ namespace Action_Delay_API_Worker
 
 
                 var reply = _jobService.EndJob(jobEndRequest);
-                await jobRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+                await ReplyAsync(jobRequest, reply, cancellationToken: stoppingToken);
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error with ExecuteEndJobRequest");
-                await jobRequest.ReplyAsync(new JobEndRequestResponse()
+                await ReplyAsync(jobRequest, new JobEndRequestResponse()
                 {
                     Success = false,
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
             }
+            finally
+            {
+                jobRequest.Data.Dispose();
+            }
         }
 
-        public async Task ExecuteStatusJobRequest(NatsMsg<byte[]> jobRequest, CancellationToken stoppingToken)
+        public async Task ExecuteStatusJobRequest(NatsMsg<NatsMemoryOwner<byte>> jobRequest, CancellationToken stoppingToken)
         {
             try
             {
-                if (jobRequest.Data == null)
+                if (jobRequest.Data.Length == 0)
                 {
-                    await jobRequest.ReplyAsync(new JobStatusRequestResponse()
+                    await ReplyAsync(jobRequest, new JobStatusRequestResponse()
                     {
                         Failed = false,
                         Info = "Failed due to Null Request"
                     }, cancellationToken: stoppingToken);
                     return;
                 }
-                var DATA = Encoding.UTF8.GetString(jobRequest.Data);
+                var DATA = Encoding.UTF8.GetString(jobRequest.Data.Span);
                 var jobStatusRequest = JsonSerializer.Deserialize<JobStatusRequest>(DATA);
 
                 if (jobStatusRequest == null)
                 {
-                    await jobRequest.ReplyAsync(new JobStatusRequestResponse()
+                    await ReplyAsync(jobRequest, new JobStatusRequestResponse()
                     {
                         Failed = false,
                         Info = "Failed due to Null/unparsable Request"
@@ -204,40 +285,44 @@ namespace Action_Delay_API_Worker
 
 
                 var reply = _jobService.StatusJob(jobStatusRequest);
-                await jobRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+                await ReplyAsync(jobRequest, reply, cancellationToken: stoppingToken);
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error with ExecuteStatusJobRequest");
-                await jobRequest.ReplyAsync(new JobStatusRequestResponse()
+                await ReplyAsync(jobRequest, new JobStatusRequestResponse()
                 {
                     Failed = false,
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
             }
+            finally
+            {
+                jobRequest.Data.Dispose();
+            }
         }
 
 
 
-        public async Task ExecuteStartJobRequest(NatsMsg<byte[]> jobRequest, CancellationToken stoppingToken)
+        public async Task ExecuteStartJobRequest(NatsMsg<NatsMemoryOwner<byte>> jobRequest, CancellationToken stoppingToken)
         {
             try
             {
-                if (jobRequest.Data == null)
+                if (jobRequest.Data.Length == 0)
                 {
-                    await jobRequest.ReplyAsync(new JobStartRequestResponse()
+                    await ReplyAsync(jobRequest, new JobStartRequestResponse()
                     {
                         Success = false,
                         Info = "Failed due to Null Request"
                     }, cancellationToken: stoppingToken);
                     return;
                 }
-                var DATA = Encoding.UTF8.GetString(jobRequest.Data);
+                var DATA = Encoding.UTF8.GetString(jobRequest.Data.Span);
                 var jobRequestData = JsonSerializer.Deserialize<JobStartRequest>(DATA);
 
                 if (jobRequestData == null)
                 {
-                    await jobRequest.ReplyAsync(new JobStartRequestResponse()
+                    await ReplyAsync(jobRequest, new JobStartRequestResponse()
                     {
                         Success = false,
                         Info = "Failed due to Null/unparsable Request"
@@ -247,28 +332,32 @@ namespace Action_Delay_API_Worker
 
 
                 var reply = _jobService.StartJob(jobRequestData);
-                await jobRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+                await ReplyAsync(jobRequest, reply, cancellationToken: stoppingToken);
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error with ExecuteStartJobRequest");
-                await jobRequest.ReplyAsync(new JobStartRequestResponse()
+                await ReplyAsync(jobRequest, new JobStartRequestResponse()
                 {
                    Success = false,
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
             }
+            finally
+            {
+                jobRequest.Data.Dispose();
+            }
         }
 
 
 
-        public async Task ExecuteDNSRequest(NatsMsg<byte[]> dnsRequest, CancellationToken stoppingToken)
+        public async Task ExecuteDNSRequest(NatsMsg<NatsMemoryOwner<byte>> dnsRequest, CancellationToken stoppingToken)
         {
             try
             {
-                if (dnsRequest.Data == null)
+                if (dnsRequest.Data.Length == 0)
                 {
-                    await dnsRequest.ReplyAsync(new SerializableDNSResponse()
+                    await ReplyAsync(dnsRequest, new SerializableDNSResponse()
                     {
                         Answers = new List<SerializableDnsAnswer>(),
                         QueryType = "Unknown",
@@ -279,12 +368,34 @@ namespace Action_Delay_API_Worker
                     }, cancellationToken: stoppingToken);
                     return;
                 }
-                var DATA = Encoding.UTF8.GetString(dnsRequest.Data);
+
+
+                string DATA = null;
+                if (dnsRequest.Headers?.ContainsKey("Comp") ?? false)
+                {
+                    Decompressor decomp = null;
+                    try
+                    {
+                        decomp = GetDecompressor();
+                        var decompressed = decomp.Unwrap(dnsRequest.Data.Span);
+                        DATA = Encoding.UTF8.GetString(decompressed);
+                    }
+                    finally
+                    {
+                        if (decomp != null)
+                            ReturnDecompressor(decomp);
+                    }
+
+                }
+                else
+                {
+                    DATA = Encoding.UTF8.GetString(dnsRequest.Data.Span);
+                }
                 var dnsRequestData = JsonSerializer.Deserialize<SerializableDNSRequest>(DATA);
 
                 if (dnsRequestData == null)
                 {
-                    await dnsRequest.ReplyAsync(new SerializableDNSResponse()
+                    await ReplyAsync(dnsRequest, new SerializableDNSResponse()
                     {
                         Answers = new List<SerializableDnsAnswer>(),
                         QueryType = "Unknown",
@@ -297,13 +408,13 @@ namespace Action_Delay_API_Worker
                 }
 
 
-                var reply = await _dnsService.PerformDnsLookupAsync(dnsRequestData);
-                await dnsRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+                var reply = await _dnsService.PerformDnsLookupAsync(dnsRequestData, (dnsRequest.Headers?.ContainsKey("Comp") ?? false) ? "nats-c" : "nats");
+                await ReplyAsync(dnsRequest, reply, cancellationToken: stoppingToken);
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error with DNS Hook");
-                await dnsRequest.ReplyAsync(new SerializableDNSResponse()
+                await ReplyAsync(dnsRequest, new SerializableDNSResponse()
                 {
                     Answers = new List<SerializableDnsAnswer>(),
                     QueryType = "Unknown",
@@ -313,16 +424,21 @@ namespace Action_Delay_API_Worker
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
             }
+            finally
+            {
+                dnsRequest.Data.Dispose();
+            }
         }
 
-        public async Task ExecuteHttpRequest(NatsMsg<byte[]> httpRequest, CancellationToken stoppingToken)
+        public async Task ExecuteHttpRequest(NatsMsg<NatsMemoryOwner<byte>> httpRequest, CancellationToken stoppingToken)
         {
             try
             {
+       
 
-                if (httpRequest.Data == null || httpRequest.Data.Length == 0)
+                if (httpRequest.Data.Length == 0)
                 {
-                    await httpRequest.ReplyAsync(new SerializableHttpResponse
+                    await ReplyAsync(httpRequest, new SerializableHttpResponse
                     {
                         Body = string.Empty,
                         WasSuccess = false,
@@ -334,12 +450,33 @@ namespace Action_Delay_API_Worker
                     return;
                 }
 
-                var DATA = Encoding.UTF8.GetString(httpRequest.Data);
+                string DATA = null;
+                if (httpRequest.Headers?.ContainsKey("Comp") ?? false)
+                {
+                    Decompressor decomp = null;
+                    try
+                    {
+                         decomp = GetDecompressor();
+                         var decompressed = decomp.Unwrap(httpRequest.Data.Span);
+                         DATA = Encoding.UTF8.GetString(decompressed);
+                    }
+                    finally
+                    {
+                        if (decomp != null)
+                            ReturnDecompressor(decomp);
+                    }
+
+                }
+                else
+                {
+                    DATA = Encoding.UTF8.GetString(httpRequest.Data.Span);
+                }
+
                 var httpRequestData = JsonSerializer.Deserialize<SerializableHttpRequest>(DATA);
 
                 if (httpRequestData == null)
                 {
-                    await httpRequest.ReplyAsync(new SerializableHttpResponse
+                    await ReplyAsync(httpRequest, new SerializableHttpResponse
                     {
                         Body = string.Empty,
                         WasSuccess = false,
@@ -351,14 +488,14 @@ namespace Action_Delay_API_Worker
                     return;
                 }
 
-                var reply = await _httpService.PerformRequestAsync(httpRequestData);
-                await httpRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+                var reply = await _httpService.PerformRequestAsync(httpRequestData, (httpRequest.Headers?.ContainsKey("Comp") ?? false) ? "nats-c" :  "nats");
+                await ReplyAsync(httpRequest, reply, cancellationToken: stoppingToken);
 
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error with HTTP Hook");
-                await httpRequest.ReplyAsync(new SerializableHttpResponse
+                await ReplyAsync(httpRequest, new SerializableHttpResponse
                 {
                     Body = string.Empty,
                     Headers = new Dictionary<string, string>(),
@@ -368,26 +505,52 @@ namespace Action_Delay_API_Worker
                     WasSuccess = false
                 }, cancellationToken: stoppingToken);
             }
+            finally
+            {
+                httpRequest.Data.Dispose();
+            }
         }
-        public async Task ExecutePingRequest(NatsMsg<byte[]> pingRequest, CancellationToken stoppingToken)
+        public async Task ExecutePingRequest(NatsMsg<NatsMemoryOwner<byte>> pingRequest, CancellationToken stoppingToken)
         {
             try
             {
-                if (pingRequest.Data == null)
+                if (pingRequest.Data.Length == 0)
                 {
-                    await pingRequest.ReplyAsync(new SerializablePingResponse()
+                    await ReplyAsync(pingRequest, new SerializablePingResponse()
                     {
                         ProxyFailure = true,
                         Info = "Failed due to Null Request"
                     }, cancellationToken: stoppingToken);
                     return;
                 }
-                var DATA = Encoding.UTF8.GetString(pingRequest.Data);
+
+                string DATA = null;
+                if (pingRequest.Headers?.ContainsKey("Comp") ?? false)
+                {
+                    Decompressor decomp = null;
+                    try
+                    {
+                        decomp = GetDecompressor();
+                        var decompressed = decomp.Unwrap(pingRequest.Data.Span);
+                        DATA = Encoding.UTF8.GetString(decompressed);
+                    }
+                    finally
+                    {
+                        if (decomp != null)
+                            ReturnDecompressor(decomp);
+                    }
+
+                }
+                else
+                {
+                    DATA = Encoding.UTF8.GetString(pingRequest.Data.Span);
+                }
+
                 var serializablePingRequest = JsonSerializer.Deserialize<SerializablePingRequest>(DATA);
 
                 if (serializablePingRequest == null)
                 {
-                    await pingRequest.ReplyAsync(new SerializablePingResponse()
+                    await ReplyAsync(pingRequest, new SerializablePingResponse()
                     {
                         ProxyFailure = true,
                         Info = "Failed due to Null/unparsable Request"
@@ -397,16 +560,87 @@ namespace Action_Delay_API_Worker
 
 
                 var reply = await _pingService.PerformRequestAsync(serializablePingRequest);
-                await pingRequest.ReplyAsync(reply, cancellationToken: stoppingToken);
+                await ReplyAsync(pingRequest, reply, cancellationToken: stoppingToken);
             }
             catch (Exception e)
             {
                 Log.Error(e, "Error with Ping Hook");
-                await pingRequest.ReplyAsync(new SerializablePingResponse()
+                await ReplyAsync(pingRequest, new SerializablePingResponse()
                 {
                     ProxyFailure = true,
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
+            }
+            finally
+            {
+                pingRequest.Data.Dispose();
+            }
+        }
+
+        public static bool DumpToFileForDictTraining;
+
+        public static JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions()
+        {
+            TypeInfoResolver = SerializableRequestJsonContext.Default,
+            AllowTrailingCommas = true,
+            PropertyNameCaseInsensitive = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault
+        };
+
+        public async Task DumpToFile<TReply>(NatsMemoryOwner<byte> inc, TReply data)
+        {
+            try
+            {
+                var msgGuid = Guid.NewGuid().ToString("N");
+               var incTask = File.WriteAllTextAsync($"Dump/{msgGuid}.out.json",
+                    JsonSerializer.Serialize(data, DefaultJsonSerializerOptions));
+               var outTask = File.WriteAllBytesAsync($"Dump/{msgGuid}.in.json", inc.Memory);
+               await Task.WhenAll(incTask, outTask);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Error dumping to file");
+            }
+        }
+
+
+        public ValueTask ReplyAsync<TReply>(NatsMsg<NatsMemoryOwner<byte>> inc,
+            TReply data) => ReplyAsync(inc, data, CancellationToken.None);
+        public ValueTask ReplyAsync<TReply>(NatsMsg<NatsMemoryOwner<byte>> inc,
+            TReply data, CancellationToken cancellationToken)
+        {
+            if (DumpToFileForDictTraining)
+               _ = DumpToFile(inc.Data, data);
+
+            if (inc.Headers?.ContainsKey("Comp") ?? false)
+            {
+                var jsonSerialized = JsonSerializer.Serialize(data, DefaultJsonSerializerOptions);
+                var utf8Data = Encoding.UTF8.GetBytes(jsonSerialized);
+
+
+                using var memOwner = MemoryPool<byte>.Shared.Rent(Compressor.GetCompressBound(utf8Data.Length));
+                Memory<byte> outgoingData = null;
+                Compressor getComp = null;
+                try
+                {
+
+                    getComp = GetCompressor();
+                    int length = getComp.Wrap(new ReadOnlySpan<byte>(utf8Data), memOwner.Memory.Span);
+                    outgoingData = memOwner.Memory.Slice(0, length);
+                    return inc.ReplyAsync(outgoingData, cancellationToken: cancellationToken, headers: new NatsHeaders() { { "Comp", "1" } }, serializer: NatsDefaultSerializer<Memory<byte>>.Default);
+                }
+                finally
+                {
+                    if (getComp != null)
+                    {
+                        ReturnCompressor(getComp);
+                    }
+                }
+
+            }
+            else
+            {
+                return inc.ReplyAsync(data, cancellationToken: cancellationToken);
             }
         }
     }

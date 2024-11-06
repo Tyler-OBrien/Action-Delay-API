@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -358,9 +358,15 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true,
                 ReturnBody = false,
-                ReturnBodyOnError = true,
+                ReturnBodyOnError = false,
                 CustomDNSServerOverride = overridenCustomNameServerResolved,
-                DNSResolveOverride = jobConfig.DNSResolveOverride
+                DNSResolveOverride = jobConfig.DNSResolveOverride,
+                RetriesCount = 0,
+                ResponseHeaders = new List<string>()
+                {
+                    "colo", 
+                    "server"
+                }
             };
             if (jobConfig.CustomHeaders != null)
             {
@@ -385,7 +391,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
             return await _queue.HTTP(newRequest, location, token);
         }
 
-
+  
 
         public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(Location location, DownloadJobGeneric jobConfig, string? overridenCustomNameServerResolved, CancellationToken token)
         {
@@ -394,17 +400,17 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name },
                     { "APIKEY", _config.PerfConfig.Secret}
                 },
-                URL = jobConfig.Endpoint,
+                URL = jobConfig.Endpoint.ProcessEndpoint(location),
                 TimeoutMs = 30_000,
                 EnableConnectionReuse = true,
                 ReturnBody = false,
                 RetriesCount = 0,
                 ReturnBodyOnError = true,
                 CustomDNSServerOverride = overridenCustomNameServerResolved,
-                DNSResolveOverride = jobConfig.DNSResolveOverride
+                DNSResolveOverride = jobConfig.DNSResolveOverride,
+                NoResponseHeaders = true
             };
             if (jobConfig.CustomHeaders != null)
             {

@@ -5,6 +5,6 @@ namespace Action_Delay_API_Worker.Models.Services
 {
     public interface IHttpService
     {
-        Task<SerializableHttpResponse> PerformRequestAsync(SerializableHttpRequest request);
+        Task<SerializableHttpResponse> PerformRequestAsync(SerializableHttpRequest request, string source);
     }
 }

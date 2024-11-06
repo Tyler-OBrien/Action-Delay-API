@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -347,7 +347,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true,
                 ReturnBody = false,
-                ReturnBodyOnError = true
+                ReturnBodyOnError = false,
+                NoResponseHeaders = true
             };
             newRequest.SetDefaultsFromLocation(location);
             if (job.ForceNetType.HasValue)
@@ -360,8 +361,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(Location location,
             CancellationToken token, UploadJobGeneric job)
         {
-
-            var randomBytes = GenerateRandomBytes(10_000);
+            int seed = -1;
+            byte[] randomBytes = null;
+     
 
             var newRequest = new NATSHttpRequest()
             {
@@ -377,8 +379,20 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 ReturnBody = false,
                 RetriesCount = 0,
                 ReturnBodyOnError = true,
-                Base64Body = System.Convert.ToBase64String(randomBytes),
+                ResponseHeaders = new List<string>()
+                {
+                    "content-length"
+                },
+                RandomBytesBody = 10_000,
             };
+            if (job is { CheckUploadedContentHash: true })
+            {
+                seed = Guid.NewGuid().GetHashCode();
+                randomBytes = GenerateRandomBytes(10_000, seed);
+                newRequest.RandomSeed = seed;
+            }
+
+
             foreach (var customHeaderKvp in job.CustomHeaders)
             {
                 newRequest.Headers[customHeaderKvp.Key] = customHeaderKvp.Value;
@@ -428,10 +442,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
             return tryPut;
         }
 
-        public static byte[] GenerateRandomBytes(int sizeInBytes)
+        public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
         {
             byte[] randomBytes = new byte[sizeInBytes];
-            Random.Shared.NextBytes(randomBytes);
+            var newRandom = new Random(seed);
+            newRandom.NextBytes(randomBytes);
             return randomBytes;
         }
 

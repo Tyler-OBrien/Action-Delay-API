@@ -28,5 +28,8 @@ namespace Action_Delay_API_Worker.Models.API.Response
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public double? ResponseTimeMs { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? GeneratedRandomBytesSha256 { get; set; }
+
     }
 }

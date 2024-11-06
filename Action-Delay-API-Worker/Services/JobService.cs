@@ -213,7 +213,7 @@ namespace Action_Delay_API_Worker.Services
 
         private async Task RunDNSJob(InMemoryJob job)
         {
-            var sendDNSRequest = await _dnsService.PerformDnsLookupAsync(job.JobDetails.DnsRequest!);
+            var sendDNSRequest = await _dnsService.PerformDnsLookupAsync(job.JobDetails.DnsRequest!, "job");
 
             if (sendDNSRequest.ResponseTimeMs.HasValue)
                 job.ResponseTimes.Add(sendDNSRequest.ResponseTimeMs.Value);
@@ -259,7 +259,7 @@ namespace Action_Delay_API_Worker.Services
 
         private async Task RunHttpJob(InMemoryJob job)
         {
-            var sendHttpRequest = await _httpService.PerformRequestAsync(job.JobDetails.HttpRequest!);
+            var sendHttpRequest = await _httpService.PerformRequestAsync(job.JobDetails.HttpRequest!, "job");
             if (sendHttpRequest.ResponseTimeMs.HasValue)
                 job.ResponseTimes.Add(sendHttpRequest.ResponseTimeMs.Value);
 

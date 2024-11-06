@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
@@ -120,10 +120,10 @@ namespace Action_Delay_API_Core.Jobs
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = "https://" + _config.WAFJob.HostName + $"/{_specialPath}",
-                TimeoutMs = 10_000
+                TimeoutMs = 10_000,
+                NoResponseHeaders = true,
             };
             newRequest.SetDefaultsFromLocation(location);
 

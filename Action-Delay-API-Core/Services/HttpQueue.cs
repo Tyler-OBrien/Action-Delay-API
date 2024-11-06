@@ -38,6 +38,7 @@ namespace Action_Delay_API_Core.Services
 
         public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, Location location, CancellationToken token, int secondsTimeout = 30)
         {
+            request.HandleNoResponseHeadersOverride();
             try
             {
                 var client = _clientFactory.CreateClient("HttpQueueClient");

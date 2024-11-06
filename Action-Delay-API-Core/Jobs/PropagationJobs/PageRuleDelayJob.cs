@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Action_Delay_API_Core;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
@@ -129,11 +129,14 @@ public class PageRuleDelayJob : BasePropagationJob
             Headers = new Dictionary<string, string>
             {
                 { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
-                { "Worker", location.DisplayName ?? location.Name }
             },
             URL = $"https://{_config.PageRuleJob.PageRuleHostname}/",
             TimeoutMs = 10_000,
-            EnableConnectionReuse = false
+            EnableConnectionReuse = false,
+            ResponseHeaders = new List<string>()
+            {
+                "location"
+            }
         };
         newRequest.SetDefaultsFromLocation(location);
 

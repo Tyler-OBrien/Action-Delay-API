@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -95,12 +95,12 @@ namespace Action_Delay_API_Core.Jobs
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name }
                 },
                 URL = _config.WfPJob.ScriptUrl + $"/?scriptName={_scriptName}",
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = false,
-                ReturnBody = true
+                ReturnBody = true,
+                NoResponseHeaders = true,
             };
             newRequest.SetDefaultsFromLocation(location);
 

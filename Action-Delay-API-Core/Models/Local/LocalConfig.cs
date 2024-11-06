@@ -1,9 +1,11 @@
-﻿using Action_Delay_API_Core.Models.NATS;
+using Action_Delay_API_Core.Models.NATS;
 
 namespace Action_Delay_API_Core.Models.Local
 {
     public class LocalConfig
     {
+        public string CoreName { get; set; }
+
         public string SENTRY_DSN { get; set; }
 
         public string API_ENDPOINT { get; set; }
@@ -12,13 +14,19 @@ namespace Action_Delay_API_Core.Models.Local
 
         public bool UsingNATS { get; set; }
 
+        public bool NATSRequestCompression { get; set; }
+
+
         public bool? BackgroundLocationDataRefresh { get; set; }
+
+        public List<string>? BackgroundRefreshProviders { get; set; }
 
         public string PostgresConnectionString { get; set; }
 
         public string ClickhouseConnectionString { get; set; }
 
         public string ActionDelayProxySecret { get; set; }
+
 
 
 
@@ -123,6 +131,8 @@ namespace Action_Delay_API_Core.Models.Local
 
         public NetType? ForceNetType { get; set; }
         public bool? CheckUploadedContentHash { get; set; }
+
+        public bool? KeepOldAndDumpToDiskOnMisMatch { get; set; }
     }
 
     public class CertificateRenewalDelayJob : BaseConfig

@@ -38,7 +38,7 @@ namespace Action_Delay_API_Worker.Services
                 .OrResult<IDnsQueryResponse>(r => r.HasError)
                 .WaitAndRetryAsync(6, retryAttempt => TimeSpan.FromMilliseconds(Math.Max(50, retryAttempt * 50)));
 
-        public async Task<SerializableDNSResponse> PerformDnsLookupAsync(SerializableDNSRequest request)
+        public async Task<SerializableDNSResponse> PerformDnsLookupAsync(SerializableDNSRequest request, string source)
         {
             var cancellationTokenSource = new CancellationTokenSource(request.TimeoutMs ?? 5_000);
             var token = cancellationTokenSource.Token;
@@ -66,18 +66,26 @@ namespace Action_Delay_API_Worker.Services
                 IPAddress[] dnsServerAddresses = null;
                 try
                 {
-                    dnsServerAddresses =
-                        await nameServerqueryRetryPolicy.ExecuteAsync(async () =>
-                        {
-                            var getAddresses = await Program.NetTypeSpecificLookup(dnsServer, request.NetType ?? NetType.Either, token);
-                            return getAddresses.AddressList;
-                        });
+                    if (IPAddress.TryParse(dnsServer, out var parsedDnsIp))
+                    {
+                        dnsServerAddresses = new IPAddress[] { parsedDnsIp };
+                    }
+                    else
+                    {
+                        dnsServerAddresses =
+                            await nameServerqueryRetryPolicy.ExecuteAsync(async () =>
+                            {
+                                var getAddresses = await Program.NetTypeSpecificLookup(dnsServer,
+                                    request.NetType ?? NetType.Either, token);
+                                return getAddresses.AddressList;
+                            });
+                    }
                 }
                 catch (Exception ex) when (ex is SocketException or ArgumentOutOfRangeException or ArgumentException)
                 {
                     _logger.LogWarning(ex,
-                        "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
-                        queryName, queryType, dnsServer);
+                        "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
+                        source, queryName, queryType, dnsServer);
                     return new SerializableDNSResponse()
                     {
                         QueryName = queryName,
@@ -91,8 +99,8 @@ namespace Action_Delay_API_Worker.Services
                 catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
                 {
                     _logger.LogWarning(ex,
-                        "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but it timed out on resolving dnsServer",
-                        queryName, queryType, dnsServer);
+                        "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but it timed out on resolving dnsServer",
+                       source, queryName, queryType, dnsServer);
                     return new SerializableDNSResponse()
                     {
                         QueryName = queryName,
@@ -106,8 +114,8 @@ namespace Action_Delay_API_Worker.Services
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex,
-                        "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
-                        queryName, queryType, dnsServer);
+                        "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
+                        source, queryName, queryType, dnsServer);
                     return new SerializableDNSResponse()
                     {
                         QueryName = queryName,
@@ -122,8 +130,8 @@ namespace Action_Delay_API_Worker.Services
                 if (dnsServerAddresses.Length == 0)
                 {
                     _logger.LogInformation(
-                        "Unable to resolve DNS server: {dnsServer}, trying to query {queryType} of {queryName}",
-                        dnsServer, queryType, queryName);
+                        "({source}): Unable to resolve DNS server: {dnsServer}, trying to query {queryType} of {queryName}",
+                        source, dnsServer, queryType, queryName);
                     return new SerializableDNSResponse()
                     {
                         QueryName = queryName,
@@ -230,15 +238,15 @@ namespace Action_Delay_API_Worker.Services
                 }
 
                 _logger.LogInformation(
-                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers, first Answer: {firstAnswer}, error message: {error}, latency: {latencyMs}, NSID: {nsid}",
-                    queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count, response.Answers.Any() ? response.Answers.FirstOrDefault() : "", response.ErrorMessage, latencyMs, dnsResponse.NSID);
+                    "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we got back {ResponseCode}, and {Count} answers, first Answer: {firstAnswer}, error message: {error}, latency: {latencyMs}, NSID: {nsid}",
+                    source, queryName, queryType, dnsServer, response.Header.ResponseCode, response.Answers.Count, response.Answers.Any() ? response.Answers.FirstOrDefault() : "", response.ErrorMessage, latencyMs, dnsResponse.NSID);
                 return dnsResponse;
             }
             catch (DnsClient.DnsResponseException dnsResponseException)
             {
                 _logger.LogWarning(dnsResponseException,
-                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but we had a dnsError {dnsError}, {dnsMessage}",
-                    queryName, queryType, dnsServer, dnsResponseException.Code, dnsResponseException.Message);
+                    "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but we had a dnsError {dnsError}, {dnsMessage}",
+                    source, queryName, queryType, dnsServer, dnsResponseException.Code, dnsResponseException.Message);
                 return new SerializableDNSResponse()
                 {
                     QueryName = queryName,
@@ -251,8 +259,8 @@ namespace Action_Delay_API_Worker.Services
             catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
             {
                 _logger.LogWarning(ex,
-                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but it timed out",
-                    queryName, queryType, dnsServer);
+                    "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, but it timed out",
+                    source,queryName, queryType, dnsServer);
                 return new SerializableDNSResponse()
                 {
                     QueryName = queryName,
@@ -266,8 +274,8 @@ namespace Action_Delay_API_Worker.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
-                    "Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error.",
-                    queryName, queryType, dnsServer);
+                    "({source}): Received Query Request for {queryName}, type {queryType} via  {dnsServer}, we had an error.",
+                    source,queryName, queryType, dnsServer);
                 return new SerializableDNSResponse()
                 {
                     QueryName = queryName,

@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
@@ -176,12 +176,28 @@ namespace Action_Delay_API_Core.Jobs
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name }
                 }, 
                 URL = String.IsNullOrEmpty(_config.CacheJob.ProxyURL) ? _config.CacheJob.URL : $"{_config.CacheJob.ProxyURL}/{location.Name}?url={_config.CacheJob.URL}", // very specific proxy format, see Action-Delay-API-Durable-Object-Proxy for implementation
                 TimeoutMs = 10_000,
-                EnableConnectionReuse = true
+                EnableConnectionReuse = true,
             };
+
+            if (String.IsNullOrEmpty(_config.CacheJob.ProxyURL))
+            {
+                newRequest.ResponseHeaders = new List<string>()
+                {
+                    "CF-Cache-Status",
+                    "Age"
+                };
+            }
+            else
+            {
+                newRequest.ResponseHeaders = new List<string>()
+                {
+                    "Proxy-CF-Cache-Status",
+                    "Proxy-Age"
+                };
+            }
             newRequest.SetDefaultsFromLocation(location);
 
             if (String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false &&

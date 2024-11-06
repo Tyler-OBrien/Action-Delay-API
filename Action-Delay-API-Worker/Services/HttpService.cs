@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.Tracing;
+﻿using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -7,7 +8,9 @@ using System.Text;
 using Action_Delay_API_Worker.Models;
 using Action_Delay_API_Worker.Models.API.Request;
 using Action_Delay_API_Worker.Models.API.Response;
+using Action_Delay_API_Worker.Models.Config;
 using Action_Delay_API_Worker.Models.Services;
+using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Extensions.Http;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
@@ -17,13 +20,16 @@ namespace Action_Delay_API_Worker.Services;
     {
         private readonly ILogger _logger;
         private readonly IHttpClientFactory _clientFactory;
+        private readonly LocalConfig _localConfig;
 
 
 
-        public HttpService(ILogger<HttpService> logger, IHttpClientFactory clientFactory)
+
+    public HttpService(ILogger<HttpService> logger, IHttpClientFactory clientFactory, IOptions<LocalConfig> probeConfiguration)
         {
             _logger = logger;
             _clientFactory = clientFactory;
+            _localConfig = probeConfiguration.Value;
         }
 
         public HttpClient NewHttpClient(bool reuseConnection)
@@ -35,7 +41,7 @@ namespace Action_Delay_API_Worker.Services;
             return _clientFactory.CreateClient("NonReuseClient");
         }
 
-        public async Task<SerializableHttpResponse> PerformRequestAsync(SerializableHttpRequest incomingRequest)
+        public async Task<SerializableHttpResponse> PerformRequestAsync(SerializableHttpRequest incomingRequest, string source)
         {
             try
             {
@@ -106,11 +112,7 @@ namespace Action_Delay_API_Worker.Services;
                         if (incomingRequest.EnableConnectionReuse is null or false)
                             request.Headers.ConnectionClose = true;
 
-                        foreach (var header in headers)
-                        {
-                            request.Headers.Add(header.Key, header.Value);
-                        }
-                        request.Headers.Add("X-Action-Delay-API-Worker-Version", Assembly.GetCallingAssembly().GetName().Version.ToString());
+                    
 
 
                         if (incomingRequest.Body != null)
@@ -132,7 +134,31 @@ namespace Action_Delay_API_Worker.Services;
                                 request.Content.Headers.ContentType = contentType;
                         }
 
-                 
+                        if (incomingRequest.RandomBytesBody.HasValue)
+                        {
+                            int seed = 0;
+                            if (incomingRequest.RandomSeed.HasValue)
+                                seed = incomingRequest.RandomSeed.Value;
+                            else
+                                seed = Guid.NewGuid().GetHashCode();
+                            request.Content =
+                                new ByteArrayContent(GenerateRandomBytes(incomingRequest.RandomBytesBody.Value, seed));
+                            if (MediaTypeHeaderValue.TryParse(incomingRequest.ContentType, out var contentType))
+                                request.Content.Headers.ContentType = contentType;
+                        }
+
+
+
+                        foreach (var header in headers)
+                        {
+                            if (request.Headers.TryAddWithoutValidation(header.Key, header.Value) == false)
+                                request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                        }
+                        if (request.Headers.Contains("X-Action-Delay-API-Worker-Version") == false)
+                            request.Headers.Add("X-Action-Delay-API-Worker-Version", Assembly.GetCallingAssembly().GetName().Version.ToString());
+                        if (request.Headers.Contains("Worker") == false)
+                            request.Headers.Add("Worker", _localConfig.Location.ToUpper());
+
 
 
                         MemoryStream content = null;
@@ -155,17 +181,26 @@ namespace Action_Delay_API_Worker.Services;
                             using var listener = new HttpEventListener();
                             var response = await newClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                             var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token);
-      
+
+                            long dnsResolveLatency = -1;
+                            if (request.Options.TryGetValue(new HttpRequestOptionsKey<long>("DNSResolveLatency"),
+                                    out var dnsResolveLatencyRaw)) dnsResolveLatency = dnsResolveLatencyRaw;
+
+
                             var timings = listener.GetTimings();
                             if (timings is { Request: not null, Dns: not null })
                                 responseTimeMs = timings.Request.Value.TotalMilliseconds -
                                                  timings.Dns.Value.TotalMilliseconds;
                             else if (timings.Request != null)
                                 responseTimeMs = timings.Request.Value.TotalMilliseconds;
+                            responseTimeMs += responseContent.latencyMs;
                             perfInfo =
-                                $"DNS: {timings.Dns?.TotalMilliseconds ?? 0}ms, Connect: {timings.SocketConnect?.TotalMilliseconds ?? 0}ms, SSL: {timings.SslHandshake?.TotalMilliseconds ?? 0}ms, Request: {timings.Request?.TotalMilliseconds ?? 0}ms, Response Headers: {timings.ResponseHeaders?.TotalMilliseconds ?? 0}ms, Response Content: {timings.ResponseContent?.TotalMilliseconds ?? 0}ms.";
-                            response.Content = new StreamContent(responseContent.Item1);
-                            couldGetBody = responseContent.Item2;
+                                $"DNS: {dnsResolveLatency}ms, Connect: {timings.SocketConnect?.TotalMilliseconds ?? 0}ms, SSL: {timings.SslHandshake?.TotalMilliseconds ?? 0}ms, Request: {timings.Request?.TotalMilliseconds ?? 0}ms, Response Headers: {timings.ResponseHeaders?.TotalMilliseconds ?? 0}ms, Response Content: {responseContent.latencyMs}ms.";
+                            couldGetBody = responseContent.couldRead;
+                            if (couldGetBody)
+                                response.Content = new StreamContent(responseContent.Item1);
+                            else
+                                response.Content = null;
                             return response;
                         }
                         finally
@@ -178,10 +213,11 @@ namespace Action_Delay_API_Worker.Services;
                 if (wantsBody == false && wantsBodyOnError && response.IsSuccessStatusCode == false)
                     wantsBody = true;
 
-                if (couldGetBody == false && wantsBody)
+                if (couldGetBody == false && (wantsBody || wantsBodyHash))
                 {
                     _logger.LogWarning(
-                        "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, the return body was too large, Http Status Code: {httpErrorStatus}",
+                        "({source}): Received Query Request for {url}, h: {headers}, t: {timeout}, nt: {netType}, connectionReuse: {connectionReuse}, the return body was too large, Http Status Code: {httpErrorStatus}",
+                        source,
                         incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs,
                         incomingRequest.NetType, incomingRequest.EnableConnectionReuse, response.StatusCode);
                     return new SerializableHttpResponse
@@ -189,7 +225,7 @@ namespace Action_Delay_API_Worker.Services;
                         WasSuccess = false,
                         StatusCode = HttpStatusCode.BadGateway,
                         ProxyFailure = true,
-                        Headers = response.Headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value)),
+                        Headers = ResolveHeaders(response.Headers, false, incomingRequest),
                         Body = string.Empty,
                         Info = $"The Response Body was too large",
                         ResponseTimeMs = Math.Round(responseTimeMs, 3),
@@ -197,8 +233,8 @@ namespace Action_Delay_API_Worker.Services;
                 }
 
                 _logger.LogInformation(
-                    "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, dns override {dnsOverride}, ns override {nameserverOverride}, we got back {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}. Timings: {perfInfo}",
-                    url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.DNSResolveOverride, incomingRequest.CustomDNSServerOverride,
+                    "({source}): {url}, h: {headers}, t: {timeout}, nt: {netType}, dnsoverride {dnsOverride}, cust ns {nameserverOverride}, status {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}, Timings: {perfInfo}",
+                    source, url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.DNSResolveOverride, incomingRequest.CustomDNSServerOverride,
                     response.StatusCode, response.Version, incomingRequest.EnableConnectionReuse, perfInfo);
 
                 string? output = null;
@@ -211,16 +247,20 @@ namespace Action_Delay_API_Worker.Services;
                 }
                 else
                 {
-                    var outputStream = await response.Content.ReadAsStreamAsync();
-                    if (wantsBodyHash) hash = Convert.ToHexString(await SHA256.HashDataAsync(outputStream));
-                    await outputStream.CopyToAsync(Stream.Null);
+
+                    if (response.Content != null)
+                    {
+                        var outputStream = await response.Content.ReadAsStreamAsync();
+                        if (wantsBodyHash) hash = Convert.ToHexString(await SHA256.HashDataAsync(outputStream));
+                        await outputStream.CopyToAsync(Stream.Null);
+                    }
                 }
 
                 return new SerializableHttpResponse
                 {
                     WasSuccess = response.IsSuccessStatusCode,
                     StatusCode = response.StatusCode,
-                    Headers = response.Headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value)),
+                    Headers = ResolveHeaders(response.Headers, response.IsSuccessStatusCode, incomingRequest),
                     Body = output,
                     ResponseTimeMs = Math.Round(responseTimeMs, 3),
                     BodySha256 = hash,
@@ -228,7 +268,7 @@ namespace Action_Delay_API_Worker.Services;
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogWarning(ex, "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an HTTP Exception, Http Status Code: {httpErrorStatus}, {HttpRequestError}, {Message}.", incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse, ex.StatusCode, ex.HttpRequestError, ex.Message);
+                _logger.LogWarning(ex, "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an HTTP Exception, Http Status Code: {httpErrorStatus}, {HttpRequestError}, {Message}.",source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse, ex.StatusCode, ex.HttpRequestError, ex.Message);
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,
@@ -241,7 +281,7 @@ namespace Action_Delay_API_Worker.Services;
             }
             catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
             {
-                _logger.LogWarning(ex, "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we timed out.", incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
+                _logger.LogWarning(ex, "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we timed out.", source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,
@@ -254,7 +294,7 @@ namespace Action_Delay_API_Worker.Services;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an exception.", incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
+                _logger.LogWarning(ex, "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an exception.", source,incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,
@@ -268,11 +308,51 @@ namespace Action_Delay_API_Worker.Services;
 
         }
 
-
- 
-
-    public async Task<(MemoryStream, bool)> ReadResponseWithLimit(HttpResponseMessage msg, CancellationToken token)
+        public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
         {
+            byte[] randomBytes = new byte[sizeInBytes];
+            var newRandom = new Random(seed);
+            newRandom.NextBytes(randomBytes);
+            return randomBytes;
+        }
+    public Dictionary<string, string> ResolveHeaders(HttpResponseHeaders headers, bool isSuccessCode,
+            SerializableHttpRequest req)
+        {
+            // if none set, return all
+            if (req.NoResponseHeaders.HasValue == false && req.ResponseHeaders == null &&
+                req.AlwaysAllResponseHeadersOnNonSuccessStatusCode.HasValue == false)
+            {
+                return headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+            }
+
+            // if return non-success and non-success
+            if (req.AlwaysAllResponseHeadersOnNonSuccessStatusCode.HasValue &&
+                req.AlwaysAllResponseHeadersOnNonSuccessStatusCode.Value && isSuccessCode == false)
+            {
+                return headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+            }
+            // if some set, return just what was ordered
+            if (req.ResponseHeaders != null && req.ResponseHeaders.Any())
+            {
+                HashSet<string> allowedHeaders =
+                    new HashSet<string>(req.ResponseHeaders.ToList(), StringComparer.OrdinalIgnoreCase);
+                return headers.Where(header => allowedHeaders.Contains(header.Key))
+                    .ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+            }
+            // if set to not get any
+            if (req.NoResponseHeaders.HasValue && req.NoResponseHeaders.Value)
+            {
+                return new Dictionary<string, string>();
+            }
+
+            // otherwise fallback to giving all
+            return headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+        }
+
+
+    public async Task<(MemoryStream? memStream, bool couldRead, long latencyMs)> ReadResponseWithLimit(HttpResponseMessage msg, CancellationToken token)
+    {
+        var stopWatch = Stopwatch.StartNew();
             var byteLimit = 10 * 1024 * 1024; // 10 MB
             var totalBytesRead = 0L;
             var memStream = new MemoryStream();
@@ -288,15 +368,19 @@ namespace Action_Delay_API_Worker.Services;
 
                     if (totalBytesRead > byteLimit)
                     {
-                        return (null, false);
+                        stopWatch.Stop();
+                        return (null, false, stopWatch.ElapsedMilliseconds);
                     }
 
+                    stopWatch.Stop();
                     await memStream.WriteAsync(buffer, 0, bytesRead, token);
+                    stopWatch.Start();
                 }
             }
 
+            stopWatch.Stop();
             memStream.Position = 0;
-            return (memStream, true);
+            return (memStream, true, stopWatch.ElapsedMilliseconds);
         }
 
 

@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using Action_Delay_API_Worker.Models;
 using Action_Delay_API_Worker.Models.API.Request;
 using Action_Delay_API_Worker.Models.API.Response;
@@ -185,7 +187,7 @@ namespace Action_Delay_API_Worker
                  newHttpRequest.Body = await ReadAllBytes(request.Body);
                  request.Body.Position = 0;
 
-                 var tryGetResponse = await httpService.PerformRequestAsync(newHttpRequest);
+                 var tryGetResponse = await httpService.PerformRequestAsync(newHttpRequest, "http");
                  return tryGetResponse;
              }
              catch (Exception ex)
@@ -219,7 +221,7 @@ namespace Action_Delay_API_Worker
                  newDnsRequest.RequestNSID = HeaderToValueBool(request, "Action-Delay-Proxy-RequestNSID");
 
 
-                 var tryGetResponse = await dnsService.PerformDnsLookupAsync(newDnsRequest);
+                 var tryGetResponse = await dnsService.PerformDnsLookupAsync(newDnsRequest, "http");
                  return tryGetResponse;
              }
              catch (Exception ex)
@@ -366,9 +368,11 @@ namespace Action_Delay_API_Worker
             if (context.InitialRequestMessage.Options.TryGetValue(new HttpRequestOptionsKey<NetType>("IPVersion"),
                     out var version)) netType = version;
 
-
+            Stopwatch stopwatch = Stopwatch.StartNew();
             IPHostEntry entry = await NetTypeSpecificLookup(hostName, netType, cancellationToken, nameserverOverride);
-
+            stopwatch.Stop();
+            context.InitialRequestMessage.Options.Set(new HttpRequestOptionsKey<long>("DNSResolveLatency"),
+                stopwatch.ElapsedMilliseconds);
 
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             socket.NoDelay = true;
@@ -423,7 +427,6 @@ namespace Action_Delay_API_Worker
 
                 entry = GetHostEntryProcessResult(hostName, records.ToArray());
             }
-
             return entry ?? new IPHostEntry() { HostName = hostName, AddressList = Array.Empty<IPAddress>(), Aliases = Array.Empty<string>()};
         }
 
