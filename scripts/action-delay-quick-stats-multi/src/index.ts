@@ -223,7 +223,7 @@ a:active {
 <h1 class="main-header"> <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Action Delay Tracker</a></h1>
 <p class="sub-header-text">
     We do each action once a minute using the CF API. For example, 
-    updating a DNS Record, or updating a Worker. <br> Then from 25 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
+    updating a DNS Record, or updating a Worker. <br> Then from 35 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
     we make requests until we see the change. <br> When 
     half of those locations see the change, we consider the change propagated 
     and the job complete.  <br>
@@ -379,7 +379,7 @@ if (currentInfoData.currentRunStatus === "Deployed") {
     pending.className = 'highlightYellow';
     }
 }
-else if (currentInfoData.currentRunStatus == "API_Error" && currentInfoData.lastRunStatus == "API_Error") {
+else if ((currentInfoData.currentRunStatus == "API_Error" && currentInfoData.lastRunStatus != "Deployed") || (currentInfoData.lastRunStatus == "API_Error" && currentInfoData.currentRunStatus != "Deployed" )) {
     delay.textContent = 'CF API Error';
     pending.textContent = 'CF API Error';
     pending.className = 'highlightRed';
@@ -400,10 +400,16 @@ console.error(\`Fetch failed: \${error}\, \${error.lineNumber\}\`);
 }
 
 async function FetchQuickAnalytics() {
+
+
+   const quickTypeAnalytics = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/CloudflareDelay');
+    const getAllQuickTypes = await quickTypeAnalytics.json();
+
+
+
 for (let job of jobs)
 try {
-    const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + job.short);
-    const quickAnalyticsData = await quickAnalyticsResponse.json();
+    const quickAnalyticsData = getAllQuickTypes.filter(stat => stat.job_name == job.short)
 
 // Parsing quickanalytics and updating the HTML
 let peakPeriod, dailyMedian, monthlyMedian, quarterlyMedian;

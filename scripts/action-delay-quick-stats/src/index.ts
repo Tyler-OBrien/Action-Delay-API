@@ -247,7 +247,7 @@ async function FetchCurrentInfo() {
             pending.className = 'highlightYellow';
             }
         }
-        else if (currentInfoData.currentRunStatus == "API_Error" && currentInfoData.lastRunStatus == "API_Error") {
+        else if ((currentInfoData.currentRunStatus == "API_Error" && currentInfoData.lastRunStatus != "Deployed") || (currentInfoData.lastRunStatus == "API_Error" && currentInfoData.currentRunStatus != "Deployed" )) {
             delay.textContent = 'CF API Error';
             pending.textContent = 'CF API Error';
             pending.className = 'highlightRed';
