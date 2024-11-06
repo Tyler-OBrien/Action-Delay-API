@@ -8,7 +8,7 @@ namespace Action_Delay_API.Models.Services.v2
     public interface IJobDataService
     {
 
-        public Task<Result<DataResponse<JobDataResponse[]>>> GetJobs(CancellationToken token);
+        public Task<Result<DataResponse<JobDataResponse[]>>> GetJobs(string type, CancellationToken token);
         public Task<Result<DataResponse<JobDataResponse>>> GetJob(string jobName, CancellationToken token);
 
         public Task<Result<DataResponse<StreamDeckResponseDTO>>> GetStreamDeckData(string jobName,

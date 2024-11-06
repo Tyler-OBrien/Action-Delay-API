@@ -112,6 +112,15 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
         /// </summary>
         public string InternalJobName { get; set; }
 
+
+        [JsonPropertyName("jobType")]
+        public string JobType { get; set; }
+
+        [JsonPropertyName("jobDescription")]
+        public string JobDescription { get; set; }
+
+
+
         [JsonPropertyName("lastRunTime")]
         public DateTime? LastRunTime { get; set; }
         [JsonPropertyName("lastRunLengthMs")]
@@ -174,6 +183,8 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
             newJobDataResponse.CurrentRunTime = data.CurrentRunTime;
             newJobDataResponse.CurrentRunLengthMs = data.CurrentRunLengthMs;
             newJobDataResponse.CurrentRunStatus = data.CurrentRunStatus;
+            newJobDataResponse.JobType = data.JobType;
+            newJobDataResponse.JobDescription = data.JobDescription;
 
             if (data?.CurrentRunStatus?.Equals(Status.STATUS_DEPLOYED, StringComparison.OrdinalIgnoreCase) ?? false)
             {

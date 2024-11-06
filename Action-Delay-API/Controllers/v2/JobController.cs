@@ -33,10 +33,18 @@ public class JobController : CustomBaseController
     [SwaggerResponseExample(200, typeof(JobDataArrayResponseExample))]
     public async Task<IActionResult> GetJobs(CancellationToken token)
     {
-        return (await _jobDataService.GetJobs(token)).MapToResult();
+        return (await _jobDataService.GetJobs("CloudflareDelay", token)).MapToResult();
+    }
+    [HttpGet("type/{type}")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<JobDataResponse[]>),
+        Description = "On success, return a list of all known jobs")]
+    [SwaggerResponseExample(200, typeof(JobDataArrayResponseExample))]
+    public async Task<IActionResult> GetJobs(string type, CancellationToken token)
+    {
+        return (await _jobDataService.GetJobs(type, token)).MapToResult();
     }
 
-    [HttpGet("{jobName}")]
+    [HttpGet("{*jobName}")]
     [SwaggerResponse(200, Type = typeof(DataResponse<JobDataResponse>),
         Description = "On success, return a list of all known jobs")]
     [SwaggerResponseExample(200, typeof(JobDataResponseExample))]

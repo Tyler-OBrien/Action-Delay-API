@@ -25,9 +25,12 @@ public class JobDataService : IJobDataService
     }
 
 
-    public async Task<Result<DataResponse<JobDataResponse[]>>> GetJobs(CancellationToken token)
+    public async Task<Result<DataResponse<JobDataResponse[]>>> GetJobs(string type, CancellationToken token)
     {
-        return new DataResponse<JobDataResponse[]>((await _genericServersContext.JobData.ToListAsync(token))
+
+        var tryGetResolvedType = await _cacheSingletonService.GetJobType(type, token);
+
+        return new DataResponse<JobDataResponse[]>((await _genericServersContext.JobData.Where(job => job.JobType == tryGetResolvedType).ToListAsync(token))
             .Select(JobDataResponse.FromJobData).ToArray());
     }
 
