@@ -7,15 +7,21 @@ minify = true
 rules = [
   { type = "Text", globs = ["**/*.json"], fallthrough = true }
 ]
-
+routes = [
+	{ pattern = "colo.cloudflare.chaika.me/*", zone_name = "chaika.me" },
+  { pattern = "delay.cloudflare.chaika.me/v2/colos*", zone_name = "chaika.me" },
+]
 
 [triggers]
 crons = [ "*/30 * * * *" ]
 
+[observability]
+enabled = true
+head_sampling_rate = 0.1 
 
-[[routes]]
-pattern = "colo.cloudflare.chaika.me/*"
-zone_name = "chaika.me"
+
+
+
 
 
 
@@ -29,3 +35,4 @@ database_id = "972558fd-cadf-4bec-8b0b-5a140d7d51fb"
 binding = "DB2" # i.e. available in your Worker on env.DB
 database_name = "cloudflare-machines-v2"
 database_id = "9cc3c208-b7fd-41e9-be43-97253311760b"
+

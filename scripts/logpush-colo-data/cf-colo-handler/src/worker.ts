@@ -29,7 +29,37 @@ export class ResultObj {
 }
 
 export default {
-  GetDORegions(coloInfo: any[]) {
+  GetR2Regions(coloInfo: any[]) {
+    for (const colo of coloInfo) {
+      colo.cfRegionR2 = '';
+      switch (colo.cfRegionLB) {
+        case 'EEU':
+        case 'ME':
+          colo.cfRegionR2 = 'eeur';
+          break;
+        case 'ENAM':
+        case 'NSAM':
+        case 'SSAM':
+          colo.cfRegionR2 = 'enam';
+          break;
+        case 'WEU':
+        case 'NAF':
+        case 'SAF':
+          colo.cfRegionR2 = 'weur';
+          break;
+        case 'SAS':
+        case 'SEAS':
+        case 'NEAS':
+        case 'OC':
+          colo.cfRegionR2 = 'apac';
+          break;
+        case 'WNAM':
+          colo.cfRegionR2 = 'wnam';
+          break;
+      }
+    }
+  },
+  GetDORegionsLegacy(coloInfo: any[]) {
     for (const colo of coloInfo) {
       colo.cfRegionDO = '';
       switch (colo.cfRegionLB) {
@@ -51,6 +81,38 @@ export default {
         case 'SEAS':
         case 'NEAS':
         case 'OC':
+          colo.cfRegionDO = 'apac';
+          break;
+        case 'WNAM':
+          colo.cfRegionDO = 'wnam';
+          break;
+      }
+    }
+  },
+  GetDORegions(coloInfo: any[]) {
+    for (const colo of coloInfo) {
+      colo.cfRegionDO = '';
+      switch (colo.cfRegionLB) {
+        case 'EEU':
+        case 'ME':
+          colo.cfRegionDO = 'eeur';
+          break;
+        case 'ENAM':
+        case 'NSAM':
+        case 'SSAM':
+          colo.cfRegionDO = 'enam';
+          break;
+        case 'WEU':
+        case 'NAF':
+        case 'SAF':
+          colo.cfRegionDO = 'weur';
+          break;
+          case 'OC':
+            colo.cfRegionDO = 'oc';
+            break;
+        case 'SAS':
+        case 'SEAS':
+        case 'NEAS':
           colo.cfRegionDO = 'apac';
           break;
         case 'WNAM':
@@ -258,6 +320,10 @@ export default {
       await this.scheduled(null, env, ctx);
       return new Response('Yerp', { status: 200 });
     }
+    let v2 = url.pathname.includes("v2");
+    if (v2)
+      ctx.passThroughOnException(); // fall back to origin if using v2 paths
+
     if (url.searchParams.has('simple') || url.pathname == '/v2/colos/iata') {
       var newUrlMatch = `https://${url.hostname}/colonamessimple`;
       var tryMatch = await caches.default.match(newUrlMatch);
@@ -271,21 +337,27 @@ export default {
         getColos = await env.DB2.prepare('SELECT coloId as ID, coloName as IATA from colos order by coloId asc;').all();
       }
       var coloInfo = getColos.results;
+
+      if (!v2) {
+        results.warning = "Please switch to https://delay.cloudflare.chaika.me/v2/colos/iata for better reliability."
+      }
+
       var newResponse = new Response(JSON.stringify(coloInfo), { status: 200, headers: { "Content-Type": "application/json" } });
       newResponse.headers.append('Cache-Control', 'public, max-age=600, immutable');
       ctx.waitUntil(caches.default.put(newUrlMatch, newResponse.clone()));
       return newResponse;
     }
-    if (url.pathname == '/' || url.pathname == '/v2/colos/' || url.pathname == '/v2/colos/iataregion' ||  url.pathname == '/v2/colos/idregion')
+    if (url.pathname == '/' || url.pathname == '/v2/colos' || url.pathname == '/v2/colos/iataregionr2' ||  url.pathname == '/v2/colos/idregionr2')
     {
       let noMeta = url.searchParams.has("nometa");
       let extraCacheKey = noMeta ? "nometa" : "meta";
 
 
+
       let selectColumns = 'coloId as ID, coloName as IATA, region as cfRegionLB, friendlyLocation as niceName, Country as country,  latitude as lat, longitude as long';
 
-      let iataRegion = url.searchParams.has("iataregion") || url.pathname == '/v2/colos/iataregion';
-      let idRegion = url.searchParams.has("idregion")  || url.pathname == '/v2/colos/idregion';
+      let iataRegion = url.searchParams.has("iataregion") || url.pathname == '/v2/colos/iataregionr2';
+      let idRegion = url.searchParams.has("idregion")  || url.pathname == '/v2/colos/idregionr2';
       if (iataRegion || idRegion) noMeta = true;
       if (iataRegion) {
         selectColumns = 'coloName as IATA, region as cfRegionLB'
@@ -296,7 +368,11 @@ export default {
         extraCacheKey += "idRegion"
       }
 
-
+      if (!iataRegion && !idRegion && !v2) {
+        v2 = url.searchParams.has("enablev2onoldhostnameforinternalpurposesthisisunstabledonotusethisunlessyouknowwhatyouredoingandyoudont");
+      }
+      if (v2)
+        extraCacheKey += "v2";
 
       var newUrlMatch = `https://${url.hostname}/colonames${extraCacheKey}`;
       var tryMatch = await caches.default.match(newUrlMatch);
@@ -314,21 +390,37 @@ export default {
         ).all();
       }
       var coloInfo = getColos.results;
-      this.GetDORegions(coloInfo)
-
       var results: any = {}
+      if (v2)
+      {
+      this.GetDORegions(coloInfo);
+      this.GetR2Regions(coloInfo);
+      }
+      else {
+        this.GetDORegionsLegacy(coloInfo)
+        if (iataRegion) {
+          results.warning = "Please switch to https://delay.cloudflare.chaika.me/v2/colos/iataregionr2 for better reliability and separating out the DO and R2 Region Fields. In this API (v1), DO regions will be tied to R2 supported regions for legacy reasons. Nice Names may also be slightly different."
+        }
+        else if (idRegion) {
+          results.warning = "Please switch to https://delay.cloudflare.chaika.me/v2/colos/idregionr2 for better reliability and separating out the DO and R2 Region Fields. In this API (v1), DO regions will be tied to R2 supported regions for legacy reasons."
+        }
+        else {
+        results.warning = "Please switch to https://delay.cloudflare.chaika.me/v2/colos for better reliability and separating out the DO and R2 Region Fields. In this API (v1), DO regions will be tied to R2 supported regions for legacy reasons."
+        }
+      }
+
       if (iataRegion || idRegion) {
         results.results = {};
         if (iataRegion) {
           for (const colo of coloInfo) {
             if (colo.cfRegionDO)
-              results.results[colo.IATA] = colo.cfRegionDO;
+              results.results[colo.IATA] = v2 ? colo.cfRegionR2 : colo.cfRegionDO;
           }
         }
         else if (idRegion) {
           for (const colo of coloInfo) {
             if (colo.cfRegionDO)
-              results.results[colo.ID] = colo.cfRegionDO;
+              results.results[colo.ID] = v2 ? colo.cfRegionR2 :colo.cfRegionDO;
           }
         }
       }
