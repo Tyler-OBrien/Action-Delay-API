@@ -1,10 +1,13 @@
 name = "edge-log-processor"
 main = "src/index.ts"
-compatibility_date = "2023-11-12"
+compatibility_date = "2024-09-12"
 logpush = true
 account_id = "b9e510810e1e12fcd40826d266a1fb12"
-workers_dev = false
+workers_dev = true
 compatibility_flags = [ "nodejs_compat" ]
+
+
+
 
 
 analytics_engine_datasets = [
@@ -19,6 +22,8 @@ bindings = [{name = "BATCHER", class_name = "Batcher"}]
 
 
 
+[observability]
+enabled = true
 
 
 
