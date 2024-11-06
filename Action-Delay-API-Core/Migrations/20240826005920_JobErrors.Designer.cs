@@ -3,6 +3,7 @@ using System;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,13 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Action_Delay_API_Core.Migrations
 {
     [DbContext(typeof(ActionDelayDatabaseContext))]
-    partial class ActionDelayDatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20240826005920_JobErrors")]
+    partial class JobErrors
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.0-rc.1.24451.1")
+                .HasAnnotation("ProductVersion", "8.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -169,13 +172,6 @@ namespace Action_Delay_API_Core.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("ErrorType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("FirstSeen")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FirstService")
                         .IsRequired()
                         .HasColumnType("text");
 

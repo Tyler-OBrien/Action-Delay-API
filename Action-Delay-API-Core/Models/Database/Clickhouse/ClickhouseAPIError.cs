@@ -9,7 +9,7 @@ using Action_Delay_API_Core.Models.Errors;
 
 namespace Action_Delay_API_Core.Models.Database.Clickhouse
 {
-    public class ClickhouseAPIError
+    public class ClickhouseAPIError : IClickhouseError
     {
 
         public static ClickhouseAPIError? CreateFromCustomError(string jobName, CustomAPIError? error)
@@ -31,6 +31,11 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
                 Sha256Hash(newClickhouseError.ErrorDescription, newClickhouseError.ErrorType);
             return newClickhouseError;
         }
+
+        public static string Sha256Hash(CustomAPIError error) => Sha256Hash(error.SimpleErrorMessage,
+            String.IsNullOrWhiteSpace(error.WorkerStatusCode)
+                ? error.StatusCode.ToString()
+                : error.WorkerStatusCode);
         public static String Sha256Hash(string errorDescription, string errorType)
         {
             StringBuilder Sb = new StringBuilder();

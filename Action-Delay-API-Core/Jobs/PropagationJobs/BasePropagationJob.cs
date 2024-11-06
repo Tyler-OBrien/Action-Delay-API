@@ -120,6 +120,9 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     JobData.LastRunTime = JobData.CurrentRunTime;
                 }
 
+                JobData.JobType = JobType;
+                JobData.JobDescription = JobDescription;
+
                 JobData.CurrentRunStatus = Status.STATUS_PENDING;
                 JobData.CurrentRunLengthMs = null;
                 JobData.CurrentRunTime = DateTime.UtcNow;
@@ -388,6 +391,8 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         {
             try
             {
+                if (customApiError != null)
+                    await InsertTrackedError(_dbContext, customApiError, JobType, _logger);
                 await _clickHouseService.InsertRun(
                     new ClickhouseJobRun()
                     {

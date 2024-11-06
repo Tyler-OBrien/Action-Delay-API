@@ -21,9 +21,11 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
         public DbSet<GenericJobData> GenericJobData { get; set; }
 
         public DbSet<LocationData> LocationData { get; set; }
+        //public DbSet<LocationServiceData> LocationServiceData { get; set; }
 
         public DbSet<ColoData> ColoData { get; set; }
         public DbSet<MetalData> MetalData { get; set; }
+        public DbSet<JobError> JobErrors { get; set; }
 
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -38,7 +40,6 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             modelBuilder.Entity<JobData>().HasKey(job => job.InternalJobName);
 
 
-
             modelBuilder.Entity<JobDataLocation>().ToTable("JobLocations");
             modelBuilder.Entity<JobDataLocation>().HasKey(location => new  { location.InternalJobName, location.LocationName});
             modelBuilder.Entity<JobDataLocation>()
@@ -46,7 +47,15 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
                 .WithMany()
                 .HasForeignKey(location => location.InternalJobName);
 
+            /*
+            modelBuilder.Entity<LocationServiceData>().ToTable("ServiceLocations");
+            modelBuilder.Entity<LocationServiceData>().HasKey(location => location.LocationName );
+            modelBuilder.Entity<LocationServiceData>()
+                .HasOne<LocationData>()
+                .WithMany()
+                .HasForeignKey(location => location.LocationName);
 
+            */
 
             modelBuilder.Entity<GenericJobData>().ToTable("JobData");
             modelBuilder.Entity<GenericJobData>().HasKey(job => job.JobName);
@@ -59,6 +68,10 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
 
             modelBuilder.Entity<MetalData>().ToTable("MetalData");
             modelBuilder.Entity<MetalData>().HasKey(metal => new { metal.ColoId, metal.MachineID});
+
+            modelBuilder.Entity<JobError>().ToTable("JobErrors");
+            modelBuilder.Entity<JobError>().HasKey(job => job.ErrorHash);
+
 
         }
 

@@ -49,7 +49,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
         public override string Name => "Worker Analytics Delay Job";
         public override string InternalName => "workeranalytics";
 
-        public override string JobType => "CloudflareDelayAnalytics";
+        public override string JobType => "CloudflareDelay";
 
         public override string JobDescription => "How far back is the newest Worker Analytics event? Worker Analytics are also needed for tail to work.";
 

@@ -54,7 +54,7 @@ public class ZoneAnalyticsDelayJob : BaseJob
     public override string Name => "Zone Analytics Delay Job";
     public override string InternalName => "analytics";
 
-    public override string JobType => "CloudflareDelayAnalytics";
+    public override string JobType => "CloudflareDelay";
 
     public override string JobDescription => "How old is the newest http analytic?";
 

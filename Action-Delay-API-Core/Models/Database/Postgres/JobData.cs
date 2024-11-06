@@ -53,6 +53,8 @@ public class JobData
         this.CurrentRunLengthMs = data.CurrentRunLengthMs;
         this.CurrentRunStatus = data.CurrentRunStatus;
         this.APIResponseTimeUtc =  data.APIResponseTimeUtc;
+        this.JobType = data.JobType;
+        this.JobDescription = data.JobDescription;
         this.ColoId =  data.ColoId;
     }
 

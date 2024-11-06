@@ -10,7 +10,7 @@ using Action_Delay_API_Core.Models.Local;
 
 namespace Action_Delay_API_Core.Models.Database.Clickhouse
 {
-    public class ClickhouseAPIErrorPerf
+    public class ClickhouseAPIErrorPerf : IClickhouseError
     {
 
         public static ClickhouseAPIErrorPerf CreateFromCustomError(string jobName, CustomAPIErrorPerf error)
