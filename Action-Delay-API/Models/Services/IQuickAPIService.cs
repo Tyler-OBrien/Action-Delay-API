@@ -13,6 +13,10 @@ namespace Action_Delay_API.Models.Services
         public Task<Result<QuickAnalyticsResponse[]>> CompatibleWorkerScriptDeploymentAnalytics(string jobName,
             CancellationToken token);
 
+        public Task<Result<QuickAnalyticsResponse[]>> CompatibleWorkerScriptDeploymentAnalyticsByType(string jobType,
+            CancellationToken token);
+
+
         public Task<Result<JobDataResponse>> CompatibleWorkerScriptDeploymentCurrentRun(string jobName,
             CancellationToken token);
     }

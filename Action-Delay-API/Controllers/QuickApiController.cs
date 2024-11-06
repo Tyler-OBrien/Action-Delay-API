@@ -37,6 +37,14 @@ public class QuickApiController : CustomBaseController
     {
         return (await _quickApiService.CompatibleWorkerScriptDeploymentAnalytics(jobName, token)).MapToResult();
     }
+
+    [HttpGet("QuickAnalytics/type/{jobType}")]
+    [SwaggerResponse(200, Type = typeof(QuickAnalyticsAPI[]), Description = "On success, return a list of analytic responses")]
+
+    public async Task<IActionResult> CompatibleWorkerScriptDeploymentAnalyticsByType(string jobType, CancellationToken token)
+    {
+        return (await _quickApiService.CompatibleWorkerScriptDeploymentAnalyticsByType(jobType, token)).MapToResult();
+    }
     // GET: api/<ScrapeJobController>
     [HttpGet("CurrentInfo/{jobName}")]
     [SwaggerResponse(200, Type = typeof(JobDataResponse), Description = "On success, return Job Data Response")]

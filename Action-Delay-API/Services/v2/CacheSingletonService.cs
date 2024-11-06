@@ -1,6 +1,7 @@
 ﻿using Action_Delay_API.Models.Services.v2;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace Action_Delay_API.Services.v2;
 
@@ -11,7 +12,10 @@ public class CacheSingletonService : ICacheSingletonService
     public readonly ILogger _logger;
 
 
-    public static HashSet<string> INTERNAL_NAMES;
+    public static Dictionary<string, string> RESOLVE_TYPE;
+
+
+    public static Dictionary<string, string> INTERNAL_JOB_NAME_TO_TYPE;
     public static Dictionary<string, string> PUBLIC_TO_INTERNAL_NAMES;
     public static DateTime JOB_NAMES_LAST_CACHE = DateTime.MinValue;
 
@@ -28,8 +32,10 @@ public class CacheSingletonService : ICacheSingletonService
 
     public void CacheJobNames(List<JobData> jobs)
     {
-        Interlocked.Exchange(ref INTERNAL_NAMES, new HashSet<string>(jobs.Select(job => job.InternalJobName)));
+        Interlocked.Exchange(ref INTERNAL_JOB_NAME_TO_TYPE, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.InternalJobName, job => job.JobType));
         Interlocked.Exchange(ref PUBLIC_TO_INTERNAL_NAMES, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.JobName, job => job.InternalJobName));
+        Interlocked.Exchange(ref RESOLVE_TYPE, jobs.DistinctBy(job => job.JobType).ToDictionary(job => job.JobType, job => job.JobType, StringComparer.OrdinalIgnoreCase));
+
         JOB_NAMES_LAST_CACHE = DateTime.UtcNow;
     }
 
@@ -47,10 +53,49 @@ public class CacheSingletonService : ICacheSingletonService
     {
         await CacheJobNames(token);
 
-        if (INTERNAL_NAMES.Contains(jobName)) return jobName;
+        if (INTERNAL_JOB_NAME_TO_TYPE.ContainsKey(jobName)) return jobName;
+        if (INTERNAL_JOB_NAME_TO_TYPE.ContainsKey(jobName.Replace("%2F", "/"))) return jobName.Replace("%2F", "/"); // try ai variant
 
         if (PUBLIC_TO_INTERNAL_NAMES.TryGetValue(jobName, out var internalName)) return internalName;
+        if (PUBLIC_TO_INTERNAL_NAMES.TryGetValue(jobName.Replace("%2F", "/"), out var internalNameai)) return internalNameai; // try ai variant
         return null;
+
+    }
+
+    public async ValueTask<string> GetJobType(string jobType, CancellationToken token)
+    {
+        await CacheJobNames(token);
+
+        if (RESOLVE_TYPE.TryGetValue(jobType, out var resolvedType)) return resolvedType;
+
+        return jobType;
+    }
+
+    public async ValueTask<string?> GetJobTypeFromName(string jobName, CancellationToken token)
+    {
+        await CacheJobNames(token);
+
+        if (PUBLIC_TO_INTERNAL_NAMES.TryGetValue(jobName, out var internalName))
+        {
+            if (INTERNAL_JOB_NAME_TO_TYPE.TryGetValue(internalName, out var foundInternalJobType))
+                return foundInternalJobType;
+        }
+
+
+        if (INTERNAL_JOB_NAME_TO_TYPE.TryGetValue(jobName, out var foundJobType))
+            return foundJobType;
+        return null;
+    }
+
+    public async ValueTask<string[]> GetJobsByType(string jobType, CancellationToken token)
+    {
+        await CacheJobNames(token);
+
+
+        var getjobs =
+            INTERNAL_JOB_NAME_TO_TYPE.Where(jobKvp => jobKvp.Value.Equals(jobType, StringComparison.OrdinalIgnoreCase)).Select(job => job.Key);
+
+        return getjobs.ToArray();
 
     }
 
@@ -72,6 +117,7 @@ public class CacheSingletonService : ICacheSingletonService
 
         return LOCATION_NAMES;
     }
+
 
     public async ValueTask<bool> DoesLocationExist(string locationName, CancellationToken token)
     {

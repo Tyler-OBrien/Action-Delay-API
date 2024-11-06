@@ -21,12 +21,14 @@ namespace Action_Delay_API_Core.Models.Services
 
         Task<List<QuickAnalyticsAPI>> GetQuickAnalytics(string jobName, CancellationToken token = default);
 
-        Task<NormalJobAnalytics> GetNormalJobAnalytics(string jobName, DateTime startTime, DateTime endTime,
+        Task<List<QuickAnalyticsAPI>> GetQuickAnalytics(string type, string[] jobs, CancellationToken token = default);
+
+        Task<NormalJobAnalytics> GetNormalJobAnalytics(string jobName, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config,
             int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength,
             CancellationToken token = default);
 
          Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string jobName, string locationName,
-             DateTime startTime, DateTime endTime, int maxPoints = 100,
+             DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100,
              JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength,
              CancellationToken token = default);
 

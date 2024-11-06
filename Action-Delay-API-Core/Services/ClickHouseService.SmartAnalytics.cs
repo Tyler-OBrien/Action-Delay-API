@@ -62,26 +62,35 @@ namespace Action_Delay_API_Core.Services
             return new IntervalToUse(dataSetInfo.DataSet, dataSetInfo.Interval, dataSetInfo.Agg);
         }
 
-        public async Task<NormalJobAnalytics> GetNormalJobAnalytics(string jobName, DateTime startTime, DateTime endTime, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
+        public async Task<NormalJobAnalytics> GetNormalJobAnalytics(string jobName, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
             bool agg = output.Agg;
             string dataSetName = "";
             if (output.Dataset == DataSet.Minutely)
-                dataSetName = "job_runs";
+                dataSetName = config.NormalDataSet;
             else if (output.Dataset == DataSet.Per30Minutes)
-                dataSetName = "job_runs_mv_30_mins";
+                dataSetName = config.ThirtyMinDataSet;
             else if (output.Dataset == DataSet.Per12Hours)
-                dataSetName = "job_runs_mv_12_hours";
+                dataSetName = config.TwelthHourDataSet;
 
 
 
-            var columns = ReturnOptionsColumns(agg, option);
+            var columns = ReturnOptionsColumns(agg, config, option);
+
+            if (columns.Any() == false)
+            {
+                return new NormalJobAnalytics()
+                {
+                    Points = new List<NormalJobAnalyticsPoint>(),
+                    GroupByMinutesInterval = output.Interval,
+                };
+            }
 
             string commandText = "";
             if (agg == false)
                 commandText =
-                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and run_status = 'Deployed' Group by time_period ORDER BY time_period";
+                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and run_status = '{config.NormalDataSetRunStatusFilter}' Group by time_period ORDER BY time_period";
             else commandText =
                 $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} Group by time_period ORDER BY time_period";
 
@@ -107,22 +116,77 @@ namespace Action_Delay_API_Core.Services
                 GroupByMinutesInterval = output.Interval,
             };
         }
-
-        public async Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string jobName, string locationName, DateTime startTime, DateTime endTime, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
+        /*
+        public async Task<NormalJobAnalytics> GetNormalJobErrorAnalytics(string jobName, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
             bool agg = output.Agg;
             string dataSetName = "";
             if (output.Dataset == DataSet.Minutely)
-                dataSetName = "job_runs";
+                dataSetName = config.NormalDataSet;
             else if (output.Dataset == DataSet.Per30Minutes)
-                dataSetName = "job_runs_mv_30_mins";
+                dataSetName = config.ThirtyMinDataSet;
             else if (output.Dataset == DataSet.Per12Hours)
-                dataSetName = "job_runs_mv_12_hours";
+                dataSetName = config.TwelthHourDataSet;
 
 
 
-            var columns = ReturnOptionsColumns(agg, option);
+            var columns = ReturnOptionsColumns(agg, config, option);
+
+            if (columns.Any() == false)
+            {
+                return new NormalJobAnalytics()
+                {
+                    Points = new List<NormalJobAnalyticsPoint>(),
+                    GroupByMinutesInterval = output.Interval,
+                };
+            }
+
+            string commandText = "";
+            if (agg == false)
+                commandText =
+                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and run_status = '{config.NormalDataSetRunStatusFilter}' Group by time_period, error_hash ORDER BY time_period";
+            else commandText =
+                $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} Group by time_period, error_hash ORDER BY time_period";
+
+
+            await using var connection = CreateConnection();
+
+            await using var command = connection.CreateCommand();
+            command.AddParameter("startDateTime", "DateTime", startTime);
+            command.AddParameter("endDateTime", "DateTime", endTime);
+            command.AddParameter("jobName", "String", jobName);
+
+            command.CommandText = commandText;
+            var result = await command.ExecuteReaderAsync(token);
+            var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
+            List<NormalJobAnalyticsPoint> data = new List<NormalJobAnalyticsPoint>(predictedPoints);
+            while (await result.ReadAsync(token))
+            {
+                data.Add(NormalJobAnalyticsFromReader(result, option, false));
+            }
+            return new NormalJobAnalytics()
+            {
+                Points = data,
+                GroupByMinutesInterval = output.Interval,
+            };
+        }
+        */
+        public async Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string jobName, string locationName, DateTime startTime, DateTime endTime,JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
+        {
+            var output = PickRightDataSet(startTime, endTime, maxPoints);
+            bool agg = output.Agg;
+            string dataSetName = "";
+            if (output.Dataset == DataSet.Minutely)
+                dataSetName = config.NormalDataSet;
+            else if (output.Dataset == DataSet.Per30Minutes)
+                dataSetName = config.ThirtyMinDataSet;
+            else if (output.Dataset == DataSet.Per12Hours)
+                dataSetName = config.TwelthHourDataSet;
+
+
+
+            var columns = ReturnOptionsColumns(agg, config, option);
 
             string commandText = "";
             if (agg == false)
@@ -139,7 +203,9 @@ namespace Action_Delay_API_Core.Services
             command.AddParameter("endDateTime", "DateTime", endTime);
             command.AddParameter("jobName", "String", jobName);
 
+
             command.CommandText = commandText;
+
             var result = await command.ExecuteReaderAsync(token);
             var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
             List<NormalJobAnalyticsPoint> data = new List<NormalJobAnalyticsPoint>(predictedPoints);
@@ -155,33 +221,40 @@ namespace Action_Delay_API_Core.Services
             };
         }
 
-        private List<string> ReturnOptionsColumns(bool agg, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength)
+        private List<string> ReturnOptionsColumns(bool agg, JobAnalyticsConfiguration config, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength)
         {
             List<string> columns = new List<string>();
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.MinRunLength))
-                columns.Add(agg ? "minMerge(min_run_length) as min_run_length" : "min(run_length) as min_run_length");
+            Dictionary<JobAnalyticsRequestOptions, string> columnNameDict = null;
+            if (agg)
+                columnNameDict = config.ColumnNamesAgg;
+            else 
+                columnNameDict = config.ColumnNames;
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.MaxRunLength))
-                columns.Add(agg ? "maxMerge(max_run_length) as max_run_length" : "max(run_length) as max_run_length");
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.AvgRunLength))
-                columns.Add(agg ? "avgMerge(avg_run_length) as avg_run_length" : "avg(run_length) as avg_run_length");
+            if (option.HasFlag(JobAnalyticsRequestOptions.MinRunLength) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.MinRunLength, out var colNameMinRunLength))
+                columns.Add(agg ? $"minMerge({colNameMinRunLength}) as min_run_length" : $"min({colNameMinRunLength}) as min_run_length");
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.MedianRunLength))
-                columns.Add(agg ? "medianMerge(median_run_length) as median_run_length" : "median(run_length) as median_run_length");
+            if (option.HasFlag(JobAnalyticsRequestOptions.MaxRunLength) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.MaxRunLength, out var colNameMaxRunLength))
+                columns.Add(agg ? $"maxMerge({colNameMaxRunLength}) as max_run_length" : $"max({colNameMaxRunLength}) as max_run_length");
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.MinResponseLatency))
-                columns.Add(agg ? "minMerge(min_response_latency) as min_response_latency" : "min(response_latency) as min_response_latency");
+            if (option.HasFlag(JobAnalyticsRequestOptions.AvgRunLength) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.AvgRunLength, out var colNameAvgRunLength))
+                columns.Add(agg ? $"avgMerge({colNameAvgRunLength}) as avg_run_length" : $"avg({colNameAvgRunLength}) as avg_run_length");
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.MaxResponseLatency))
-                columns.Add(agg ? "maxMerge(max_response_latency) as max_response_latency" : "max(response_latency) as max_response_latency");
+            if (option.HasFlag(JobAnalyticsRequestOptions.MedianRunLength) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.MedianRunLength, out var colNameMedianRunLength))
+                columns.Add(agg ? $"medianMerge({colNameMedianRunLength}) as median_run_length" : $"median({colNameMedianRunLength}) as median_run_length");
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.AvgResponseLatency))
-                columns.Add(agg ? "avgMerge(avg_response_latency) as avg_response_latency" : "avg(response_latency) as avg_response_latency");
+            if (option.HasFlag(JobAnalyticsRequestOptions.MinResponseLatency) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.MinResponseLatency, out var colNameMinResponseLatency))
+                columns.Add(agg ? $"minMerge({colNameMinResponseLatency}) as min_response_latency" : $"min({colNameMinResponseLatency}) as min_response_latency");
 
-            if (option.HasFlag(JobAnalyticsRequestOptions.MedianResponseLatency))
-                columns.Add(agg ? "medianMerge(median_response_latency) as median_response_latency" : "median(response_latency) as median_response_latency");
+            if (option.HasFlag(JobAnalyticsRequestOptions.MaxResponseLatency) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.MaxResponseLatency, out var colNameMaxResponseLatency))
+                columns.Add(agg ? $"maxMerge({colNameMaxResponseLatency}) as max_response_latency" : $"max({colNameMaxResponseLatency}) as max_response_latency");
+
+            if (option.HasFlag(JobAnalyticsRequestOptions.AvgResponseLatency) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.AvgResponseLatency, out var colNameAvgResponseLatency))
+                columns.Add(agg ? $"avgMerge({colNameAvgResponseLatency}) as avg_response_latency" : $"avg({colNameAvgResponseLatency}) as avg_response_latency");
+
+            if (option.HasFlag(JobAnalyticsRequestOptions.MedianResponseLatency) && columnNameDict.TryGetValue(JobAnalyticsRequestOptions.MedianResponseLatency, out var colNameMedianResponseLatencyValue))
+                columns.Add(agg ? $"medianMerge({colNameMedianResponseLatencyValue}) as median_response_latency" : $"median({colNameMedianResponseLatencyValue}) as median_response_latency");
             return columns;
         }
 

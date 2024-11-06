@@ -75,3 +75,115 @@ ALTER TABLE job_runs_locations_perf
 
 
 ALTER TABLE job_runs_locations_perf RENAME COLUMN colo_id TO location_id
+
+
+CREATE MATERIALIZED VIEW job_runs_perf_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    minState(average_response_latency) as min_average_response_latency,
+    maxState(average_response_latency) as max_average_response_latency,
+    avgState(average_response_latency) as avg_average_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(average_response_latency) as quan_average_response_latency
+FROM job_runs_perf
+where run_status = 'Success'
+GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+
+
+
+CREATE MATERIALIZED VIEW job_runs_perf_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    minState(average_response_latency) as min_average_response_latency,
+    maxState(average_response_latency) as max_average_response_latency,
+    avgState(average_response_latency) as avg_average_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(average_response_latency) as quan_average_response_latency
+FROM job_runs_perf
+where run_status = 'Success'
+GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+
+
+
+
+
+CREATE MATERIALIZED VIEW job_runs_locations_perf_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    location_name,
+    average_time,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
+FROM job_runs_locations_perf
+where run_status = 'Success'
+GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+
+
+
+CREATE MATERIALIZED VIEW job_runs_locations_perf_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    location_name,
+    average_time,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
+FROM job_runs_locations_perf
+where run_status = 'Success'
+GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+
+
+
+CREATE MATERIALIZED VIEW api_errors_perf_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    location_name,
+    location_id,
+   error_hash,
+  countState()  error_count,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
+FROM api_errors_perf
+GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+
+
+
+CREATE MATERIALIZED VIEW api_errors_perf_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    location_name,
+   location_id,
+   error_hash,
+  countState()  error_count,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
+FROM api_errors_perf
+GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+

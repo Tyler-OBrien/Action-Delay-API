@@ -80,11 +80,11 @@ AS SELECT
     minState(run_length) as min_run_length,
     maxState(run_length) as max_run_length,
     avgState(run_length) as avg_run_length,
-    median(run_length) as median_run_length,
+    quantilesState(0.5, 0.9, 0.99)(run_length) as quan_run_length,
     minState(response_latency) as min_response_latency,
     maxState(response_latency) as max_response_latency,
     avgState(response_latency) as avg_response_latency,
-    quantilesState(0.5)(response_latency) as median_response_latency
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM job_runs
 where run_status = 'Deployed'
 GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
@@ -101,11 +101,11 @@ AS SELECT
     minState(run_length) as min_run_length,
     maxState(run_length) as max_run_length,
     avgState(run_length) as avg_run_length,
-    median(run_length) as median_run_length,
+    quantilesState(0.5, 0.9, 0.99)(run_length) as quan_run_length,
     minState(response_latency) as min_response_latency,
     maxState(response_latency) as max_response_latency,
     avgState(response_latency) as avg_response_latency,
-    quantilesState(0.5)(response_latency) as median_response_latency
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM job_runs
 where run_status = 'Deployed'
 GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
@@ -125,11 +125,11 @@ AS SELECT
     minState(run_length) as min_run_length,
     maxState(run_length) as max_run_length,
     avgState(run_length) as avg_run_length,
-    quantilesState(0.5)(run_length) as median_run_length,
+    quantilesState(0.5, 0.9, 0.99)(run_length) as quan_run_length,
     minState(response_latency) as min_response_latency,
     maxState(response_latency) as max_response_latency,
     avgState(response_latency) as avg_response_latency,
-    quantilesState(0.5)(response_latency) as median_response_latency
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM job_runs_locations
 where run_status = 'Deployed'
 GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
@@ -147,14 +147,50 @@ AS SELECT
     minState(run_length) as min_run_length,
     maxState(run_length) as max_run_length,
     avgState(run_length) as avg_run_length,
-    quantilesState(0.5)(run_length) as median_run_length,
+    quantilesState(0.5, 0.9, 0.99)(run_length) as quan_run_length,
     minState(response_latency) as min_response_latency,
     maxState(response_latency) as max_response_latency,
     avgState(response_latency) as avg_response_latency,
-    quantilesState(0.5)(response_latency) as median_response_latency
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM job_runs_locations
 where run_status = 'Deployed'
 GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+
+
+
+CREATE MATERIALIZED VIEW api_errors_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+    error_hash,
+  countState()  error_count,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
+FROM api_errors
+GROUP BY job_name, error_hash, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+
+
+
+CREATE MATERIALIZED VIEW api_errors_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    average_time,
+  countState()  error_count,
+   error_hash,
+    minState(response_latency) as min_response_latency,
+    maxState(response_latency) as max_response_latency,
+    avgState(response_latency) as avg_response_latency,
+    quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
+FROM api_errors
+GROUP BY job_name, error_hash, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
 
 
 

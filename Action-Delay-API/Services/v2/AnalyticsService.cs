@@ -106,6 +106,89 @@ public class AnalyticsService : IAnalyticsService
         return newJobAnalyticsPoint;
     }
 
+    public static JobAnalyticsConfiguration JobAnalyticsWorkersDelayConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs",
+        NormalDataSetRunStatusFilter = "Deployed",
+        ThirtyMinDataSet = "job_runs_mv_30_mins",
+        TwelthHourDataSet = "job_runs_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "min_run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "max_run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "avg_run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_response_latency" },
+        }
+    };
+    public static JobAnalyticsConfiguration JobAnalyticsAIConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_ai",
+        NormalDataSetRunStatusFilter = "Success",
+        ThirtyMinDataSet = "job_runs_ai_mv_30_mins",
+        TwelthHourDataSet = "job_runs_ai_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "average_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "average_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "average_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "average_response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "min_run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "max_run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "avg_run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_average_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_average_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_average_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_average_response_latency" },
+        }
+    };
+
+    public static JobAnalyticsConfiguration JobAnalyticsPerfConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_perf",
+        NormalDataSetRunStatusFilter = "Success",
+        ThirtyMinDataSet = "job_runs_perf_mv_30_mins",
+        TwelthHourDataSet = "job_runs_perf_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+
+            { JobAnalyticsRequestOptions.MinResponseLatency, "average_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "average_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "average_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "average_response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_average_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_average_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_average_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_average_response_latency" },
+        }
+    };
+
     public async Task<Result<DataResponse<NormalJobAnalyticsDTO>>> GetJobAnalytics(string jobName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
     {
         var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);
@@ -117,9 +200,18 @@ public class AnalyticsService : IAnalyticsService
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
+        var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
+
         var getCurrentJobStatusTask = _genericServersContext.JobData.FirstOrDefaultAsync(job => job.InternalJobName == tryGetJobInternalName, token);
-    
-        var getAnalyticsTask =  _clickhouseService.GetNormalJobAnalytics(jobName, startDateTime, endDateTime, maxPoints, options, token);
+
+        Task<NormalJobAnalytics> getAnalyticsTask = null;
+
+        if (getJobType?.Equals("AI", StringComparison.OrdinalIgnoreCase) ?? false) 
+            getAnalyticsTask =  _clickhouseService.GetNormalJobAnalytics(tryGetJobInternalName, startDateTime, endDateTime, JobAnalyticsAIConfig, maxPoints, options, token);
+        else if (getJobType?.Equals("Perf", StringComparison.OrdinalIgnoreCase) ?? false)
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(tryGetJobInternalName, startDateTime, endDateTime, JobAnalyticsPerfConfig, maxPoints, options, token);
+        else 
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(tryGetJobInternalName, startDateTime, endDateTime, JobAnalyticsWorkersDelayConfig, maxPoints, options, token);
         await Task.WhenAll(getAnalyticsTask, getCurrentJobStatusTask);
         var getCurrentJobStatus = getCurrentJobStatusTask.Result;
         var getAnalytics = getAnalyticsTask.Result;
@@ -129,9 +221,97 @@ public class AnalyticsService : IAnalyticsService
         {
             getAnalytics.Points.Add(JobDataFromOptions(getCurrentJobStatus, options));
         }
-        return new DataResponse<NormalJobAnalyticsDTO>(new NormalJobAnalyticsDTO(getAnalytics, jobName));
+        return new DataResponse<NormalJobAnalyticsDTO>(new NormalJobAnalyticsDTO(getAnalytics, tryGetJobInternalName));
 
     }
+
+    public static JobAnalyticsConfiguration JobLocationAnalyticsWorkersDelayConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_locations",
+        ThirtyMinDataSet = "job_runs_locations_mv_30_mins",
+        TwelthHourDataSet = "job_runs_locations_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "min_run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "max_run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "avg_run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_response_latency" },
+        }
+    };
+    public static JobAnalyticsConfiguration JobLocationAnalyticsAIConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_locations_ai",
+        ThirtyMinDataSet = "job_runs_locations_ai_mv_30_mins",
+        TwelthHourDataSet = "job_runs_locations_ai_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "min_run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "max_run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "avg_run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_response_latency" },
+        }
+    };
+
+    public static JobAnalyticsConfiguration JobLocationAnalyticsPerfConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_locations_perf",
+        ThirtyMinDataSet = "job_runs_locations_perf_mv_30_mins",
+        TwelthHourDataSet = "job_runs_locations_perf_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "min_run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "max_run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "avg_run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" }, 
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_response_latency" },
+        }
+    };
+
+
 
     public async Task<Result<DataResponse<NormalJobLocationAnalyticsDTO>>> GetJobAnalyticsLocation(string jobName, string locationName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
     {
@@ -148,8 +328,22 @@ public class AnalyticsService : IAnalyticsService
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
+        var getJobType = await _cacheSingletonService.GetJobType(tryGetJobInternalName, token);
 
-        var getAnalytics = await _clickhouseService.GetNormalJobLocationAnalytics(jobName, locationName, startDateTime, endDateTime, maxPoints, options, token);
-        return new DataResponse<NormalJobLocationAnalyticsDTO>(new NormalJobLocationAnalyticsDTO(getAnalytics, locationName, jobName));
+
+
+
+        Task<NormalJobAnalytics> tryGetAnalytics = null;
+
+        if (getJobType.Equals("AI", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(tryGetJobInternalName, locationName, startDateTime, endDateTime, JobLocationAnalyticsAIConfig, maxPoints, options, token);
+        else if (getJobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(tryGetJobInternalName, locationName, startDateTime, endDateTime, JobLocationAnalyticsPerfConfig, maxPoints, options, token);
+        else
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(tryGetJobInternalName, locationName, startDateTime, endDateTime, JobLocationAnalyticsWorkersDelayConfig, maxPoints, options, token);
+
+        var getAnalytics = await tryGetAnalytics;
+
+        return new DataResponse<NormalJobLocationAnalyticsDTO>(new NormalJobLocationAnalyticsDTO(getAnalytics, locationName, tryGetJobInternalName));
     }
 }

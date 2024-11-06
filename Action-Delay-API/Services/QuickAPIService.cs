@@ -30,9 +30,7 @@ namespace Action_Delay_API.Services
             _cacheSingletonService = cacheSingletonService;
             _logger = logger;
         }
-        // GET: api/<ScrapeJobController>
-        [HttpGet("QuickAnalytics/{jobName}")]
-        [SwaggerResponse(200, Type = typeof(DataResponse<List<Location>>), Description = "On success")]
+
 
         public async Task<Result<QuickAnalyticsResponse[]>> CompatibleWorkerScriptDeploymentAnalytics(string jobName, CancellationToken token)
         {
@@ -45,6 +43,23 @@ namespace Action_Delay_API.Services
             {
                 MedianRunLength = api.MedianRunLength,
                 Period = api.Period,
+            }).ToArray();
+        }
+
+        public async Task<Result<QuickAnalyticsResponse[]>> CompatibleWorkerScriptDeploymentAnalyticsByType(string jobType, CancellationToken token)
+        {
+
+            var tryGetCleanTyped = await _cacheSingletonService.GetJobType(jobType, token);
+            var tryGetJobInternalName = await _cacheSingletonService.GetJobsByType(jobType, token);
+            if (tryGetJobInternalName.Any() == false)
+                return Result.Fail(new ErrorResponse(404,
+                    "Could not find jobs by this type", "job_not_found"));
+
+            return (await _clickHouseService.GetQuickAnalytics(tryGetCleanTyped, tryGetJobInternalName, token)).Select(api => new QuickAnalyticsResponse()
+            {
+                MedianRunLength = api.MedianRunLength,
+                Period = api.Period,
+                JobName = api.JobName,
             }).ToArray();
         }
         // GET: api/<ScrapeJobController>

@@ -11,5 +11,14 @@ namespace Action_Delay_API.Models.Services.v2
         public ValueTask<string?> GetInternalJobName(string jobName, CancellationToken token);
 
         public ValueTask<bool> DoesLocationExist(string locationName, CancellationToken token);
+
+        public ValueTask<string?> GetJobTypeFromName(string jobName, CancellationToken token);
+
+
+        public ValueTask<string> GetJobType(string jobType, CancellationToken token);
+
+        public ValueTask<string[]> GetJobsByType(string jobType, CancellationToken token);
+
+
     }
 }

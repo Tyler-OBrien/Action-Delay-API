@@ -9,6 +9,12 @@ namespace Action_Delay_API_Core.Models.API.Quick
 {
     public class QuickAnalyticsAPI
     {
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("job_name")]
+
+        public string JobName { get; set; }
+
         [JsonPropertyName("period")]
 
         public string Period { get; set; }
