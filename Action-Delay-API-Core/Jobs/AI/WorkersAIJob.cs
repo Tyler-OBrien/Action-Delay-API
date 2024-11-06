@@ -71,7 +71,7 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         public override async Task BaseRun()
         {
-            AIGetModelsResponse.AIGetModelsResponseDTO[] models = null;
+            List<AIGetModelsResponse.AIGetModelsResponseDTO> models = null;
             var tryFindData = await _dbContext.GenericJobData.FirstOrDefaultAsync(data => data.JobName == InternalName);
 
             var tryGetAIModels =
@@ -88,7 +88,7 @@ namespace Action_Delay_API_Core.Jobs.AI
             if (tryGetAIModels.IsSuccess && (tryGetAIModels.Value?.Result?.Any() ?? false))
             {
                 var getValue = tryGetAIModels.Value;
-                models = getValue.Result;
+                models = getValue.Result.ToList();
                 if (tryFindData == null)
                 {
                     tryFindData = new GenericJobData()
@@ -109,12 +109,45 @@ namespace Action_Delay_API_Core.Jobs.AI
                 var getModels =
                     JsonSerializer.Deserialize<AIGetModelsResponse.AIGetModelsResponseDTO[]>(
                         tryFindData.Value);
-                models = getModels;
+                models = getModels.ToList();
             }
             else
             {
                 throw new Exception("Could not get model data, nothing in DB and API did not respond right.");
             }
+
+            var tryGetStaticDBData = await _dbContext.GenericJobData.FirstOrDefaultAsync(data => data.JobName == InternalName + "_static");
+            if (tryGetStaticDBData != null)
+            {
+                int injectedModels = 0;
+                try
+                {
+                    var getStaticModels =
+                        JsonSerializer.Deserialize<AIGetModelsResponse.AIGetModelsResponseDTO[]>(
+                            tryGetStaticDBData.Value);
+                    foreach (var staticModel in getStaticModels)
+                    {
+                        var tryGetCurrent = models.FirstOrDefault(model =>
+                            model.Name.Equals(staticModel.Name, StringComparison.OrdinalIgnoreCase));
+                        if (tryGetCurrent == null)
+                        {
+                            models.Add(staticModel);
+                            injectedModels += 1;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deseralizing custom static ai model config data");
+                }
+
+                _logger.LogInformation($"Injected {injectedModels} models from static config");
+            }
+            else
+            {
+                _logger.LogInformation($"No Static models from ${InternalName + "_static"}");
+            }
+
 
             var locationsEnabled = new HashSet<string>(_config.AI.Locations, StringComparer.OrdinalIgnoreCase);
             var getUsableLocations = _config.Locations.Where(location =>
@@ -145,7 +178,51 @@ namespace Action_Delay_API_Core.Jobs.AI
             {
                 if (Runs.Any())
                 {
-                    await _clickHouseService.InsertRunAI(Runs.ToList(), Locations.ToList(), Errors.ToList());
+                    try
+                    {
+                        foreach (var run in Runs)
+                        {
+                            var tryGetJob = await _dbContext.JobData.AsTracking().FirstOrDefaultAsync(job => job.InternalJobName == run.JobName);
+                            if (tryGetJob == null)
+                            {
+                                var newJobData  = tryGetJob = new JobData()
+                                {
+                                    JobName = run.JobName,
+                                    InternalJobName = run.JobName,
+                                    JobType = "AI",
+                                    JobDescription = "AI Model Run"
+                                };
+                                _dbContext.JobData.Add(newJobData);
+                            }
+                            else
+                            {
+                                tryGetJob.LastRunStatus = tryGetJob.CurrentRunStatus;
+                                tryGetJob.LastRunLengthMs = tryGetJob.CurrentRunLengthMs;
+                                tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
+                            }
+
+                            tryGetJob.CurrentRunTime = run.RunTime;
+                            tryGetJob.CurrentRunLengthMs = run.ResponseLatency; // for AI jobs, RunLength = Tokens, ResponseLatency = Latency
+                            tryGetJob.CurrentRunStatus = run.RunStatus;
+                        }
+                        await TrySave(true);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Issue saving to Db");
+                    }
+                    var errorList = Errors.ToList();
+                    try
+                    {
+                        await InsertTrackedErrors(_dbContext, errorList, JobType, _logger);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error logging errors to postgres");
+                    }
+
+                    await _clickHouseService.InsertRunAI(Runs.ToList(), Locations.ToList(), errorList);
                 }
                 Runs.Clear();
                 Locations.Clear();
@@ -319,6 +396,8 @@ namespace Action_Delay_API_Core.Jobs.AI
                 }
 
 
+      
+
                 FinishedRunInsertLater(
                     new ClickhouseJobRun()
                     {
@@ -409,12 +488,13 @@ namespace Action_Delay_API_Core.Jobs.AI
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name },
                     { "APIKEY", _config.AI.AIWorkerSecret}
                 },
                 URL = "https://" + _config.AI.AIWorkerHostname,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true,
+                NoResponseHeaders = true,
+                ReturnBody = false,
             };
             newRequest.SetDefaultsFromLocation(location);
             return await _queue.HTTP(newRequest, location, token);
@@ -428,7 +508,6 @@ namespace Action_Delay_API_Core.Jobs.AI
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name },
                     { "APIKEY", _config.AI!.AIWorkerSecret},
                     { "model", config.ModelName},
                     { "input", config.Input},
@@ -443,7 +522,11 @@ namespace Action_Delay_API_Core.Jobs.AI
                 BodyBytes = config.Content,
                 Method = MethodType.POST,
                 RetriesCount = 0,
+                NoResponseHeaders = true
+
             };
+            if (String.IsNullOrEmpty(config.OutputTypeCheck) == false)
+                newRequest.Headers["OutputTypeCheck"] = config.OutputTypeCheck;
             newRequest.SetDefaultsFromLocation(location);
             if (config.MaxTokens.HasValue && config.MaxTokens.Value > 0)
                 newRequest.Headers.Add("maxTokens", config.MaxTokens.Value.ToString());

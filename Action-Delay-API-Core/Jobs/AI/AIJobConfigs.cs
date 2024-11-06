@@ -66,6 +66,42 @@ namespace Action_Delay_API_Core.Jobs.AI
                     }
                 }
 
+
+
+            // NOT SUREIF THESE WILL CHANGE CATEGORIES SO
+
+            if (model.Name.Equals("@cf/meta/llama-3.2-11b-vision-instruct", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("2cbc033b-ded8-4e02-bbb2-47cf05d5cfe5", StringComparison.Ordinal))
+            {
+                return new AIJobConfig()
+                {
+                    ModelName = model.Name,
+                    Input = "raw",
+                    InputField = "n/a",
+                    OutputType = "json",
+                    ContentStr = (System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        prompt = GetImageGenText(),
+                        image = $"$base64touint8array:{(Convert.ToBase64String(GetNewImage()))}"
+                    })),
+                };
+            }
+
+            if (model.Name.Equals("@cf/myshell-ai/melotts", StringComparison.OrdinalIgnoreCase)) // idk GUID!!!
+            {
+                return new AIJobConfig()
+                {
+                    ModelName = model.Name,
+                    Input = "text",
+                    InputField = "prompt",
+                    OutputType = "JsonCheckFieldStr",
+                    OutputTypeCheck = "audio",
+                    ContentStr = GetText(),
+                };
+            }
+
+
+
+
             // Automatic Speech Recognition / dfce1c48-2a81-462e-a7fd-de97ce985207 
             if (model.Task.Name.Equals("Automatic Speech Recognition", StringComparison.OrdinalIgnoreCase) || model.Task.Id.Equals("dfce1c48-2a81-462e-a7fd-de97ce985207", StringComparison.Ordinal))
             {
@@ -246,6 +282,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                         ContentStr = GetText(),
                     };
                 }
+           
                 else if (model.Name.Equals("@cf/runwayml/stable-diffusion-v1-5-img2img", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("19547f04-7a6a-4f87-bf2c-f5e32fb12dc5", StringComparison.Ordinal))
                 {
                     return new AIJobConfig()
@@ -275,6 +312,20 @@ namespace Action_Delay_API_Core.Jobs.AI
                             image = $"$base64touint8array:{Convert.ToBase64String(GetNewImage())}",
                             mask = $"$base64touint8array:{Convert.ToBase64String(GetNewImage())}"
                         }),
+                    };
+                }
+                else if ((model.Name.Equals("@cf/black-forest-labs/flux-1-schnell",
+                              StringComparison.OrdinalIgnoreCase) ||
+                          model.Id.Equals("9e087485-23dc-47fa-997d-f5bfafc0c7cc", StringComparison.Ordinal)))
+                {
+                    return new AIJobConfig()
+                    {
+                        ModelName = model.Name,
+                        Input = "text",
+                        InputField = "prompt",
+                        OutputType = "JsonCheckFieldStr",
+                        OutputTypeCheck = "image",
+                        ContentStr = GetText(),
                     };
                 }
                 // no fallback for this type.
@@ -417,6 +468,8 @@ namespace Action_Delay_API_Core.Jobs.AI
         public string InputField { get; set; }
 
         public string OutputType { get; set; }
+
+        public string OutputTypeCheck { get; set; }
 
         public int? MaxTokens { get; set; } = 100;
 
