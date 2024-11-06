@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -14,6 +14,8 @@ using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Jobs.AI;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace Action_Delay_API_Core.Jobs.Performance
 {
@@ -64,7 +66,54 @@ namespace Action_Delay_API_Core.Jobs.Performance
             {
                 if (Runs.Any())
                 {
-                    await _clickHouseService.InsertRunPerf(Runs, Locations, Errors);
+                    try
+                    {
+                        foreach (var run in Runs)
+                        {
+                            var tryGetJob = await _dbContext.JobData.AsTracking()
+                                .FirstOrDefaultAsync(job => job.InternalJobName == run.JobName);
+                            if (tryGetJob == null)
+                            {
+                                var newJobData = tryGetJob = new JobData()
+                                {
+                                    JobName = run.JobName,
+                                    InternalJobName = run.JobName,
+                                    JobType = "Perf",
+                                    JobDescription = "Upload Test"
+                                };
+                                _dbContext.JobData.Add(newJobData);
+                            }
+                            else
+                            {
+                                tryGetJob.LastRunStatus = tryGetJob.CurrentRunStatus;
+                                tryGetJob.LastRunLengthMs = tryGetJob.CurrentRunLengthMs;
+                                tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
+                            }
+
+                            tryGetJob.CurrentRunTime = run.RunTime;
+                            tryGetJob.CurrentRunLengthMs =
+                                run.ResponseLatency; // for Perf jobs, Latency = Latency
+                            tryGetJob.CurrentRunStatus = run.RunStatus;
+                        }
+
+                        await TrySave(true);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Issue saving to Db");
+                    }
+
+                    var errorList = Errors.ToList();
+                    try
+                    {
+                        await InsertTrackedErrors(_dbContext, errorList, JobType, _logger);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error logging errors to postgres");
+                    }
+                    await _clickHouseService.InsertRunPerf(Runs.ToList(), Locations.ToList(), errorList);
                 }
 
                 Runs.Clear();
@@ -197,9 +246,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             if (tryGetValue.ProxyFailure == false)
                             {
                                 var newError = new CustomAPIErrorPerf(
-                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(100),
+                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(255),
                                     (int)(tryGetValue.StatusCode),
-                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(100),
+                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(255),
                                     tryGetValue.StatusCode.ToString(), tryGetValue.ResponseTimeMs,
                                     GetColoId(tryGetValue.Headers));
                                 newError.LocationName = completedLocation.Name;
@@ -287,9 +336,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
         }
 
 
-        public List<ClickhouseJobRunPerf> Runs = new List<ClickhouseJobRunPerf>();
-        public List<ClickhouseJobLocationRunPerf> Locations = new List<ClickhouseJobLocationRunPerf>();
-        public List<ClickhouseAPIErrorPerf> Errors = new List<ClickhouseAPIErrorPerf>();
+        public ConcurrentBag<ClickhouseJobRunPerf> Runs = new ConcurrentBag<ClickhouseJobRunPerf>();
+        public ConcurrentBag<ClickhouseJobLocationRunPerf> Locations = new ConcurrentBag<ClickhouseJobLocationRunPerf>();
+        public ConcurrentBag<ClickhouseAPIErrorPerf> Errors = new ConcurrentBag<ClickhouseAPIErrorPerf>();
 
         public void FinishedRunInsertLater(ClickhouseJobRunPerf run, List<ClickhouseJobLocationRunPerf>? locations,
             List<ClickhouseAPIErrorPerf>? apiError = null)
@@ -341,7 +390,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
-                    { "Worker", location.DisplayName ?? location.Name },
                 },
                 URL = resolvedUrl.ToString(),
                 TimeoutMs = 10_000,

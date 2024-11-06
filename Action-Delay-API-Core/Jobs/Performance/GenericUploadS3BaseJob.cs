@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -15,6 +15,8 @@ using Action_Delay_API_Core.Models.NATS;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
+using Minio.Handlers;
 
 namespace Action_Delay_API_Core.Jobs.Performance
 {
@@ -59,13 +61,60 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 runningJobs.Add(RunSpecificJob(uploadTask));
             }
 
-            runningJobs.Add(Task.Delay(5000));
+            runningJobs.Add(Task.Delay(1000));
             await Task.WhenAll(runningJobs);
             try
             {
                 if (Runs.Any())
                 {
-                    await _clickHouseService.InsertRunPerf(Runs.ToList(), Locations.ToList(), Errors.ToList());
+                    try
+                    {
+                        foreach (var run in Runs)
+                        {
+                            var tryGetJob = await _dbContext.JobData.AsTracking()
+                                .FirstOrDefaultAsync(job => job.InternalJobName == run.JobName);
+                            if (tryGetJob == null)
+                            {
+                                var newJobData = tryGetJob = new JobData()
+                                {
+                                    JobName = run.JobName,
+                                    InternalJobName = run.JobName,
+                                    JobType = "Perf",
+                                    JobDescription = "S3 Upload Test"
+                                };
+                                _dbContext.JobData.Add(newJobData);
+                            }
+                            else
+                            {
+                                tryGetJob.LastRunStatus = tryGetJob.CurrentRunStatus;
+                                tryGetJob.LastRunLengthMs = tryGetJob.CurrentRunLengthMs;
+                                tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
+                            }
+
+                            tryGetJob.CurrentRunTime = run.RunTime;
+                            tryGetJob.CurrentRunLengthMs =
+                                run.ResponseLatency; // for Perf jobs, Latency = Latency
+                            tryGetJob.CurrentRunStatus = run.RunStatus;
+                        }
+
+                        await TrySave(true);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Issue saving to Db");
+                    }
+
+                    var errorList = Errors.ToList();
+                    try
+                    {
+                        await InsertTrackedErrors(_dbContext, errorList, JobType, _logger);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error logging errors to postgres");
+                    }
+                    await _clickHouseService.InsertRunPerf(Runs.ToList(), Locations.ToList(), errorList);
                 }
 
                 Runs.Clear();
@@ -78,7 +127,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
             }
 
             _logger.LogInformation($"Perf Run over");
-            await Task.Delay(TimeSpan.FromMinutes(1));
         }
 
 
@@ -455,6 +503,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     // if this worked, let's pull it back and look at what we get back!
                     newRequest.URL = getUrl;
                     newRequest.Method = MethodType.GET;
+                    newRequest.Headers.Remove("Content-MD5");
                     newRequest.ReturnBodySha256 = true;
                     newRequest.ReturnBodyOnError = false;
                     var tryGet = await _queue.HTTP(newRequest, location, token);
@@ -465,13 +514,33 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             tryPut.Value.WasSuccess = false;
                             tryPut.Value.StatusCode = HttpStatusCode.PreconditionFailed;
                             tryPut.Value.Body =
-                                $"Uploaded Content Hash: {getBytesSha256} was different then retrieved: {tryGet.Value.BodySha256}";
+                                $"Uploaded Content Hash was different then retrieved.";
                             var tryGetHeader = tryGet.ValueOrDefault.Headers.FirstOrDefault(headerkvp =>
                                 headerkvp.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase));
                             if (String.IsNullOrEmpty(tryGetHeader.Key) == false &&
                                 int.TryParse(tryGetHeader.Value, out var parsedContentLength) &&
                                 parsedContentLength != randomBytes.Length)
                                 tryPut.Value.Body += $" Content Length Different then expected: {parsedContentLength}";
+
+                            try
+                            {
+                                if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue &&
+                                    job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                                {
+                                    if (Directory.Exists("HashMissMash") == false)
+                                        Directory.CreateDirectory("HashMissMash");
+                                    await File.WriteAllBytesAsync($"HashMissMash/{objectName}", randomBytes, CancellationToken.None);
+                                    await File.WriteAllTextAsync($"HashMissMash/{objectName}",
+                                        $"{tryPut.Value.Body}. I thought we uploaded {getBytesSha256} but we actually got {tryGet.ValueOrDefault!.BodySha256}, md5: {md5Hash}, other response headers: {String.Join(" | ", tryGet.Value.Headers.Select(kvp => $"[{kvp.Key}] = [{kvp.Value}]"))}", CancellationToken.None);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error on KeepOldAndDumpToDiskOnMisMatch ");
+                                SentrySdk.CaptureException(ex);
+                            }
+
+
                             return tryPut;
                         }
                     }
@@ -481,6 +550,32 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     _logger.LogError(ex, "Error pulling back upload info");
                     SentrySdk.CaptureException(ex);
                 }
+
+                try
+                {
+                    if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue && job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                    {
+
+                        var deleteArgs = new RemoveObjectArgs().WithBucket(job.BucketName).WithObject(objectName);
+                        var tryGetHeader = tryPut.Value.Headers.FirstOrDefault(headerKvp =>
+                            headerKvp.Key.Equals("x-amz-version-id", StringComparison.OrdinalIgnoreCase));
+
+                        if ( String.IsNullOrWhiteSpace(tryGetHeader.Value) == false)
+                        {
+                            deleteArgs.WithVersionId(tryGetHeader.Value);
+                        }
+
+                        await client.RemoveObjectAsync(deleteArgs, CancellationToken.None);
+
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error pulling back upload info");
+                    SentrySdk.CaptureException(ex);
+                }
+
 
             }
 

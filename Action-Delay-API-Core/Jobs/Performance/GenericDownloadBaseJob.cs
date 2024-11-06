@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -12,6 +12,8 @@ using Action_Delay_API_Core.Models.NATS.Requests;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using Action_Delay_API.Extensions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Action_Delay_API_Core.Jobs.Performance
 {
@@ -57,7 +59,56 @@ namespace Action_Delay_API_Core.Jobs.Performance
             {
                 if (Runs.Any())
                 {
-                    await _clickHouseService.InsertRunPerf(Runs.ToList(), Locations.ToList(), Errors.ToList());
+
+                    try
+                    {
+                        foreach (var run in Runs)
+                        {
+                            var tryGetJob = await _dbContext.JobData.AsTracking()
+                                .FirstOrDefaultAsync(job => job.InternalJobName == run.JobName);
+                            if (tryGetJob == null)
+                            {
+                                var newJobData = tryGetJob = new JobData()
+                                {
+                                    JobName = run.JobName,
+                                    InternalJobName = run.JobName,
+                                    JobType = "Perf",
+                                    JobDescription = "Download Test"
+                                };
+                                _dbContext.JobData.Add(newJobData);
+                            }
+                            else
+                            {
+                                tryGetJob.LastRunStatus = tryGetJob.CurrentRunStatus;
+                                tryGetJob.LastRunLengthMs = tryGetJob.CurrentRunLengthMs;
+                                tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
+                            }
+
+                            tryGetJob.CurrentRunTime = run.RunTime;
+                            tryGetJob.CurrentRunLengthMs =
+                                run.ResponseLatency; // for Perf jobs, Latency = Latency
+                            tryGetJob.CurrentRunStatus = run.RunStatus;
+                        }
+
+                        await TrySave(true);
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Issue saving to Db");
+                    }
+
+                    var errorList = Errors.ToList();
+                    try
+                    {
+                        await InsertTrackedErrors(_dbContext, errorList, JobType, _logger);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error logging errors to postgres");
+                    }
+
+                    await _clickHouseService.InsertRunPerf(Runs.ToList(), Locations.ToList(), errorList);
                 }
                 Runs.Clear();
                 Locations.Clear();
@@ -74,6 +125,10 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         public async Task RunSpecificJob(DownloadJobGeneric downloadJobConfig)
         {
+            var allowedLocsHashset = new HashSet<string>(downloadJobConfig.AllowedEdgeLocations ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            var locationsToUse = _config.Locations.Where(location =>
+                location.Disabled == false && (allowedLocsHashset.Any() == false || allowedLocsHashset.Contains(location.Name) ) ).ToList();
+
             var name = downloadJobConfig.Name;
             var url = downloadJobConfig.Endpoint;
             string? resolvedDnsNameserverIP = null;
@@ -101,11 +156,10 @@ namespace Action_Delay_API_Core.Jobs.Performance
             }
 
             var cancellationTokenSource = new CancellationTokenSource();
-            var locstoUse = _config.Locations.Where(location => location.Disabled == false).ToList();
             try
             {
                 Dictionary<Location, Task> preInitWarmTasks = new();
-                foreach (var location in locstoUse)
+                foreach (var location in locationsToUse)
                 {
                     preInitWarmTasks.Add(location, SendRequestWarmup(location, downloadJobConfig, resolvedDnsNameserverIP, CancellationToken.None));
                 }
@@ -120,7 +174,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     {
                         _logger.LogCritical(ex,
                             $"{name}: Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}, removing from list..");
-                        locstoUse.Remove(preInitTask.Key);
+                        locationsToUse.Remove(preInitTask.Key);
                     }
                 }
                 _logger.LogInformation($"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {string.Join(", ", preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
@@ -137,7 +191,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             List<CustomAPIErrorPerf>? errors = new List<CustomAPIErrorPerf>();
 
-            var locations = locstoUse;
+            var locations = locationsToUse;
 
             // Start monitoring on each Location
             foreach (var location in locations)
@@ -207,10 +261,10 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             if (tryGetValue.ProxyFailure == false)
                             {
                                 var newError = new CustomAPIErrorPerf(
-                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(100) ??
+                                    tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(255) ??
                                     string.Empty,
                                     (int)(tryGetValue.StatusCode),
-                                    tryGetValue.Body?.IntelligentCloudflareErrorsFriendlyTruncate(100) ?? string.Empty,
+                                    tryGetValue.Body?.IntelligentCloudflareErrorsFriendlyTruncate(255) ?? string.Empty,
                                     tryGetValue.StatusCode.ToString(), tryGetValue.ResponseTimeMs,
                                     GetColoId(tryGetValue.Headers));
                                 newError.LocationName = completedLocation.Name;
@@ -351,7 +405,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
-                    { "Worker", location.DisplayName ?? location.Name },
                     { "APIKEY", _config.PerfConfig.Secret}
                 },
                 URL = resolvedUrl.ToString(),
