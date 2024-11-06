@@ -35,7 +35,7 @@ public class JSONErrorMiddleware : IMiddleware
             SentrySdk.CaptureException(ex);
             var errorResponse =
                 new ErrorResponse((context.Response.StatusCode >= 500 ? context.Response.StatusCode : 500), "Internal Server Error", "internal_error");
-
+            context.Response.StatusCode = (context.Response.StatusCode >= 500 ? context.Response.StatusCode : 500);
             await context.Response.WriteAsJsonAsync(errorResponse);
         }
     }
