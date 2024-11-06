@@ -127,6 +127,11 @@ namespace Action_Delay_API_Core.Jobs
             }
 
             var getResponse = tryGetResult.Value;
+            if (tryGetResult.Value.ProxyFailure)
+            {
+                _logger.LogInformation($"Proxy Failure {getResponse.Info}, aborting loc");
+                return new RunLocationResult("Proxy Failure", null, -1);
+            }
 
 
 
