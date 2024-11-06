@@ -57,7 +57,7 @@ namespace Action_Delay_API_Core.Services
             foreach (var location in _config.Locations.Where(location => location.Disabled == false))
             {
                var tryGetColoId = await RunLocation(location, CancellationToken.None);
-               var tryGetLatency = await RunLatency(location, CancellationToken.None);
+               var tryGetLatency = await RunLatency(location, CancellationToken.None, "cloudflare.com");
                var tryGetColoInfo = getAllCurrentColos.FirstOrDefault(colo => colo.ColoId == tryGetColoId);
 
                if (tryGetColoInfo == null)
@@ -104,6 +104,8 @@ namespace Action_Delay_API_Core.Services
                    tryGetCurrentLocationData.LastUpdate = DateTime.UtcNow;
 
                }
+
+               
             }
 
             foreach (var location in _config.Locations.Where(location => location.Disabled))
@@ -120,13 +122,13 @@ namespace Action_Delay_API_Core.Services
             _logger.LogInformation($"Finished running colo data update..");
         }
 
-        public async Task<double?> RunLatency(Location location, CancellationToken token)
+        public async Task<double?> RunLatency(Location location, CancellationToken token, string hostname)
         {
             try
             {
                 var newRequest = new NATSPingRequest()
                 {
-                    Hostname = "cloudflare.com",
+                    Hostname = hostname,
                     TimeoutMs = 10_000,
                     PingCount = 10
                 };
@@ -204,8 +206,6 @@ namespace Action_Delay_API_Core.Services
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Program.VERSION} Update Colo location"},
-                    { "Worker", location.DisplayName ?? location.Name }
-
                 },
                 URL = "https://debug.chaika.me",
                 TimeoutMs = 10_000,
