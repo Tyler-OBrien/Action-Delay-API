@@ -34,7 +34,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         protected Dictionary<Location, bool> FinishedLocationStatus { get; set; } = new Dictionary<Location, bool>();
         protected Dictionary<Location, JobDataLocation> RunningLocationsData { get; set; } = new Dictionary<Location, JobDataLocation>();
 
-        protected BasePropagationJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BasePropagationJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(apiBroker, config, logger, clickhouseService, context, queue)
+        protected BasePropagationJob(IOptions<LocalConfig> config, ILogger<BasePropagationJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService, context, queue)
         {
 
         }
@@ -108,6 +108,8 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     {
                         JobName = Name,
                         InternalJobName = InternalName,
+                        JobType = JobType,
+                        JobDescription = JobDescription,
                     };
                     _dbContext.JobData.Add(newJobData);
                     await TrySave(true);

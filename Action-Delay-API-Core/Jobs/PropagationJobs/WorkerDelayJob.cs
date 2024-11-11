@@ -16,6 +16,8 @@ namespace Action_Delay_API_Core.Jobs
 {
     public class WorkerDelayJob : BasePropagationJob
     {
+        private readonly ICloudflareAPIBroker _apiBroker;
+
         private string _generatedValue { get; set; }
         private int _repeatedRunCount = 1;
 
@@ -28,10 +30,11 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        public WorkerDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
             if (_jobConfig == null)
                 _jobConfig = _config.DelayJob;
+            _apiBroker = apiBroker;
         }
 
         public override string Name => "Worker Script Delay Job";

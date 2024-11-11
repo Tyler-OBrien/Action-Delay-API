@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -21,7 +21,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
     {
 
 
-        public GenericDownloadBaseJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<GenericDownloadBaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(apiBroker, config, logger, clickhouseService, context, queue)
+        public GenericDownloadBaseJob(IOptions<LocalConfig> config, ILogger<GenericDownloadBaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService, context, queue)
         {
         }
 

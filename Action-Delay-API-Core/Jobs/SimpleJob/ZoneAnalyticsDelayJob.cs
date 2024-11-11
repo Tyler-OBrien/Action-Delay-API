@@ -17,8 +17,11 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob;
 
 public class ZoneAnalyticsDelayJob : BaseJob
 {
-    public ZoneAnalyticsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<ZoneAnalyticsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+    private readonly ICloudflareAPIBroker _apiBroker;
+
+    public ZoneAnalyticsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<ZoneAnalyticsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
     {
+        _apiBroker = apiBroker;
     }
     public override int TargetExecutionSecond => 28;
 

@@ -14,8 +14,11 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
 {
     public class WorkerLogsDelayJob : BaseJob
     {
-        public WorkerLogsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerLogsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        private readonly ICloudflareAPIBroker _apiBroker;
+
+        public WorkerLogsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkerLogsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
+            _apiBroker = apiBroker;
         }
         public override int TargetExecutionSecond => 29;
         public override bool Enabled => _config.WorkerLogsDelayJob != null && (_config.WorkerLogsDelayJob.Enabled.HasValue == false || _config.WorkerLogsDelayJob is { Enabled: true });

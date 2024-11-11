@@ -16,6 +16,7 @@ namespace Action_Delay_API_Core.Jobs
 {
     public class WfPJob : BasePropagationJob
     {
+        private readonly ICloudflareAPIBroker _apiBroker;
 
         private string _generatedValue { get; set; }
 
@@ -27,8 +28,9 @@ namespace Action_Delay_API_Core.Jobs
         public override bool Enabled => _config.WfPJob != null && (_config.WfPJob.Enabled.HasValue == false || _config.WfPJob is { Enabled: true });
 
 
-        public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
+            _apiBroker = apiBroker;
         }
 
         public override string Name => "WfP User Script Delay Job";

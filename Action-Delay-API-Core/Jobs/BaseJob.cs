@@ -27,7 +27,6 @@ public class Status
 
 public abstract class BaseJob
 {
-    internal readonly ICloudflareAPIBroker _apiBroker;
     internal readonly LocalConfig _config;
     internal readonly ILogger _logger;
     internal readonly IClickHouseService _clickHouseService;
@@ -36,9 +35,8 @@ public abstract class BaseJob
 
 
 
-    protected BaseJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue)
+    protected BaseJob(IOptions<LocalConfig> config, ILogger<BaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue)
     {
-        _apiBroker = apiBroker;
         _config = config.Value;
         _logger = logger;
         _clickHouseService = clickhouseService;

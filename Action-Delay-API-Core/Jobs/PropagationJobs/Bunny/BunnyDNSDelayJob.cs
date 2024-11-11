@@ -1,48 +1,54 @@
-﻿using Action_Delay_API_Core.Models.Jobs;
-using Action_Delay_API_Core.Models.NATS.Requests;
-using FluentResults;
-using Action_Delay_API_Core.Models.NATS.Responses;
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.DNS;
-using Action_Delay_API_Core.Models.Local;
-using Action_Delay_API_Core.Models.Services;
-using Microsoft.Extensions.Options;
 using Action_Delay_API_Core.Models.Database.Postgres;
-using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.Errors;
-using Action_Delay_API_Core.Jobs.PropagationJobs;
+using Action_Delay_API_Core.Models.Jobs;
+using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.NATS.Requests;
+using Action_Delay_API_Core.Models.Services;
+using FluentResults;
+using Microsoft.Extensions.Options;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Action_Delay_API_Core.Models.NATS.Responses;
+using Action_Delay_API_Core.Broker.Bunny;
+using Action_Delay_API_Core.Models.BunnyAPI;
+using Action_Delay_API_Core.Models.BunnyAPI.DNS;
 
-namespace Action_Delay_API_Core.Jobs
+namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
 {
-    public class DNSDelayJob : BasePropagationJob
+    public class BunnyDNSDelayJob : BasePropagationJob
     {
 
-        private readonly ICloudflareAPIBroker _apiBroker;
+        private readonly IBunnyAPIBroker _apiBroker;
         internal DNSDelayJobConfig _jobConfig;
         internal string _valueToLookFor;
         private int _repeatedRunCount = 1;
 
-        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue )
+        public BunnyDNSDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyDNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
             if (_jobConfig == null)
-                _jobConfig = _config.DNSJob;
+                _jobConfig = _config.BunnyDNSJob;
             _apiBroker = apiBroker;
         }
 
 
-        
 
 
 
-        public override int TargetExecutionSecond => 10;
-        public override bool Enabled => _config.DNSJob != null && (_config.DNSJob.Enabled.HasValue == false || _config.DNSJob is { Enabled: true });
 
-        public override string Name => "DNS Delay Job";
-        public override string InternalName => "dns";
+        public override int TargetExecutionSecond => 13;
+        public override bool Enabled => _config.BunnyDNSJob != null && (_config.BunnyDNSJob.Enabled.HasValue == false || _config.BunnyDNSJob is { Enabled: true });
 
-        public override string JobType => "CloudflareDelay";
+        public override string Name => "Bunny DNS Delay Job";
+        public override string InternalName => "bunnydns";
 
-        public override string JobDescription => "Delay of an updated DNS Record being reflected on Edge on a paid zone";
+        public override string JobType => "BunnyDelay";
+
+        public override string JobDescription => "Delay of an updated DNS Record being reflected on Edge";
 
 
 
@@ -67,7 +73,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override async Task HandleCompletion()
         {
-          _logger.LogInformation($"Completed {Name}..");
+            _logger.LogInformation($"Completed {Name}..");
         }
 
         public override async Task PreWarmRunLocation(Location location)
@@ -75,7 +81,7 @@ namespace Action_Delay_API_Core.Jobs
             await SendRequest(location, CancellationToken.None);
         }
 
-        public  override async Task RunAction()
+        public override async Task RunAction()
         {
             _valueToLookFor = $"Automagically Updating DNS Record - Last Updated: {DateTime.UtcNow:R} - {Name} - Action Delay API {Program.VERSION} {_config.Location}";
             await RunRepeatableAction();
@@ -83,19 +89,14 @@ namespace Action_Delay_API_Core.Jobs
 
         public override async Task RunRepeatableAction()
         {
-            var newUpdateRequest = new UpdateRecordRequest()
+            var newUpdateRequest = new BunnyUpdateRecordRequest()
             {
-                Comment = "Automagically Updating DNS Record",
-                Content = _valueToLookFor + $" {_repeatedRunCount++}",
-                Name = _jobConfig.Name,
-                Proxied = false,
-                Ttl = 1,
-                Type = "TXT"
+                Value = _valueToLookFor + $" {_repeatedRunCount++}",
             };
             var tryPutAPI = await _apiBroker.UpdateDNSRecord(_jobConfig.RecordId, _jobConfig.ZoneId, newUpdateRequest, _jobConfig.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)
             {
-                _logger.LogCritical($"Failure updating worker script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
+                _logger.LogCritical($"Failure updating dns record, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
 
                 if (tryPutAPI.Errors?.FirstOrDefault() is CustomAPIError apiError) throw apiError;
                 throw new CustomAPIError(
@@ -131,6 +132,11 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.Value.ProxyFailure)
             {
                 _logger.LogInformation($"Proxy Failure {getResponse.Info}, aborting loc");
+                return new RunLocationResult("Proxy Failure", null, -1);
+            }
+            if (tryGetResult.Value.ResponseCode != "NoError" && (getResponse.Answers == null || getResponse.Answers.Any() == false ) )
+            {
+                _logger.LogInformation($"Proxy Failure {getResponse.Info} based on response {getResponse.ResponseCode}, aborting loc");
                 return new RunLocationResult("Proxy Failure", null, -1);
             }
 

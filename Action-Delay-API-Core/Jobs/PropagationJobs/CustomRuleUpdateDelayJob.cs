@@ -18,13 +18,16 @@ namespace Action_Delay_API_Core.Jobs
     public class CustomRuleUpdateDelayJob : BasePropagationJob
     {
 
- 
+        private readonly ICloudflareAPIBroker _apiBroker;
+
+
         private string _valueToLookFor;
         private int _repeatedRunCount = 1;
         private string _specialPath;
 
-        public CustomRuleUpdateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CustomRuleUpdateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        public CustomRuleUpdateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CustomRuleUpdateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
+            _apiBroker = apiBroker;
         }
 
 

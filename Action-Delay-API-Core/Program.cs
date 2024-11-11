@@ -6,6 +6,7 @@ using System.Security.Authentication;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker.Bunny;
 using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Jobs.AI;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -132,6 +133,14 @@ public class Program
 
 
                 services.AddTransient<ICloudflareAPIBroker, CloudflareAPIBroker>();
+
+                services.AddHttpClient<IBunnyAPIBroker, BunnyAPIBroker>()
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler(GetRetryPolicy());
+
+
+
+                services.AddTransient<IBunnyAPIBroker, BunnyAPIBroker>();
 
 
                 services.AddHttpClient<IColoDataBroker, ColoDataBroker>()

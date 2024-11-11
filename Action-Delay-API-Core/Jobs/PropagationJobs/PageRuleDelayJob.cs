@@ -16,13 +16,16 @@ using Microsoft.Extensions.Options;
 
 public class PageRuleDelayJob : BasePropagationJob
 {
+    private readonly ICloudflareAPIBroker _apiBroker;
+
     private string _valueToLookFor;
     private int _repeatedRunCount = 1;
 
     public PageRuleDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config,
         ILogger<PageRuleDelayJob> logger, IQueue queue, IClickHouseService clickHouse,
-        ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
     {
+        _apiBroker = apiBroker;
     }
 
 

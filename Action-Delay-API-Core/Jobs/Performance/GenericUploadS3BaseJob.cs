@@ -1,4 +1,4 @@
-﻿using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -22,9 +22,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
 {
     public class GenericUploadS3BaseJob : BaseJob
     {
-        public GenericUploadS3BaseJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config,
+        public GenericUploadS3BaseJob(IOptions<LocalConfig> config,
             ILogger<GenericUploadS3BaseJob> logger, IClickHouseService clickhouseService,
-            ActionDelayDatabaseContext context, IQueue queue) : base(apiBroker, config, logger, clickhouseService,
+            ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService,
             context, queue)
         {
         }

@@ -16,8 +16,11 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
 {
     public class CertificateDelayJob : BaseJob
     {
-        public CertificateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CertificateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        private readonly ICloudflareAPIBroker _apiBroker;
+
+        public CertificateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CertificateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
+            _apiBroker = apiBroker;
         }
         public override int TargetExecutionSecond => 25;
         public override bool Enabled => _config.CertRenewalDelayJob != null && (_config.CertRenewalDelayJob.Enabled.HasValue == false || _config.CertRenewalDelayJob is { Enabled: true });
@@ -39,6 +42,8 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                     {
                         JobName = Name,
                         InternalJobName = InternalName,
+                        JobDescription = JobDescription,
+                        JobType = JobType,
                     };
                     _dbContext.JobData.Add(newJobData);
                     await TrySave(true);

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -21,9 +21,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
 {
     public class GenericUploadBaseJob : BaseJob
     {
-        public GenericUploadBaseJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config,
+        public GenericUploadBaseJob(IOptions<LocalConfig> config,
             ILogger<GenericUploadBaseJob> logger, IClickHouseService clickhouseService,
-            ActionDelayDatabaseContext context, IQueue queue) : base(apiBroker, config, logger, clickhouseService,
+            ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService,
             context, queue)
         {
         }

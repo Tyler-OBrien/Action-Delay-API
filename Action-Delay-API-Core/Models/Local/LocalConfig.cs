@@ -49,6 +49,9 @@ namespace Action_Delay_API_Core.Models.Local
         public DNSDelayJobConfig? DNSJob { get; set; }
         public DNSDelayJobConfig? DNSJobFree { get; set; }
 
+        public DNSDelayJobConfig? BunnyDNSJob { get; set; }
+
+
         public CustomRuleUpdateConfig? WAFJob { get; set; }
         public CacheDelayJobConfig? CacheJob { get; set; }
         public ZoneAnalyticDelayJob? ZoneAnalyticsDelayJob { get; set; }

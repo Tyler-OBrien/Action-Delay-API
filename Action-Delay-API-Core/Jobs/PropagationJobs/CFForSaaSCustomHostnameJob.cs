@@ -21,6 +21,8 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 {
     public class CFForSaaSCustomHostnameJob : BasePropagationJob
     {
+        private readonly ICloudflareAPIBroker _apiBroker;
+
         private string _customHostnameId { get; set; }
 
         public override int TargetExecutionSecond => 20;
@@ -28,8 +30,9 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         public override bool Enabled => _config.CustomHostnamesDelayJob != null && (_config.CustomHostnamesDelayJob.Enabled.HasValue == false || _config.CustomHostnamesDelayJob is { Enabled: true });
 
 
-        public CFForSaaSCustomHostnameJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CFForSaaSCustomHostnameJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(apiBroker, config, logger, clickHouse, dbContext, queue)
+        public CFForSaaSCustomHostnameJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CFForSaaSCustomHostnameJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
+            _apiBroker = apiBroker;
         }
 
         public override TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)

@@ -51,11 +51,12 @@ namespace Action_Delay_API_Core.Jobs.AI
     }
     public class WorkersAIJob : BaseJob
     {
-
+        private readonly ICloudflareAPIBroker _apiBroker;
         private readonly IAIJobConfigs _jobConfigs;
-        public WorkersAIJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkersAIJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, IAIJobConfigs aiJobConfigs) : base(apiBroker, config, logger, clickhouseService, context, queue)
+        public WorkersAIJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkersAIJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, IAIJobConfigs aiJobConfigs) : base(config, logger, clickhouseService, context, queue)
         {
             _jobConfigs = aiJobConfigs;
+            _apiBroker = apiBroker;
         }
 
         public override string Name => "Workers AI";
