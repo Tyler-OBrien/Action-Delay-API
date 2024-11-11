@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -291,7 +291,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 if (finishedLocationStatus.Any(kvp => kvp.Value.Success))
                 {
                     averageOfSuccessFull = (ulong)finishedLocationStatus.Where(kvp => kvp.Value.Success)
-                        .Average(kvp => (double)kvp.Value.Duration);
+                        .Select(kvp => (double)kvp.Value.Duration)
+                        .Median();
 
                 }
 

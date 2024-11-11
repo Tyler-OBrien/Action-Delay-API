@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -306,8 +306,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 ulong averageOfSuccessFull = 0;
                 if (finishedLocationStatus.Any(kvp => kvp.Value.Success))
                 {
-                    averageOfSuccessFull = (ulong)finishedLocationStatus.Where(kvp => kvp.Value.Success)
-                        .Average(kvp => (double)kvp.Value.Duration);
+                    averageOfSuccessFull = (ulong)finishedLocationStatus.Where(kvp => kvp.Value.Success).Select(kvp => (double)kvp.Value.Duration)
+                        .Median();
 
                 }
 
