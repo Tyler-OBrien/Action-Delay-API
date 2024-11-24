@@ -20,7 +20,7 @@ class GetRegionResult {
 }
 
 
-const SUPPORTED_REGIONS = ['enam', 'wnam', 'weur', 'eeur', 'apac']
+const SUPPORTED_REGIONS = ['enam', 'wnam', 'weur', 'eeur', 'apac', 'oc']
 
 const handler = {
 	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -67,6 +67,7 @@ const handler = {
 					var newHeaders = new Headers(getCacheMatch.headers);
 					newHeaders.set("routing", "cache");
 					newHeaders.set("x-cache-dur", cacheDur.toString());
+					newHeaders.set("x-adp-dur", cacheDur.toString())
 					try {
 
 						if (env.AE)
@@ -111,6 +112,7 @@ const handler = {
 							"region": getBucketLocation.region,
 							"routing": getBucketLocation.routing,
 							"x-put-dur": putEnd.toString(),
+							"x-adp-dur": putEnd.toString(),
 						}
 					});
 				}
@@ -131,6 +133,7 @@ const handler = {
 						"region": getBucketLocation.region,
 						"routing": getBucketLocation.routing,
 						"x-put-dur": putEnd.toString(),
+						"x-adp-dur": putEnd.toString(),
 					}
 				})
 			}
@@ -149,7 +152,9 @@ const handler = {
 					console.log(exception)
 				}
 				console.log(exception);
-				return new Response(`Error R2 PUT: ${exception}`, { status: 500 });
+				return new Response(`Error R2 PUT: ${exception}`, { status: 500, headers: {
+					"x-adp-dur": putEnd.toString()
+				} });
 			}
 		}
 		var getDur = -1;
@@ -186,7 +191,9 @@ const handler = {
 				console.log(exception)
 			}
 			console.log(exception);
-			return new Response(`Error R2 GET: ${exception}`, { status: 500 });
+			return new Response(`Error R2 GET: ${exception}`, { status: 500, headers: {
+				"x-adp-dur": getDur.toString(),
+			} });
 		}
 
 
@@ -200,6 +207,7 @@ const handler = {
 			if (isCachingEnabled)
 				newResp.headers.set('x-cache-dur', cacheDur.toString());
 			newResp.headers.set('x-get-dur', getDur.toString());
+			newResp.headers.set('x-adp-dur', getDur.toString())
 			return newResp;
 		}
 
@@ -211,6 +219,7 @@ const handler = {
 		if (isCachingEnabled)
 			headers.set('x-cache-dur', cacheDur.toString());
 		headers.set('x-get-dur', getDur.toString());
+		headers.set('x-adp-dur', getDur.toString())
 
 
 		if (isCachingEnabled) {

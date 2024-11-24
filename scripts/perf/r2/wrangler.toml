@@ -35,6 +35,11 @@ binding = 'wnam'
 bucket_name = 'action-delay-api-perf-wnam'
 preview_bucket_name = 'action-delay-api-perf-wnam'
 
+[[r2_buckets]]
+binding = 'oc'
+bucket_name = 'action-delay-api-perf-oc'
+preview_bucket_name = 'action-delay-api-perf-oc'
+
 
 [[analytics_engine_datasets]]
 binding = "AE"

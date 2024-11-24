@@ -50,9 +50,11 @@ export default {
         case 'SAS':
         case 'SEAS':
         case 'NEAS':
-        case 'OC':
           colo.cfRegionR2 = 'apac';
           break;
+        case 'OC':
+            colo.cfRegionR2 = 'oc';
+            break;
         case 'WNAM':
           colo.cfRegionR2 = 'wnam';
           break;
@@ -80,9 +82,11 @@ export default {
         case 'SAS':
         case 'SEAS':
         case 'NEAS':
-        case 'OC':
           colo.cfRegionDO = 'apac';
           break;
+        case 'OC':
+            colo.cfRegionDO = 'oc';
+            break;
         case 'WNAM':
           colo.cfRegionDO = 'wnam';
           break;
