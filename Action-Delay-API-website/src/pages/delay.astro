@@ -1,52 +1,110 @@
 ---
-import { getCollection } from 'astro:content';
+import { getCollection } from "astro:content";
 
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from "../layouts/BaseLayout.astro";
 
-import JobDisplay from '../components/JobDisplay.astro';
-import Hero from '../components/Hero.astro';
-import Grid from '../components/Grid.astro';
-import type { QuickStats } from '../../models/cloudflare/quickstat';
-import type { Job } from '../../models/cloudflare/job';
-
+import JobDisplay from "../components/JobDisplay.astro";
+import Hero from "../components/Hero.astro";
+import Grid from "../components/Grid.astro";
+import type { QuickStats } from "../../models/cloudflare/quickstat";
+import type { Job } from "../../models/cloudflare/job";
+import SmartGraph from "../components/graph/SmartGraph";
 
 const getJobs = async () => {
-	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/CloudflareDelay")).json()).data
-}
-var getJobsTask = getJobs()
+  return (
+    await (
+      await fetch(
+        "https://delay.cloudflare.chaika.me/v2/jobs/type/CloudflareDelay"
+      )
+    ).json()
+  ).data;
+};
+var getJobsTask = getJobs();
 
 const getAnalytics = async () => {
-	return (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/CloudflareDelay")).json());
-}
-var getAnalyticsTask = getAnalytics()
+  return await (
+    await fetch(
+      "https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/CloudflareDelay"
+    )
+  ).json();
+};
+var getAnalyticsTask = getAnalytics();
 
 const jobs: Job[] = await getJobsTask;
 const stats: QuickStats[] = await getAnalyticsTask;
 
+// Define your priority groups
+const FIRST_GROUP = ["worker", "dns", 'waf'];  
+const LAST_GROUP = ["analytics", "wfp", 'cron', 'cert'];  
 
+const reorderedList = jobs
+  .filter(job => job.internalJobName !== "workertesting")
+  .sort((joba, jobb) => {
+    const jobAName = joba.internalJobName;
+    const jobBName = jobb.internalJobName;
 
+    // Check if jobs are in FIRST_GROUP
+    const aIsFirst = FIRST_GROUP.some(prefix => jobAName === prefix || jobAName.startsWith(prefix + "-"));
+    const bIsFirst = FIRST_GROUP.some(prefix => jobBName === prefix || jobBName.startsWith(prefix + "-"));
+    
+    // Check if jobs are in LAST_GROUP
+    const aIsLast = LAST_GROUP.some(prefix => jobAName === prefix || jobAName.startsWith(prefix + "-"));
+    const bIsLast = LAST_GROUP.some(prefix => jobBName === prefix || jobBName.startsWith(prefix + "-"));
+
+    if (aIsFirst && bIsFirst) {
+      // Both in first group - sort alphabetically within group
+      return jobAName.localeCompare(jobBName);
+    }
+    if (aIsLast && bIsLast) {
+      // Both in last group - sort alphabetically within group
+      return jobAName.localeCompare(jobBName);
+    }
+    
+    // Handle priority ordering
+    if (aIsFirst) return -1;  // a goes first
+    if (bIsFirst) return 1;   // b goes first
+    if (aIsLast) return 1;    // a goes last
+    if (bIsLast) return -1;   // b goes last
+
+    // Neither in special groups - sort alphabetically
+    return jobAName.localeCompare(jobBName);
+  });
 ---
-
+<script define:vars={{ reorderedList, stats }}>
+globalThis.jobData = reorderedList;
+globalThis.jobStats = stats;
+</script>
 <BaseLayout
-	title="Cloudflare Delay Monitoring"
-	description="See Cloudflare Delay Monitoring Jobs"
+  title="Cloudflare Delay Monitoring"
+  description="See Cloudflare Delay Monitoring Jobs"
 >
-	<div class="stack gap-20">
-		<main class="wrapper stack gap-8">
-			<Hero
-				title="Cloudflare Delay Jobs"
-				tagline="See Cloudflare Delay Monitoring Jobs"
-				align="start"
-			/>
-			<Grid>
-				{
-					jobs.map((job: Job) => (
-						<li>
-							<JobDisplay   type="job" job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
-							</li>
-					))
-				}
-			</Grid>
-		</main>
-	</div>
+  <div class="stack gap-20">
+    <main class="wrapper stack gap-8">
+      <Hero
+        title="Cloudflare Delay Jobs"
+        tagline="See Cloudflare Delay Monitoring Jobs"
+        align="start"
+      />
+      <a id="websocket-conn-status">Disconnected</a>
+      <Grid>
+        {
+          reorderedList.map((job: Job) => (
+            <li>
+              <JobDisplay
+                type="job"
+                job={job}
+                stats={stats.filter(
+                  (stat) => stat.job_name.toLowerCase() == job.internalJobName
+                )}
+              />
+            </li>
+          ))
+        }
+      </Grid>
+      <script src="/assets/js/8.0.7/signalr.min.js" is:inline> </script>
+      <script src="/assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
+      <script src="../scripts/signalr-delay-code.js"> </script>
+	  <SmartGraph endpoint=`/v2/jobs/analytics/type/CloudflareDelay` label=`Overall Cloudflare Delay Job API Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+    </main>
+  </div>
 </BaseLayout>

@@ -113,7 +113,7 @@ const ApexGraph = (props) => {
     chart: {
       id: chartUuid,
       type: 'line',
-      height: 400,
+      height: 1000,
       background: hasDarkClass ? '#171717' : '#fffff',
       zoom: {
         autoScaleYaxis: true,

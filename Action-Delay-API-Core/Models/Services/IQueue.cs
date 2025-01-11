@@ -12,6 +12,8 @@ namespace Action_Delay_API_Core.Models.Services
 
         Task<Result<SerializablePingResponse>> Ping(NATSPingRequest request, Location location, CancellationToken token);
 
+        Task JobStatusUpdate(string jobName, string? newStatus, ulong? runLength, DateTime? lastUpdate);
 
+        Task JobLocationUpdate(string jobName, string locationName, string? newStatus, ulong? runLength, DateTime? lastUpdate);
     }
 }

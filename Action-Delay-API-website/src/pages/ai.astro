@@ -9,8 +9,19 @@ import Grid from '../components/Grid.astro';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
 import type { Job } from '../../models/cloudflare/job';
 
-const jobs: Job[] = (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/ai")).json()).data;
-const stats: QuickStats[] = (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/ai")).json());
+
+const getJobs = async () => {
+	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/ai")).json()).data
+}
+var getJobsTask = getJobs()
+
+const getAnalytics = async () => {
+	return (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/ai")).json());
+}
+var getAnalyticsTask = getAnalytics()
+
+const jobs: Job[] = await getJobsTask;
+const stats: QuickStats[] = await getAnalyticsTask;
 
 ---
 

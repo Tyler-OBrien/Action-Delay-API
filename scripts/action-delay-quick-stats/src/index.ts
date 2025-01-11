@@ -178,6 +178,8 @@ export default {
         <div class="medians"></div>
         <div class="medians"></div>
 		<div class="links">
+                		<a href="https://delay.chaika.me/job/${apiName}">New Website w/ Graphs</a><br>
+        <br>
 		<a href="https://dns.cloudflare.chaika.me">DNS Delay (Paid)</a><br>
 		<a href="https://dnsfree.cloudflare.chaika.me">DNS Delay (Free)</a><br>
 		<a href="https://worker.cloudflare.chaika.me">Worker Deployment Lag</a><br>
@@ -190,6 +192,7 @@ export default {
         <a href="https://workeranalytics.cloudflare.chaika.me">Worker Analytics Delay</a><br>
 		<a href="https://customhostnames.cloudflare.chaika.me">Custom Hostnames Delay</a><br>
 		<a href="https://cert.cloudflare.chaika.me">Certificate Update Delay</a><br>
+        <br>
 		<a href="https://all.cloudflare.chaika.me">Overview of All</a><br>
 	</div>
     </div>

@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Core", "Ac
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Action-Delay-API-Worker", "Action-Delay-API-Worker\Action-Delay-API-Worker.csproj", "{B5B0C69B-528C-40DE-A25D-B426E3832BE2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Sync", "Action-Delay-API-Sync\Action-Delay-API-Sync.csproj", "{BD851F95-FDE7-406C-AA02-9985CBE35B10}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{B5B0C69B-528C-40DE-A25D-B426E3832BE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B5B0C69B-528C-40DE-A25D-B426E3832BE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B5B0C69B-528C-40DE-A25D-B426E3832BE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD851F95-FDE7-406C-AA02-9985CBE35B10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD851F95-FDE7-406C-AA02-9985CBE35B10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD851F95-FDE7-406C-AA02-9985CBE35B10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD851F95-FDE7-406C-AA02-9985CBE35B10}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

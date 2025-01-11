@@ -151,6 +151,16 @@ namespace Action_Delay_API_Core.Services
            return null;
         }
 
+        public Task JobStatusUpdate(string jobName, string? newStatus, ulong? runLength, DateTime? lastUpdate)
+        {
+            return null;
+        }
+
+        public Task JobLocationUpdate(string jobName, string locationName, string? newStatus, ulong? runLength, DateTime? lastUpdate)
+        {
+            return null;
+        }
+
 
         public void Dispose()
         {

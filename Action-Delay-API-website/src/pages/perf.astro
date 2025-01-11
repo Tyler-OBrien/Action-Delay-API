@@ -21,6 +21,10 @@ var getAnalyticsTask = getAnalytics()
 
 const jobs: Job[] = await getJobsTask;
 const stats: QuickStats[] = await getAnalyticsTask;
+
+
+const reorderedList = jobs.sort()
+
 ---
 
 <BaseLayout
@@ -36,7 +40,7 @@ const stats: QuickStats[] = await getAnalyticsTask;
 			/>
 			<Grid>
 				{
-					jobs.map((job: Job) => (
+					reorderedList.map((job: Job) => (
 						<li>
 							<JobDisplay  type="perf"  job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
 							</li>

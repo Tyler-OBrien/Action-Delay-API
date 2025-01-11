@@ -128,6 +128,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 JobData.CurrentRunStatus = Status.STATUS_PENDING;
                 JobData.CurrentRunLengthMs = null;
                 JobData.CurrentRunTime = DateTime.UtcNow;
+                _ = PushJobUpdateEvent();
                 SentrySdk.AddBreadcrumb($"Got Job Data: {JobData.CurrentRunStatus}");
                 foreach (var location in _config.Locations.Where(location => location.Disabled == false))
                 {
@@ -170,17 +171,21 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 {
                     await RunAction();
                     JobData.CurrentRunStatus = Status.STATUS_UNDEPLOYED;
+                    _ = PushJobUpdateEvent();
+
                 }
                 catch (CustomAPIError ex)
                 {
                     _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", Name, ex.Message);
                     JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
+                    _ = PushJobUpdateEvent();
                     await InsertRunFailure(Status.STATUS_API_ERROR, ex);
                     throw;
                 }
                 catch (Exception)
                 {
                     JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                    _ = PushJobUpdateEvent();
                     await InsertRunFailure(Status.STATUS_ERRORED, null);
                     throw;
                 }
@@ -252,12 +257,11 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                                         _logger.LogInformation(
                                             $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
                                         cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
-                                        JobData.CurrentRunStatus = Status.STATUS_PENDING;
+                                        JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
                                         JobData.CurrentRunLengthMs =
                                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
-
+                                        _ = PushJobUpdateEvent();
                                         await TrySave(true);
-                                        JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
                                     }
                                     else
                                     {
@@ -267,6 +271,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                                         JobData.CurrentRunLengthMs =
                                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
                                         JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                                        _ = PushJobUpdateEvent();
                                         await TrySave(true);
                                     }
                                 }
@@ -444,6 +449,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                         RunningLocationsData[location].CurrentRunLengthMs = 0;
                         RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
                         _ = TrySave();
+                        _ = PushJobLocationUpdate(RunningLocationsData[location]);
                         return false;
                     }
 
@@ -493,6 +499,8 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     {
                         RunningLocationsData[location].CurrentRunStatus = Status.STATUS_DEPLOYED;
                         _ = TrySave();
+                        _ = PushJobLocationUpdate(RunningLocationsData[location]);
+
                         return true;
                     }
                 }
@@ -500,12 +508,19 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             catch (OperationCanceledException ex)
             {
                 RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                _ = PushJobLocationUpdate(RunningLocationsData[location]);
                 _logger.LogError(ex, $"Location {location.Name} timed out");
                 return false;
             }
             catch (Exception ex)
             {
-                RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                try
+                {
+                    RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                    _ = PushJobLocationUpdate(RunningLocationsData[location]);
+                }
+                catch (Exception) { /* nom */ }
+
                 _logger.LogError(ex, $"Error running location {location.Name}");
                 return false;
             }
@@ -563,6 +578,17 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             }
         }
 
+        public async Task PushJobUpdateEvent()
+        {
+            _ = _queue.JobStatusUpdate(this.JobData.InternalJobName, this.JobData.CurrentRunStatus,
+                this.JobData.CurrentRunLengthMs, this.JobData.CurrentRunTime);
+        }
+
+        public async Task PushJobLocationUpdate(JobDataLocation jobDataLocation)
+        {
+            _ = _queue.JobLocationUpdate(jobDataLocation.InternalJobName, jobDataLocation.LocationName, jobDataLocation.CurrentRunStatus,
+                jobDataLocation.CurrentRunLengthMs, jobDataLocation.CurrentRunTime);
+        }
 
 
         public virtual TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)

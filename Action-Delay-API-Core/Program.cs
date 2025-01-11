@@ -73,7 +73,6 @@ public class Program
                            options.TracesSampleRate = 1.0;
                            options.AutoSessionTracking = true;
                            options.IsGlobalModeEnabled = true;
-                           options.EnableTracing = true;
                            options.SetBeforeSend((sentryEvent, hint) =>
                            {
                                if (sentryEvent.Level == SentryLevel.Warning &&  sentryEvent.EventId.ToString().Contains("InboxSubscription", StringComparison.OrdinalIgnoreCase) && (sentryEvent?.Message?.Message?.Contains("Unregistered message inbox received", StringComparison.OrdinalIgnoreCase) ?? false))

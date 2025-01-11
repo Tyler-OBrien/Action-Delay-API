@@ -216,6 +216,7 @@ if (job.internalJobName === "cron") {
 					<div class="content">
 						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} client:only="preact"/>
 						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+						<!-- <SmartGraph endpoint=`v2/jobs/${job.internalJobName}/erroranalytics` label={job.jobName} options={["AvgApiResponseLatency" ]} client:only="preact"/> -->
 
 					</div>
 

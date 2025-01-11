@@ -16,6 +16,7 @@ using ZstdSharp;
 using System.Text;
 using Microsoft.Extensions.Primitives;
 using System.Buffers;
+using Action_Delay_API_Core.Models.NATS.Event;
 
 namespace Action_Delay_API_Core.Services
 {
@@ -109,7 +110,7 @@ namespace Action_Delay_API_Core.Services
             var myRegistry = new MixedSerializerRegistry();
 
 
-            var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout  = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), InboxPrefix = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "_INBOX_ActionDelayAPI" : $"_INBOX_{_configuration.CoreName}", Name = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "Action-Delay-API-Core" : _configuration.CoreName, SubPendingChannelCapacity = 10_000, SubscriptionCleanUpInterval  = TimeSpan.FromMinutes(2)};
+            var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout  = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), InboxPrefix = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "_INBOX_ActionDelayAPI" : $"_INBOX_{_configuration.CoreName}", Name = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "Action-Delay-API-Core" : _configuration.CoreName, SubPendingChannelCapacity = 10_000, SubscriptionCleanUpInterval  = TimeSpan.FromMinutes(2), MaxReconnectRetry = -1};
             _natsConnection = new NatsConnection(options);
 
             _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.ConnectionState}");
@@ -168,6 +169,20 @@ namespace Action_Delay_API_Core.Services
             return tryGetReply.ValueOrDefault;
         }
 
+        public async Task JobStatusUpdate(string jobName, string? newStatus, ulong? runLength, DateTime? lastUpdate)
+        {
+            await SendMessageNoReply<NATSJobUpdate>($"jobs.{jobName}",
+                new NATSJobUpdate()
+                    { JobName = jobName, RunLength = runLength, RunTime = lastUpdate, Status = newStatus }, CancellationToken.None, 30, true);
+        }
+
+        public async Task JobLocationUpdate(string jobName, string locationName, string? newStatus, ulong? runLength, DateTime? lastUpdate)
+        {
+            await SendMessageNoReply<NATSJobLocationUpdate>($"jobs.{jobName}.{locationName}",
+                new NATSJobLocationUpdate()
+                    { JobName = jobName, LocationName = locationName, RunLength = runLength, RunTime = lastUpdate, Status = newStatus }, CancellationToken.None, 30, true);
+        }
+
 
         public static JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions()
         {
@@ -176,6 +191,63 @@ namespace Action_Delay_API_Core.Services
             PropertyNameCaseInsensitive = true,
             TypeInfoResolver = SerializableRequestJsonContext.Default,
         };
+
+        public async Task<Result> SendMessageNoReply<TIn>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30, bool compressed = false)
+        {
+            try
+            {
+
+                if (compressed)
+                {
+
+                    var serializedMsg = JsonSerializer.Serialize(message, DefaultJsonSerializerOptions);
+                    var getString = Encoding.UTF8.GetBytes(serializedMsg);
+
+                    using var memOwner = MemoryPool<byte>.Shared.Rent(Compressor.GetCompressBound(getString.Length));
+                    Memory<byte> outgoingData = null;
+                    Compressor getComp = null;
+                    try
+                    {
+
+                        getComp = GetCompressor();
+                        int length = getComp.Wrap(new ReadOnlySpan<byte>(getString), memOwner.Memory.Span);
+                        outgoingData = memOwner.Memory.Slice(0, length);
+
+
+                    }
+                    finally
+                    {
+                        if (getComp != null)
+                        {
+                            ReturnCompressor(getComp);
+                        }
+                    }
+
+                    if (outgoingData.Length == 0)
+                        return Result.Fail($"Failed to compress");
+
+
+
+                    await _natsConnection.PublishAsync<Memory<byte>>(subject, outgoingData,
+                        cancellationToken: cancellationToken, headers: new NatsHeaders() { { "Comp", "1" } }, serializer:  NatsDefaultSerializer<Memory<byte>>.Default);
+                    return Result.Ok();
+
+                }
+                else
+                {
+                    await _natsConnection.PublishAsync<TIn>(subject, message,
+                        cancellationToken: cancellationToken);
+                    return Result.Ok();
+
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "NATS Connection to {subject} failed.", subject);
+            }
+
+            return Result.Fail("NATS Connection Failed");
+        }
 
         public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30, bool compressed = false)
         {

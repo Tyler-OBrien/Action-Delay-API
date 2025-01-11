@@ -18,13 +18,17 @@ using Action_Delay_API.Services.v2;
 using Microsoft.OpenApi.Models;
 using Sentry.Extensibility;
 using Swashbuckle.AspNetCore.Filters;
+using Action_Delay_API.Controllers.v2;
+using MessagePack.Resolvers;
+using MessagePack;
+using Microsoft.AspNetCore.Http.Connections;
 
 namespace Action_Delay_API;
 
 
 public class Program
 {
-    public static int Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         const string outputFormat =
             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] [{SourceContext}] {Message:lj} {Exception}{NewLine}";
@@ -45,7 +49,13 @@ public class Program
         try
         {
             Log.Information("Starting host");
-            BuildHost(args).Run();
+            var builtHost = BuildHost(args);
+
+            var service =  builtHost.Services.GetRequiredService<NATSHubService>();
+
+            service.Run(CancellationToken.None).ConfigureAwait(false);
+            
+            await builtHost.RunAsync();
             return 0;
         }
         // Note: This will change in .net 7 https://github.com/dotnet/runtime/issues/60600#issuecomment-1068323222
@@ -57,7 +67,7 @@ public class Program
         }
         finally
         {
-            Log.CloseAndFlush();
+            await Log.CloseAndFlushAsync();
         }
     }
 
@@ -73,7 +83,8 @@ public class Program
         var newLocalConfig = new LocalConfig()
         {
             ClickhouseConnectionString = apiConfiguration.ClickhouseConnectionString,
-            PostgresConnectionString = apiConfiguration.PostgresConnectionString
+            PostgresConnectionString = apiConfiguration.PostgresConnectionString,
+            NATSConnectionURL = apiConfiguration.NATSConnectionURL,
         };
 
         builder.Services.AddSingleton<LocalConfig>(newLocalConfig);
@@ -143,6 +154,16 @@ public class Program
             options.InvalidModelStateResponseFactory = ctx => new ModelStateFilterJSON();
         });
 
+
+       builder.Services.AddSignalR(options =>
+           {
+               options.MaximumReceiveMessageSize = 1024;
+               options.StreamBufferCapacity = 1;
+           })
+            .AddMessagePackProtocol();
+
+        builder.Services.AddSingleton<NATSHubService>();
+
         //builder.Services.AddScoped<IPrometheusStatsCollector, PrometheusStatsCollector>();
 
         var app = builder.Build();
@@ -205,6 +226,11 @@ public class Program
         app.UseAuthorization();
 
         app.MapControllers();
+
+        app.MapHub<JobSignalRHub>("/v2/jobs/signalr", options =>
+        {
+            options.Transports = HttpTransportType.WebSockets;
+        } );
 
         //if (apiConfiguration.Prometheus_Metrics_Port != default) app.UseHttpMetrics();
 

@@ -111,6 +111,9 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
         [JsonPropertyName("friendlyLocationName")]
         public string FriendlyLocationName { get; set; }
 
+        [JsonPropertyName("region")]
+        public string Region { get; set; }
+
         [JsonPropertyName("provider")]
         public string Provider { get; set; }
 
@@ -161,6 +164,7 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
             locationDataResponse.LocationLatitude = data.LocationLatitude;
             locationDataResponse.LocationLongitude = data.LocationLongitude;
             locationDataResponse.ColoFriendlyLocationName = data.ColoFriendlyLocationName;
+            locationDataResponse.Region = data.Region;
             locationDataResponse.ColoId = data.ColoId;
             locationDataResponse.IATA = data.IATA;
             locationDataResponse.LastUpdate = data.LastUpdate;

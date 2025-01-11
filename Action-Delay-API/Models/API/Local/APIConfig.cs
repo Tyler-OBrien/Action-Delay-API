@@ -14,5 +14,7 @@
 
         public string ExternalJobAPIKey { get; set; }
 
+        public string CoreName { get; set; }
+
     }
 }
