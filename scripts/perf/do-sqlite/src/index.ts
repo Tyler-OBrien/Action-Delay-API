@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 interface Env {
 	SqliteDO: DurableObjectNamespace<import('./index').PerfDOSqlite>;
-	PerfDOKV: AnalyticsEngineDataset;
+	PerfDOSqlite: AnalyticsEngineDataset;
 	API_KEY: string;
 }
 
@@ -31,14 +31,14 @@ export class PerfDOSqlite extends DurableObject {
 
 		var incomingPath = new URL(request.url);
 		if (incomingPath.pathname == "/no-op") {
-			return new Response("ok", { status: 200})
+			return new Response("ok", { status: 200 })
 		}
 
 		if (incomingPath.pathname == "/test-read") {
-			return new Response(JSON.stringify(sql.exec("Select 1").toArray()), { status: 200})
+			return new Response(JSON.stringify(sql.exec("Select 1").toArray()), { status: 200 })
 		}
 		if (incomingPath.pathname == "/test-read2") {
-			return new Response(JSON.stringify(sql.exec("Select * from Test").toArray()), { status: 200})
+			return new Response(JSON.stringify(sql.exec("Select * from Test").toArray()), { status: 200 })
 		}
 		if (incomingPath.pathname == "/test-read3") {
 			var triedquery = sql.exec("Select test from Test").raw();
@@ -46,17 +46,40 @@ export class PerfDOSqlite extends DurableObject {
 			return new Response(tryGetVal)
 		}
 		if (incomingPath.pathname == "/test-delete") {
-			return new Response(JSON.stringify(sql.exec("Drop table Test").toArray()), { status: 200})
+			return new Response(JSON.stringify(sql.exec("Drop table Test").toArray()), { status: 200 })
 		}
+		var requestBuffer = await request.arrayBuffer();
+		var startReq = performance.now();
+		await this.ctx.storage.transaction(async (txn: DurableObjectTransaction) => {
+			sql.exec(`CREATE TABLE IF NOT EXISTS Test (
+				ID INTEGER PRIMARY KEY,
+				test BLOB
+			  );
+			  
+			  INSERT OR REPLACE INTO Test (ID, test) VALUES (0, ?1);`, requestBuffer)
+		})
+await this.ctx.storage.sync()
 
-		
-		var response = sql.exec(`CREATE TABLE IF NOT EXISTS Test (
-  ID INTEGER PRIMARY KEY,
-  test BLOB
-);
-
-INSERT OR REPLACE INTO Test (ID, test) VALUES (0, ?1);`, await request.arrayBuffer())
-		return new Response("Done!", { status: 200})
+		var getDur = performance.now() - startReq;
+		try {
+			this.ctx.waitUntil(this.logOutput(getDur, incomingPath.pathname))
+		}
+		catch (exception) {
+			console.log(exception)
+		}
+		return new Response("Done!", { status: 200, headers: { "x-adp-dur": getDur.toString() } })
+	}
+	async logOutput(getDur: Number, incomingPath: string) {
+		const res = await fetch("https://cloudflare.com/cdn-cgi/trace");
+		var text = await res.text();
+		const arr = text.split("\n");
+		const colo = arr.filter((v) => v.startsWith("colo="))[0].split("colo=")[1];
+		if (this.env.PerfDOSqlite)
+			this.env.PerfDOSqlite.writeDataPoint({
+				blobs: [colo, incomingPath.slice(1)],
+				doubles: [getDur],
+				indexes: ["binding"],
+			});
 	}
 }
 
@@ -73,7 +96,7 @@ export default {
 
 		let coloId = new URL(request.url).pathname.slice(1);
 		if (coloId.length == 0) {
-			return new Response("404", { status: 404})
+			return new Response("404", { status: 404 })
 		}
 		if (request.headers.get("DO") != null) {
 			coloId = request.headers.get("DO")!;
@@ -98,11 +121,22 @@ export default {
 					var doResponse = await doStub.fetch(request.url, {
 						body: data,
 						method: request.method
-				   });							
-				   var getDur = performance.now() - startReq;
+					});
+					var getDur = performance.now() - startReq;
+					try {
+						if (env.PerfDOSqlite)
+							env.PerfDOSqlite.writeDataPoint({
+								blobs: [coloId],
+								doubles: [getDur],
+								indexes: ["rtt"],
+							});
+					}
+					catch (exception) {
+						console.log(exception)
+					}
 					return new Response(doResponse.body, {
 						headers: {
-							"x-adp-dur":  getDur.toString()
+							"x-adp-dur": getDur.toString()
 						}
 					});
 				} catch (e: any) {

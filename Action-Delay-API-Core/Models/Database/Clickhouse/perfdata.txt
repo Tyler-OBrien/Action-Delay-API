@@ -42,6 +42,9 @@ PRIMARY KEY (run_time, job_name, location_name)
 PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
 
+
+
+
 ALTER TABLE job_runs_perf
     MODIFY COLUMN `job_name` LowCardinality(String),
     MODIFY COLUMN `run_status` LowCardinality(String),
@@ -75,6 +78,10 @@ ALTER TABLE job_runs_locations_perf
 
 
 ALTER TABLE job_runs_locations_perf RENAME COLUMN colo_id TO location_id
+
+
+ALTER TABLE job_runs_locations_perf ADD COLUMN binding_response_latency UInt32;
+ALTER TABLE job_runs_perf ADD COLUMN average_binding_response_latency UInt32;
 
 
 CREATE MATERIALIZED VIEW job_runs_perf_mv_30_mins

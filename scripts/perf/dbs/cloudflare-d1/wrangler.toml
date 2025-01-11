@@ -1,0 +1,16 @@
+name = "action-delay-api-perf-db-d1"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
+
+
+
+[[d1_databases]]
+binding = "DB"
+database_name = "action-delay-api-perf"
+database_id = "0ff0fadb-0740-4e9b-ae55-f136528a3c87"

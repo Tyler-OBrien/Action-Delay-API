@@ -238,22 +238,26 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         public class AILocationReturn
         {
-            public AILocationReturn(bool success, ulong duration, DateTime responseUtc, int? coloId, int? tokens = null)
+            public AILocationReturn(bool success, ulong duration, DateTime responseUtc, int? coloId, int? tokens, ulong? bindingDuration)
             {
                 Success = success;
                 Duration = duration;
                 ResponseUtc = responseUtc;
                 ColoId = coloId;
                 Tokens = tokens;
+                BindingDuration = bindingDuration;
             }
 
             public bool Success { get; set; }
 
             public ulong Duration { get; set; }
 
+            public ulong? BindingDuration { get; set; }
+
             public DateTime ResponseUtc { get; set; }
 
             public int? ColoId { get; set; }
+
 
             public int? Tokens { get; set; }
         }
@@ -312,14 +316,14 @@ namespace Action_Delay_API_Core.Jobs.AI
 
                         if (taskResult == null || (taskResult?.IsFailed ?? true) || taskResult.ValueOrDefault == null)
                         {
-                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1));
+                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1, null, null));
                             continue;
                         }
                         var tryGetValue = taskResult!.Value!;
 
                         if (String.IsNullOrWhiteSpace(tryGetValue.Body))
                         {
-                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1));
+                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers)));
                         }
                         else
                         {
@@ -333,7 +337,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                             {
                                 _logger.LogWarning(ex,
                                     $"Failure parsing response for {model.Name} from {completedLocation.Name}");
-                                FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1));
+                                FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers)));
                             }
 
                             if (parsedResult != null)
@@ -344,7 +348,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                                         new AILocationReturn(parsedResult.Success,
                                             (ulong)tryGetValue.ResponseTimeMs.Value,
                                             tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens));
+                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens, TryGetBindingDir(tryGetValue.Headers)));
 
                                 }
                                 else if (parsedResult is { Success: false, Error: not null })
@@ -358,11 +362,11 @@ namespace Action_Delay_API_Core.Jobs.AI
                                         new AILocationReturn(parsedResult.Success,
                                             (ulong)tryGetValue.ResponseTimeMs.Value,
                                             tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens));
+                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens, TryGetBindingDir(tryGetValue.Headers)));
                                 }
                                 else
                                 {
-                                    FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1));
+                                    FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers)));
                                 }
                             }
                         }
@@ -388,12 +392,27 @@ namespace Action_Delay_API_Core.Jobs.AI
             {
                 ulong averageTokensOfSuccessful = 0;
                 ulong averageOfSuccessFull = 0;
+                ulong averageBindingLatencyOfSuccessful = 0;
                 if (FinishedLocationStatus.Any(kvp => kvp.Value.Success))
                 {
-                    averageOfSuccessFull = (ulong)FinishedLocationStatus.Where(kvp => kvp.Value.Success)
-                        .Average(kvp => (double)kvp.Value.Duration);
-                    averageTokensOfSuccessful = (ulong)FinishedLocationStatus.Where(kvp => kvp.Value.Success)
-                        .Average(kvp => (double)(kvp.Value.Tokens ?? 0));
+
+                    var tryGetSuccessful = FinishedLocationStatus.Where(kvp => kvp.Value.Success)
+                        .Select(kvp => (double)kvp.Value.Duration).ToList();
+                    if (tryGetSuccessful.Any())
+                    {
+                        averageOfSuccessFull = (ulong)tryGetSuccessful.Median();
+                        averageTokensOfSuccessful = (ulong)FinishedLocationStatus.Where(kvp => kvp.Value.Success)
+                            .Average(kvp => (double)(kvp.Value.Tokens ?? 0));
+                    }
+
+                    var tryGetBindingLatenciesToUse = FinishedLocationStatus.Where(kvp => kvp.Value.Success)
+                        .Where(kvp => kvp.Value.BindingDuration != null)
+                        .Select(kvp => (double)kvp.Value.BindingDuration!.Value).ToList();
+                    if (tryGetBindingLatenciesToUse.Any())
+                        averageBindingLatencyOfSuccessful = (ulong)tryGetBindingLatenciesToUse
+                            .Median();
+
+
                 }
 
 
@@ -408,6 +427,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                         RunLength = averageTokensOfSuccessful,
                         RunTime = DateTime.UtcNow,
                         ResponseLatency = averageOfSuccessFull,
+                        BindingResponseLatency = averageBindingLatencyOfSuccessful,
                     }, FinishedLocationStatus.ToList().Select(
                             locationDataKv => new ClickhouseJobLocationRun()
                             {
@@ -417,6 +437,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                                 RunLength = (ulong)(locationDataKv.Value.Tokens ?? 0),
                                 RunTime = locationDataKv.Value.ResponseUtc,
                                 ResponseLatency = locationDataKv.Value.Duration,
+                                BindingResponseLatency = locationDataKv.Value.BindingDuration ?? 0,
                                 ColoId = locationDataKv.Value.ColoId ?? 0,
                             }).ToList(), errors?.Any() == false ? new List<ClickhouseAPIError>() :  errors.Select(error => ClickhouseAPIError.CreateFromCustomError(model.Name, error)).ToList() ?? null);
             }
@@ -442,7 +463,21 @@ namespace Action_Delay_API_Core.Jobs.AI
             if (apiError != null)
                 Errors.AddRange(apiError);
         }
-        
+
+        public static ulong? TryGetBindingDir(Dictionary<string, string> headers)
+        {
+            if (headers != null)
+            {
+                var tryGetHeader = headers.FirstOrDefault(headerKvp =>
+                    headerKvp.Key.Equals("x-adp-dur", StringComparison.OrdinalIgnoreCase));
+                if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false &&
+                    ulong.TryParse(tryGetHeader.Value, out var parsedDur))
+                    return parsedDur;
+            }
+
+            return null;
+        }
+
         public static int GetColoId(Dictionary<string, string> headers)
         {
             if (headers != null && headers.TryGetValue("colo", out var coloStr) &&
@@ -523,7 +558,13 @@ namespace Action_Delay_API_Core.Jobs.AI
                 BodyBytes = config.Content,
                 Method = MethodType.POST,
                 RetriesCount = 0,
-                NoResponseHeaders = true
+                NoResponseHeaders = true,
+                ResponseHeaders = new List<string>()
+                {
+                    "colo",
+                    "server",
+                    "x-adp-dur",
+                }
 
             };
             if (String.IsNullOrEmpty(config.OutputTypeCheck) == false)

@@ -16,7 +16,7 @@ analytics_engine_datasets = [
 
 
 [durable_objects]
-bindings = [{name = "DO", class_name = "PerfDO"}]
+bindings = [{name = "DO", class_name = "PerfDONew"}]
 
 
 
@@ -28,3 +28,9 @@ enabled = true
 [[migrations]]
 tag = "v1" # Should be unique for each entry
 new_sqlite_classes  = ["PerfDO"]
+
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["PerfDO"] # Array of deleted class names
+new_classes = ["PerfDONew"]

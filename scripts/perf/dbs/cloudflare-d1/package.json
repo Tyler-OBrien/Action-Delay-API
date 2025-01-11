@@ -8,11 +8,8 @@
 		"deploy": "wrangler deploy"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20231025.0",
+		"@cloudflare/workers-types": "^4.20241230.0",
 		"typescript": "^5.2.2",
-		"wrangler": "^3.87.0"
-	},
-	"dependencies": {
-		"@microlabs/otel-cf-workers": "1.0.0-rc.40"
+		"wrangler": "^3.99.0"
 	}
 }

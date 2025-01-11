@@ -1,0 +1,19 @@
+{
+  "name": "kv-store-typescript-example",
+  "author": "oss@fastly.com",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "^18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@fastly/js-compute": "^3.0.0"
+  },
+  "scripts": {
+    "build": "js-compute-runtime build/index.js bin/main.wasm",
+    "deploy": "npm run build && ../fastly.exe compute deploy"
+  }
+}

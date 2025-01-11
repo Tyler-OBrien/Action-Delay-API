@@ -9,6 +9,7 @@
         public string RunStatus { get; set; }
 
         public UInt64 ResponseLatency { get; set; }
+        public UInt64 BindingResponseLatency { get; set; }
 
         public string LocationId { get; set; }
     }

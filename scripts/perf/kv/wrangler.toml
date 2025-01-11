@@ -6,7 +6,7 @@ compatibility_flags = [ "nodejs_compat" ]
 
 
 kv_namespaces = [
-  { binding = "KV", id = "c6a6c055efd741ccacee9916533e80da" }
+  { binding = "KV", id = "c6a6c055efd741ccacee9916533e80da", preview_id = "c6a6c055efd741ccacee9916533e80da"  }
 ]
 
 [observability]

@@ -32,8 +32,32 @@ export class PerfKVDO extends DurableObject {
 		if (incomingPath.pathname == "/no-op") {
 			return new Response("ok", { status: 200})
 		}
-		await this.ctx.storage.put("test", await request.arrayBuffer());
-		return new Response("Done!", { status: 200})
+		var startReq = performance.now();
+
+		await this.ctx.storage.transaction(async (txn: DurableObjectTransaction) => {
+			await txn.put("test", await request.arrayBuffer());
+		})
+		await this.ctx.storage.sync()
+		var getDur = performance.now() - startReq;
+		try {
+			this.ctx.waitUntil(this.logOutput(getDur, incomingPath.pathname))
+		}
+		catch (exception) {
+			console.log(exception)
+		}
+		return new Response("Done!", { status: 200, headers: { "x-adp-dur": getDur.toString() } })
+	}
+	async logOutput(getDur: Number, incomingPath: string) {
+		const res = await fetch("https://cloudflare.com/cdn-cgi/trace");
+		var text = await res.text();
+		const arr = text.split("\n");
+		const colo = arr.filter((v) => v.startsWith("colo="))[0].split("colo=")[1];
+		if (this.env.PerfDOKV)
+			this.env.PerfDOKV.writeDataPoint({
+				blobs: [colo, incomingPath.slice(1)],
+				doubles: [getDur],
+				indexes: ["binding"],
+			});
 	}
 }
 
@@ -76,6 +100,18 @@ export default {
 						 method: request.method
 					});
 					var getDur = performance.now() - startReq;
+					try {
+						if (env.PerfDOKV)
+							env.PerfDOKV.writeDataPoint({
+								blobs: [coloId],
+								doubles: [getDur],
+								indexes: ["rtt"],
+							});
+
+					}
+					catch (exception) {
+						console.log(exception)
+					}
 					return new Response(doResponse.body, {
 						headers: {
 							"x-adp-dur":  getDur.toString()

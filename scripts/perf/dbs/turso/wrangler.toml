@@ -1,0 +1,10 @@
+name = "action-delay-api-perf-db-turso"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
+

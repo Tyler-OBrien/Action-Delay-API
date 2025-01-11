@@ -101,8 +101,10 @@ globalThis.crypto = crypto;
 					success: true,
 					result: response
 				});
-				insertSuccess(env, modelToUse, -1);
-				return new Response(resp);
+				insertSuccess(env, modelToUse, -1, (performance.now() - start));
+				return new Response(resp, { headers: {
+					"x-adp-dur": (performance.now() - start).toString()
+				}});
 			}
 			else if (outputType.toUpperCase() === "JSONCHECKFIELDSTR") {
 				if (request.headers.has("outputTypeCheck") == false || !outputTypeCheck) {
@@ -119,14 +121,17 @@ globalThis.crypto = crypto;
 					success: true,
 					result: str.length
 				});
-				insertSuccess(env, modelToUse, -1);
-				return new Response(resp);
+				insertSuccess(env, modelToUse, -1, (performance.now() - start));
+				return new Response(resp, { headers: {
+					"x-adp-dur": (performance.now() - start).toString()
+				}});
 			}
 			else if (outputType.toUpperCase() === "RAW") {
-				insertSuccess(env, modelToUse, -1);
+				insertSuccess(env, modelToUse, -1, (performance.now() - start));
 				return new Response(response, {
 					headers: {
 						"content-type": outputContentType ?? "text/event-stream",
+						"x-adp-dur": (performance.now() - start).toString()
 					},
 				});
 			}
@@ -149,12 +154,14 @@ globalThis.crypto = crypto;
 					}), { status: 200 });
 				}
 				*/
-				insertSuccess(env, modelToUse, result.length)
+				insertSuccess(env, modelToUse, result.length, (performance.now() - start))
 				return new Response(JSON.stringify({
 					success: true,
 					result: { response: resultString },
 					tokens: result.length
-				}));
+				}), { headers: {
+					"x-adp-dur": (performance.now() - start).toString()
+				}});
 			}
 			else if (outputType.toLowerCase() === "buffereventstreamdebug") {
 				console.log(`debug`)
@@ -163,12 +170,14 @@ globalThis.crypto = crypto;
 					success: true,
 					result: { response: result },
 					tokens: result.length
-				}));
+				}), {headers: {
+					"x-adp-dur": (performance.now() - start).toString()
+				}});
 			}
 			else {
 				var tryGetSize = await getReadableStreamSizeAndCheckIfEmpty(response)
 				if (tryGetSize === 0) {
-					insertFailure(env, modelToUse, inputObj[inputField].toString(), "EmptyStreamResponse", "Empty Stream Response, length 0")
+					insertFailure(env, modelToUse, inputObj[inputField].toString(), "EmptyStreamResponse", "Empty Stream Response, length 0", (performance.now() - start))
 					return new Response(JSON.stringify({
 						success: false,
 						error: {
@@ -176,40 +185,46 @@ globalThis.crypto = crypto;
 							message: 'Empty Stream Response, length 0',
 							logs: JSON.stringify(env.AI.getLogs())
 						}
-					}), { status: 200 });
+					}), { status: 200, headers: {
+						"x-adp-dur": (performance.now() - start).toString()
+					} });
 				}
 
 
-				insertSuccess(env, modelToUse, tryGetSize ?? "-1")
+				insertSuccess(env, modelToUse, tryGetSize ?? "-1", (performance.now() - start))
 				return new Response(JSON.stringify({
 					success: true,
 					result: {
 						length: tryGetSize
 					}
-				}));
+				}), { headers: {
+					"x-adp-dur": (performance.now() - start).toString()
+				}});
 			}
 		} catch (error: any) {
 			console.log(`We think this request for ${modelToUse} took ${performance.now() - start}`)
 			console.log(JSON.stringify(error))
-			insertFailure(env, modelToUse, '', error.name ?? "Unknown", error.message ?? error)
+			insertFailure(env, modelToUse, '', error.name ?? "Unknown", error.message ?? error, performance.now() - start)
 			return new Response(JSON.stringify({
 				success: false,
 				error: {
 					code: error?.name ?? 'Unknown',
 					message: error?.message ?? error,
 				}
-			}), { status: 200 });
+			}), { status: 200, headers: {
+				"x-adp-dur": (performance.now() - start).toString()
+			} });
 		}
 		return new Response("Unknown Internal Error", { status: 504 });
 	},
 };
 
-function insertSuccess(Env: Env, model: string | null, tokens: number) {
+function insertSuccess(Env: Env, model: string | null, tokens: number, timeTaken: number) {
 	try {
 		if (Env.AE)
 			Env.AE.writeDataPoint({
 				'blobs': [], 
-				'doubles': [tokens],
+				'doubles': [tokens, timeTaken],
 				'indexes': [`${model ?? "Unknown"}-error`]
 			  })
 	}
@@ -217,12 +232,12 @@ function insertSuccess(Env: Env, model: string | null, tokens: number) {
 }
 
 
-function insertFailure(Env: Env, model: string | null, input: string | any, errorType: string, errorReason: string) {
+function insertFailure(Env: Env, model: string | null, input: string | any, errorType: string, errorReason: string, timeTaken: number) {
 	try {
 		if (Env.AE)
 			Env.AE.writeDataPoint({
 				'blobs': [input ?? "Unknown", errorType, errorReason], 
-				'doubles': [25, 0.5],
+				'doubles': [-1, -1, timeTaken],
 				'indexes': [`${model ?? "Unknown"}-error`]
 			  })
 	}

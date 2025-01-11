@@ -118,7 +118,7 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime, server.RunLength,
-                                    server.RunStatus, server.ResponseLatency, server.ColoId
+                                    server.RunStatus, server.ResponseLatency, server.ColoId, server.BindingResponseLatency
                                 })
                                 .ToArray(), token);
                     }
@@ -141,7 +141,7 @@ namespace Action_Delay_API_Core.Services
                         runs.Select(run => new object[]
                             {
                                 run.JobName, run.RunTime, run.RunLength, run.RunStatus,
-                                string.Empty, run.ResponseLatency
+                                string.Empty, run.ResponseLatency, run.BindingResponseLatency
                             })
                             .ToArray(), token);
 
@@ -201,7 +201,7 @@ namespace Action_Delay_API_Core.Services
                     await bulkCopyRun.WriteToServerAsync(
                         runs.Select(run => new object[]
                             {
-                                run.JobName, run.RunTime, run.RunStatus, run.ResponseLatency
+                                run.JobName, run.RunTime, run.RunStatus, run.ResponseLatency, run.BindingResponseLatency
                             })
                             .ToArray(), token);
 
@@ -225,7 +225,7 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime,
-                                    server.RunStatus, server.ResponseLatency, server.LocationId
+                                    server.RunStatus, server.ResponseLatency, server.LocationId, server.BindingResponseLatency
                                 })
                                 .ToArray(), token);
                     }

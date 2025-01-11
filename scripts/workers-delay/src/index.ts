@@ -1,8 +1,5 @@
 import { BetterKV } from "flareutils";
 import { Toucan } from 'toucan-js';
-import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
-import { instrumentDO } from '@microlabs/otel-cf-workers'
-
 
 
 const HTML = `<!DOCTYPE html>
@@ -403,6 +400,7 @@ var handler = {
     ctx: ExecutionContext
   ): Promise<void> {
     console.log(`Hello World!`);
+    return new Response("disabled")
     let id = env.DO.idFromName("update-me-pls");
     const stubby = env.DO.get(id);
     try {
@@ -420,7 +418,7 @@ var handler = {
   },
 };
 
-class UnwrappedDO implements DurableObject {
+class DO implements DurableObject {
   state: DurableObjectState;
   env: Env;
 
@@ -433,6 +431,7 @@ class UnwrappedDO implements DurableObject {
     if (url.pathname == "/forceClear") {
       await this.state.storage.delete("deployed", { noCache: true, allowConcurrency: true })
       await this.state.storage.deleteAlarm({ allowConcurrency: true });
+      console.log(`force cleared!`)
       return new Response("ok")
     }
     if (url.searchParams.get("getDeployed") == "true") {
@@ -617,54 +616,5 @@ async function fetchPlus(url: any, options = {}, retries = 5): Promise<Response>
   }
 }
 
-const config: ResolveConfigFn = (env: Env, _trigger) => {
-	// if null, we're not going to export any..
-	if (!env.BASELIME_API_KEY) {
-		const headSamplerConfig = {
-			acceptRemote: false, //Whether to accept incoming trace contexts
-			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
-		}
-		return {
-			sampling: {
-				headSampler: headSamplerConfig
-			},
-			exporter: {},
-			service: {}
-		}
-	}
-	return {
-		exporter: {
-			url: 'https://otel.baselime.io/v1',
-			headers: { 'x-api-key': env.BASELIME_API_KEY },
-		},
-		service: { name: env.SERVICE_NAME },
-	}
-}
-
-const DOconfig: ResolveConfigFn = (env: Env, _trigger) => {
-	// if null, we're not going to export any..
-	if (!env.BASELIME_API_KEY) {
-		const headSamplerConfig = {
-			acceptRemote: false, //Whether to accept incoming trace contexts
-			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
-		}
-		return {
-			sampling: {
-				headSampler: headSamplerConfig
-			},
-			exporter: {},
-			service: {}
-		}
-	}
-	return {
-		exporter: {
-			url: 'https://otel.baselime.io/v1',
-			headers: { 'x-api-key': env.BASELIME_API_KEY },
-		},
-		service: { name: env.SERVICE_NAME + "-do" },
-	}
-}
-const DO = instrumentDO(UnwrappedDO, DOconfig);
-
 export { DO }
-export default instrument(handler, config)
+export default handler;

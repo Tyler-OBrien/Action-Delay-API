@@ -366,3 +366,7 @@ Action-Delay-API-Durable-Object-Proxy/.wrangler/
 scripts/perf/fastly/fastly.exe
 
 scripts/cron-queue-AE/
+
+scripts/perf/dbs/cloudflare-d1/.wrangler/
+
+scripts/perf/dbs/turso/.wrangler/

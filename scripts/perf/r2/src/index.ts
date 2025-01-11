@@ -1,5 +1,4 @@
 import regions from "./routing.json";
-import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
 
 export interface Env {
 	KV: KVNamespace;
@@ -278,30 +277,5 @@ const getRegion = function (iata: regions, continent: string | undefined): GetRe
 	return new GetRegionResult(SUPPORTED_REGIONS[0], "fallback-global"); // simple fallback
 }
 
-const config: ResolveConfigFn = (env: Env, _trigger: any) => {
-	// if null, we're not going to export any..
-	if (!env.BASELIME_API_KEY) {
-		const headSamplerConfig = {
-			acceptRemote: false, //Whether to accept incoming trace contexts
-			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
-		}
-		return {
-			sampling: {
-				headSampler: headSamplerConfig
-			},
-			exporter: {},
-			service: {}
-		}
-	}
-	return {
-		exporter: {
-			url: 'https://otel.baselime.io/v1',
-			headers: { 'x-api-key': env.BASELIME_API_KEY },
-		},
-		service: { name: env.SERVICE_NAME },
-	}
-}
 
-
-
-export default instrument(handler, config)
+export default handler;

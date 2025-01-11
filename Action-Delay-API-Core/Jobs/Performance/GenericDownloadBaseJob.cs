@@ -239,7 +239,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         if (taskResult == null || (taskResult?.IsFailed ?? true) || taskResult.ValueOrDefault == null)
                         {
                             finishedLocationStatus.Add(completedLocation,
-                                new PerformanceLocationReturn(false, 0, DateTime.UtcNow, null));
+                                new PerformanceLocationReturn(false, 0, DateTime.UtcNow, null, null));
                             continue;
                         }
 
@@ -252,7 +252,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 new PerformanceLocationReturn(tryGetValue.WasSuccess,
                                     (ulong)(tryGetValue.ResponseTimeMs.HasValue == false ? 0 : tryGetValue.ResponseTimeMs.Value) ,
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                    GetColoId(tryGetValue.Headers)));
+                                    GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
 
                         }
                         else if (tryGetValue.WasSuccess == false)
@@ -275,7 +275,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 new PerformanceLocationReturn(tryGetValue.WasSuccess,
                                     (ulong)(tryGetValue?.ResponseTimeMs.HasValue == false ? 0 : tryGetValue!.ResponseTimeMs!.Value),
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                    GetColoId(tryGetValue.Headers)));
+                                    GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
                         }
 
 
@@ -303,11 +303,20 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             try
             {
+                ulong averageBindingLatencyOfSuccessful = 0;
                 ulong averageOfSuccessFull = 0;
                 if (finishedLocationStatus.Any(kvp => kvp.Value.Success))
                 {
-                    averageOfSuccessFull = (ulong)finishedLocationStatus.Where(kvp => kvp.Value.Success).Select(kvp => (double)kvp.Value.Duration)
-                        .Median();
+                    var tryGetSuccessful = finishedLocationStatus.Where(kvp => kvp.Value.Success)
+                        .Select(kvp => (double)kvp.Value.Duration).ToList();
+                    if (tryGetSuccessful.Any()) averageOfSuccessFull = (ulong)tryGetSuccessful.Median();
+
+                    var tryGetBindingLatenciesToUse = finishedLocationStatus.Where(kvp => kvp.Value.Success)
+                        .Where(kvp => kvp.Value.BindingDuration != null)
+                        .Select(kvp => (double)kvp.Value.BindingDuration!.Value).ToList();
+                    if (tryGetBindingLatenciesToUse.Any())
+                        averageBindingLatencyOfSuccessful = (ulong)tryGetBindingLatenciesToUse
+                            .Median();
 
                 }
 
@@ -320,7 +329,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 if (finishedLocationStatus.Any() == false)
                     runStatus = "Failure";
 
-                _logger.LogInformation($"Finished {name}, runStatus: {runStatus}, average ms: {averageOfSuccessFull}, successful: {finishedLocationStatus.Count(kvp => kvp.Value.Success)}/{locations.Count}");
+                _logger.LogInformation($"Finished {name}, runStatus: {runStatus}, average ms: {averageOfSuccessFull}, binding avg: {averageBindingLatencyOfSuccessful}, successful: {finishedLocationStatus.Count(kvp => kvp.Value.Success)}/{locations.Count}");
                 FinishedRunInsertLater(
                     new ClickhouseJobRunPerf()
                     {
@@ -329,6 +338,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         RunLength = 0,
                         RunTime = DateTime.UtcNow,
                         ResponseLatency = averageOfSuccessFull,
+                        BindingResponseLatency = averageBindingLatencyOfSuccessful
                     }, finishedLocationStatus.ToList().Select(
                         locationDataKv => new ClickhouseJobLocationRunPerf()
                         {
@@ -339,6 +349,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             RunTime = locationDataKv.Value.ResponseUtc,
                             ResponseLatency = locationDataKv.Value.Duration,
                             LocationId = locationDataKv.Value.LocationId ?? string.Empty,
+                            BindingResponseLatency = locationDataKv.Value.BindingDuration ?? 0,
                         }).ToArray(),
                     errors?.Any() == false
                         ? Array.Empty<ClickhouseAPIErrorPerf>()
@@ -367,6 +378,21 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 Locations.AddRange(locations);
             if (apiError != null)
                 Errors.AddRange(apiError);
+        }
+
+
+        public static ulong? TryGetBindingDir(Dictionary<string, string> headers)
+        {
+            if (headers != null)
+            {
+                var tryGetHeader = headers.FirstOrDefault(headerKvp =>
+                    headerKvp.Key.Equals("x-adp-dur", StringComparison.OrdinalIgnoreCase));
+                if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false &&
+                    ulong.TryParse(tryGetHeader.Value, out var parsedDur))
+                    return parsedDur;
+            }
+
+            return null;
         }
 
         public static string GetColoId(Dictionary<string, string> headers)
@@ -418,7 +444,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 ResponseHeaders = new List<string>()
                 {
                     "colo", 
-                    "server"
+                    "server",
+                    "x-adp-dur"
                 }
             };
             if (jobConfig.CustomHeaders != null)
@@ -463,7 +490,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 ReturnBodyOnError = true,
                 CustomDNSServerOverride = overridenCustomNameServerResolved,
                 DNSResolveOverride = jobConfig.DNSResolveOverride,
-                NoResponseHeaders = true
+                NoResponseHeaders = true,
+                ResponseHeaders = new List<string>()
+                {
+                    "colo",
+                    "server",
+                    "x-adp-dur"
+                }
             };
             if (jobConfig.CustomHeaders != null)
             {
@@ -493,19 +526,23 @@ namespace Action_Delay_API_Core.Jobs.Performance
     }
     public class PerformanceLocationReturn
     {
-        public PerformanceLocationReturn(bool success, ulong duration, DateTime responseUtc, string? locationId)
+        public PerformanceLocationReturn(bool success, ulong duration, DateTime responseUtc, string? locationId, ulong? bindingDuration)
         {
             Success = success;
             Duration = duration;
             ResponseUtc = responseUtc;
             LocationId = locationId;
+            BindingDuration = bindingDuration;
         }
 
         public bool Success { get; set; }
 
         public ulong Duration { get; set; }
 
+
         public DateTime ResponseUtc { get; set; }
+
+        public ulong? BindingDuration { get; set; }
 
         public string? LocationId { get; set; }
 

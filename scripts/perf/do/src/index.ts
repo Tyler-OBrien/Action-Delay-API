@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
 interface Env {
-	DO: DurableObjectNamespace<import('./index').PerfDO>;
+	DO: DurableObjectNamespace<import('./index').PerfDONew>;
 	PerfDOKV: AnalyticsEngineDataset;
 	API_KEY: string;
 }
@@ -24,7 +24,7 @@ function b64toBlob(base64) {
 }
 
 /** A Durable Object's behavior is defined in an exported Javascript class */
-export class PerfDO extends DurableObject {
+export class PerfDONew extends DurableObject {
 	/**
 	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
 	 * 	`DurableObjectStub::get` for a given identifier (no-op constructors can be omitted)

@@ -1,0 +1,13 @@
+# This file describes a Fastly Compute package. To learn more visit:
+# https://www.fastly.com/documentation/reference/compute/fastly-toml
+
+authors = []
+description = ""
+language = "javascript"
+manifest_version = 3
+name = "action-delay-api-static"
+service_id = "nYNIZ9r14Ncc5hylQIz4P3"
+
+[scripts]
+  build = "npm run build"
+  post_init = "npm install"

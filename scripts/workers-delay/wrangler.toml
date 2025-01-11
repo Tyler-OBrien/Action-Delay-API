@@ -26,8 +26,6 @@ SERVICE_NAME = "workers_delay"
 
 
 
-[triggers]
-crons = [ "*/1 * * * *" ]
 
 
 

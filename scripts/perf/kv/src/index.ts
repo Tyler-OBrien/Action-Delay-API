@@ -1,6 +1,3 @@
-import { instrument, ResolveConfigFn } from '@microlabs/otel-cf-workers'
-
-
 export interface Env {
 	KV: KVNamespace;
 	API_KEY: string;
@@ -25,6 +22,7 @@ const handler = {
 				});
 			}
 			const key = url.pathname.slice(1);
+
 			if (key.startsWith("cached") || key.startsWith("uncached")) {
 				return new Response("cached and uncached dirs are protected.", {
 					status: 401,
@@ -42,12 +40,12 @@ const handler = {
 							blobs: [],
 							doubles: [getDur],
 							indexes: [key],
-						  });
+						});
 				}
 				catch (exception) {
 					console.log(exception)
 				}
-				return new Response(null, { status: 200, headers: { "x-adp-dur": getDur.toString()} });
+				return new Response(null, { status: 200, headers: { "x-adp-dur": getDur.toString() } });
 			}
 			catch (exception) {
 				console.log(exception);
@@ -59,7 +57,7 @@ const handler = {
 
 		if (url.pathname.startsWith('/cached/')) {
 			if (url.pathname === '/cached/500kb') {
-				return await getKeyResponse(env.KV, 'cached/500Kb-new', 31536001, env.AE );
+				return await getKeyResponse(env.KV, 'cached/500Kb-new', 31536001, env.AE);
 			} else if (url.pathname === '/cached/5mb') {
 				return await getKeyResponse(env.KV, 'cached/5mb', 31536001, env.AE);
 			} else if (url.pathname === '/cached/10kb') {
@@ -80,10 +78,12 @@ const handler = {
 };
 
 
-const getKeyResponse = async function(kv: KVNamespace, key: string, cacheTtl: number, AE: AnalyticsEngineDataset): Promise<Response> {
+const getKeyResponse = async function (kv: KVNamespace, key: string, cacheTtl: number, AE: AnalyticsEngineDataset): Promise<Response> {
+	var startReq = performance.now();
+
 	try {
 		var startReq = performance.now();
-		var tryGet = await kv.get(key, { cacheTtl: cacheTtl, type: 'stream' });
+		var tryGet = await kv.get(key, { cacheTtl: cacheTtl, type: 'arrayBuffer' });
 		var getDur = performance.now() - startReq;
 		try {
 			if (AE)
@@ -91,7 +91,7 @@ const getKeyResponse = async function(kv: KVNamespace, key: string, cacheTtl: nu
 					blobs: [],
 					doubles: [getDur, cacheTtl],
 					indexes: [key],
-				  });
+				});
 		}
 		catch (exception) {
 			console.log(exception)
@@ -111,36 +111,14 @@ const getKeyResponse = async function(kv: KVNamespace, key: string, cacheTtl: nu
 		})
 	}
 	catch (exception) {
+		var getDur = performance.now() - startReq;
 		console.log(exception);
-		return new Response(`Error KV GET: ${exception}`, { status: 500 });
+		return new Response(`Error KV GET: ${exception}`, {
+			status: 500, headers: {
+				"x-adp-dur": getDur.toString()
+			}
+		});
 	}
 }
 
-
-
-
-const config: ResolveConfigFn = (env: Env, _trigger: any) => {
-	// if null, we're not going to export any..
-	if (!env.BASELIME_API_KEY) {
-		const headSamplerConfig = {
-			acceptRemote: false, //Whether to accept incoming trace contexts
-			ratio: 0.0 //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
-		}
-		return {
-			sampling: {
-				headSampler: headSamplerConfig
-			},
-			exporter: {},
-			service: {}
-		}
-	}
-	return {
-		exporter: {
-			url: 'https://otel.baselime.io/v1',
-			headers: { 'x-api-key': env.BASELIME_API_KEY },
-		},
-		service: { name: env.SERVICE_NAME },
-	}
-}
-
-export default instrument(handler, config)
+export default handler;

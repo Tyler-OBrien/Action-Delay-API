@@ -44,6 +44,13 @@ PRIMARY KEY (run_time, job_name, location_name)
 PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
 
+
+ALTER TABLE job_runs_locations_ai ADD COLUMN binding_response_latency UInt32;
+ALTER TABLE job_runs_ai ADD COLUMN average_binding_response_latency UInt32;
+
+
+
+
 ALTER TABLE job_runs_ai
     MODIFY COLUMN `job_name` LowCardinality(String),
     MODIFY COLUMN `run_status` LowCardinality(String),
