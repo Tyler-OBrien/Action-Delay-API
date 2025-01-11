@@ -30,7 +30,6 @@ namespace Action_Delay_API.Models.API.Requests.DTOs.v2.Analytics
         /// CF API Response Latency: MinApiResponseLatency,MaxApiResponseLatency,AvgApiResponseLatency,MedianApiResponseLatency
         /// </summary>
         [SwaggerParameter($"Metrics to return. Comma-separated. Specify at least one. <br />  Run Options: MinRunLength,MaxRunLength,AvgRunLength,MedianRunLength <br />  CF API Response Latency: MinApiResponseLatency,MaxApiResponseLatency,AvgApiResponseLatency,MedianApiResponseLatency", Required = true)]
-        [Required]
         public string? Metrics { get; set; }
 
       

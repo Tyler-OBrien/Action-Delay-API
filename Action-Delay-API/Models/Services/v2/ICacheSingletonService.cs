@@ -6,11 +6,16 @@ namespace Action_Delay_API.Models.Services.v2
     {
         public void CacheJobNames(List<JobData> jobs);
 
-        public void CacheLocationNames(IEnumerable<string> locationNames);
+        public void CacheLocationNames(List<LocationData> locationNames);
 
         public ValueTask<string?> GetInternalJobName(string jobName, CancellationToken token);
 
         public ValueTask<bool> DoesLocationExist(string locationName, CancellationToken token);
+
+        public ValueTask<string[]> GetLocationsForRegion(string regionName, CancellationToken token);
+
+        public ValueTask<Dictionary<string, string[]>> GetRegions(CancellationToken token);
+
 
         public ValueTask<string?> GetJobTypeFromName(string jobName, CancellationToken token);
 

@@ -34,7 +34,7 @@ public class AnalyticsController : CustomBaseController
 
 
     public DateTime firstDayOfThisCentury = new DateTime(2000, 1, 1);
-    private Result<JobAnalyticsRequestOptions> ProcessQueryParameters(AnalyticsQueryParams queryParams)
+    private Result<JobAnalyticsRequestOptions> ProcessQueryParameters(AnalyticsQueryParams queryParams, bool metricsRequired = true)
     {
         if (queryParams.StartDateTime == null)
         {
@@ -61,13 +61,13 @@ public class AnalyticsController : CustomBaseController
         }
 
 
-        if (String.IsNullOrWhiteSpace(queryParams.Metrics))
+        if (String.IsNullOrWhiteSpace(queryParams.Metrics) && metricsRequired)
         {
             return Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
                 "Query Params Metrics cannot be empty", "bad_query_param"));
         }
 
-        if (queryParams.Metrics.Length > 200)
+        if (queryParams.Metrics?.Length > 200)
         {
             return Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
                 "Query Params Metrics too long", "bad_query_param"));
@@ -75,7 +75,7 @@ public class AnalyticsController : CustomBaseController
 
         var newRequestOptions = JobAnalyticsRequestOptions.None;
 
-        var splitMetrics = new HashSet<string>(queryParams.Metrics.Split(","), StringComparer.OrdinalIgnoreCase);
+        var splitMetrics = new HashSet<string>(queryParams?.Metrics?.Split(",") ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
 
         if (splitMetrics.Contains("MinRunLength"))
             newRequestOptions |= JobAnalyticsRequestOptions.MinRunLength;
@@ -102,7 +102,7 @@ public class AnalyticsController : CustomBaseController
         if (splitMetrics.Contains("MedianApiResponseLatency") || splitMetrics.Contains("MedianEdgeResponseLatency"))
             newRequestOptions |= JobAnalyticsRequestOptions.MedianResponseLatency;
 
-        if (newRequestOptions == JobAnalyticsRequestOptions.None)
+        if (newRequestOptions == JobAnalyticsRequestOptions.None && metricsRequired)
         {
             return Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
                 "Query Params Metrics cannot be none/empty. ", "bad_query_param"));
@@ -135,6 +135,76 @@ public class AnalyticsController : CustomBaseController
     }
 
 
+    /// <summary>
+    /// Get Adaptively Sampled Job Error Analytics
+    /// </summary>
+    /// <param name="jobName"></param>
+    /// <param name="queryParams"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    [HttpGet("{jobName}/erroranalytics")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<ErrorJobAnalyticsDTO>),
+        Description = "On success, return adaptively sampled job analytics with the requested metrics")]
+    //[SwaggerResponseExample(200, typeof(JobDataResponseExample))]
+    [SwaggerRequestExample(typeof(AnalyticsQueryParams), typeof(ErrorJobAnalyticsDTORequestExample))]
+    public async Task<IActionResult> GetJobErrorAnalytics(string jobName, [FromQuery] AnalyticsQueryParams queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        return (await _analyticsService.GetErrorAnalyticsForJob(jobName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+
+    /// <summary>
+    /// Get Adaptively Sampled Job Analytics
+    /// </summary>
+    /// <param name="jobName"></param>
+    /// <param name="queryParams"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    [HttpGet("analytics/type/{jobType}")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<NormalJobAnalyticsDTO>),
+        Description = "On success, return adaptively sampled job analytics with the requested metrics")]
+    //[SwaggerResponseExample(200, typeof(JobDataResponseExample))]
+    [SwaggerRequestExample(typeof(AnalyticsQueryParams), typeof(NormalJobAnalyticsRequestExample))]
+    public async Task<IActionResult> GetJobAnalyticsByType(string jobType, [FromQuery] AnalyticsQueryParams queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams, false);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+
+
+        return (await _analyticsService.GetJobAnalyticsByType(jobType, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+    /// <summary>
+    /// Get Adaptively Sampled Job Error Analytics
+    /// </summary>
+    /// <param name="jobName"></param>
+    /// <param name="queryParams"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    [HttpGet("erroranalytics/type/{jobType}")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<ErrorJobAnalyticsDTO>),
+        Description = "On success, return adaptively sampled job analytics with the requested metrics")]
+    //[SwaggerResponseExample(200, typeof(JobDataResponseExample))]
+    [SwaggerRequestExample(typeof(AnalyticsQueryParams), typeof(ErrorJobAnalyticsDTORequestExample))]
+    public async Task<IActionResult> GetJobErrorAnalyticsByType(string jobType, [FromQuery] AnalyticsQueryParams queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        return (await _analyticsService.GetErrorAnalyticsForJobType(jobType, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+
     [HttpGet("{jobName}/locations/{locationName}/analytics")]
     [SwaggerResponse(200, Type = typeof(DataResponse<NormalJobLocationAnalyticsDTO>),
 
@@ -149,5 +219,38 @@ public class AnalyticsController : CustomBaseController
             return tryGetRequestOptions.MapToResult();
 
         return (await _analyticsService.GetJobAnalyticsLocation(jobName, locationName.ToUpper(), queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+    [HttpGet("{jobName}/locations/region/{regionName}/analytics")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<NormalJobLocationAnalyticsDTO>),
+
+        Description = "On success, return adaptively sampled job analytics with the requested metrics and location")]
+    //[SwaggerResponseExample(200, typeof(JobLocationDataResponseExample))]
+
+    public async Task<IActionResult> GetJobLocationAnalyticsByRegion(string jobName, string regionName, [FromQuery] AnalyticsQueryParamsLocations queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        return (await _analyticsService.GetJobAnalyticsLocationRegion(new []{ jobName }, regionName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+
+    [HttpGet("analytics/locations/region/{regionName}/{jobNames}")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<NormalJobLocationAnalyticsDTO>),
+
+        Description = "On success, return adaptively sampled job analytics with the requested metrics and location")]
+    //[SwaggerResponseExample(200, typeof(JobLocationDataResponseExample))]
+
+    public async Task<IActionResult> GetJobLocationAnalyticsByRegionMultiple(string regionName, string jobNames, [FromQuery] AnalyticsQueryParamsLocations queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        return (await _analyticsService.GetJobAnalyticsLocationRegion(jobNames.Split(","), regionName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
     }
 }

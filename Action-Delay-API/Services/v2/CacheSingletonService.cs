@@ -17,6 +17,9 @@ public class CacheSingletonService : ICacheSingletonService
 
     public static Dictionary<string, string> INTERNAL_JOB_NAME_TO_TYPE;
     public static Dictionary<string, string> PUBLIC_TO_INTERNAL_NAMES;
+
+    public static Dictionary<string, string[]> REGION_TO_LOCATION;
+
     public static DateTime JOB_NAMES_LAST_CACHE = DateTime.MinValue;
 
 
@@ -99,10 +102,13 @@ public class CacheSingletonService : ICacheSingletonService
 
     }
 
-    public void CacheLocationNames(IEnumerable<string> locationNames)
+    public void CacheLocationNames(List<LocationData> locationNames)
 
     {
-        Interlocked.Exchange(ref LOCATION_NAMES, new HashSet<string>(locationNames));
+        Interlocked.Exchange(ref LOCATION_NAMES, new HashSet<string>(locationNames.Select(location => location.LocationName )));
+        Interlocked.Exchange(ref REGION_TO_LOCATION,
+            locationNames.GroupBy(loc => loc.Region).ToDictionary(keyKvp => keyKvp.Key,
+                elementKvp => elementKvp.Select(data => data.LocationName).ToArray())); 
         LOCATION_NAMES_LAST_CACHE = DateTime.UtcNow;
     }
 
@@ -111,11 +117,34 @@ public class CacheSingletonService : ICacheSingletonService
         if ((DateTime.UtcNow - LOCATION_NAMES_LAST_CACHE).TotalSeconds > 30)
         {
             // new
-            CacheLocationNames(await _genericServersContext.JobLocations.Select(job => job.LocationName)
+            CacheLocationNames(await _genericServersContext.LocationData
                 .ToListAsync(token));
         }
 
         return LOCATION_NAMES;
+    }
+
+    public async ValueTask<Dictionary<string, string[]>> GetRegions(CancellationToken token)
+    {
+        if ((DateTime.UtcNow - LOCATION_NAMES_LAST_CACHE).TotalSeconds > 30)
+        {
+            // new
+            CacheLocationNames(await _genericServersContext.LocationData
+                .ToListAsync(token));
+        }
+
+        return REGION_TO_LOCATION;
+    }
+
+    public async ValueTask<string[]> GetLocationsForRegion(string regionName, CancellationToken token)
+    {
+        var getLocs = await GetRegions(token);
+
+        if (getLocs.TryGetValue(regionName, out var locs))
+            return locs;
+
+        return Array.Empty<string>();
+
     }
 
 

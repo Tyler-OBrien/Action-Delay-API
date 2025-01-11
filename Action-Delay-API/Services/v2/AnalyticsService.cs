@@ -188,6 +188,30 @@ public class AnalyticsService : IAnalyticsService
             { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_average_response_latency" },
         }
     };
+    public async Task<Result<DataResponse<NormalJobAnalyticsDTO>>> GetJobAnalyticsByType(string jobType, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
+    {
+        var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);
+        if (tryValidate.IsFailed)
+            return Result.Fail(tryValidate.Errors.First());
+
+
+        Task<NormalJobAnalytics> getAnalyticsTask = null;
+        var jobList = await _cacheSingletonService.GetJobsByType(jobType, token);
+
+
+        if (jobType?.Equals("AI", StringComparison.OrdinalIgnoreCase) ?? false)
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(jobList, startDateTime, endDateTime, JobAnalyticsAIConfig, maxPoints, options, token);
+        else if (jobType?.Equals("Perf", StringComparison.OrdinalIgnoreCase) ?? false)
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(jobList, startDateTime, endDateTime, JobAnalyticsPerfConfig, maxPoints, options, token);
+        else
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(jobList, startDateTime, endDateTime, JobAnalyticsWorkersDelayConfig, maxPoints, options, token);
+        var getAnalytics = await getAnalyticsTask;
+
+
+        return new DataResponse<NormalJobAnalyticsDTO>(new NormalJobAnalyticsDTO(getAnalytics, jobType));
+
+    }
+
 
     public async Task<Result<DataResponse<NormalJobAnalyticsDTO>>> GetJobAnalytics(string jobName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
     {
@@ -205,13 +229,15 @@ public class AnalyticsService : IAnalyticsService
         var getCurrentJobStatusTask = _genericServersContext.JobData.FirstOrDefaultAsync(job => job.InternalJobName == tryGetJobInternalName, token);
 
         Task<NormalJobAnalytics> getAnalyticsTask = null;
+        var jobList = new string[] { tryGetJobInternalName };
 
-        if (getJobType?.Equals("AI", StringComparison.OrdinalIgnoreCase) ?? false) 
-            getAnalyticsTask =  _clickhouseService.GetNormalJobAnalytics(tryGetJobInternalName, startDateTime, endDateTime, JobAnalyticsAIConfig, maxPoints, options, token);
+
+        if (getJobType?.Equals("AI", StringComparison.OrdinalIgnoreCase) ?? false)
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(jobList, startDateTime, endDateTime, JobAnalyticsAIConfig, maxPoints, options, token);
         else if (getJobType?.Equals("Perf", StringComparison.OrdinalIgnoreCase) ?? false)
-            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(tryGetJobInternalName, startDateTime, endDateTime, JobAnalyticsPerfConfig, maxPoints, options, token);
-        else 
-            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(tryGetJobInternalName, startDateTime, endDateTime, JobAnalyticsWorkersDelayConfig, maxPoints, options, token);
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(jobList, startDateTime, endDateTime, JobAnalyticsPerfConfig, maxPoints, options, token);
+        else
+            getAnalyticsTask = _clickhouseService.GetNormalJobAnalytics(jobList, startDateTime, endDateTime, JobAnalyticsWorkersDelayConfig, maxPoints, options, token);
         await Task.WhenAll(getAnalyticsTask, getCurrentJobStatusTask);
         var getCurrentJobStatus = getCurrentJobStatusTask.Result;
         var getAnalytics = getAnalyticsTask.Result;
@@ -306,13 +332,72 @@ public class AnalyticsService : IAnalyticsService
             { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
             { JobAnalyticsRequestOptions.MinResponseLatency, "min_response_latency" },
             { JobAnalyticsRequestOptions.MaxResponseLatency, "max_response_latency" },
-            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" }, 
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" },
             { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_response_latency" },
         }
     };
 
 
 
+
+
+    public async Task<Result<DataResponse<NormalJobLocationAnalyticsDTO>>> GetJobAnalyticsLocationRegion(string[] jobNames, string regionName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
+    {
+        var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);
+        if (tryValidate.IsFailed)
+            return Result.Fail(tryValidate.Errors.First());
+
+        var tryGetLocs = await _cacheSingletonService.GetLocationsForRegion(regionName, token);
+
+        if (tryGetLocs.Any() == false)
+            return Result.Fail(new ErrorResponse(404,
+                "Could not find any locs for region", "no_locations_for_region"));
+
+        string? currentJobType = null;
+        List<string> newJobList = new List<string>();
+        foreach (var jobName in jobNames)
+        {
+            var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+            if (tryGetJobInternalName == null)
+                return Result.Fail(new ErrorResponse(404,
+                    "Could not find job", "job_not_found"));
+
+            newJobList.Add(tryGetJobInternalName);
+            var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
+
+
+            if (currentJobType != null)
+            {
+                if (currentJobType.Equals(getJobType, StringComparison.OrdinalIgnoreCase) == false)
+                {
+                    return Result.Fail(new ErrorResponse(404,
+                        "You have specified jobs of different types which is disallowed", "jobs_of_different_types"));
+                }
+            }
+            else
+            {
+                currentJobType = getJobType;
+            }
+        }
+
+   
+
+
+
+
+        Task<NormalJobAnalytics> tryGetAnalytics = null;
+
+        if (currentJobType.Equals("AI", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(newJobList.ToArray(), tryGetLocs, startDateTime, endDateTime, JobLocationAnalyticsAIConfig, maxPoints, options, token);
+        else if (currentJobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(newJobList.ToArray(), tryGetLocs, startDateTime, endDateTime, JobLocationAnalyticsPerfConfig, maxPoints, options, token);
+        else
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(newJobList.ToArray(), tryGetLocs, startDateTime, endDateTime, JobLocationAnalyticsWorkersDelayConfig, maxPoints, options, token);
+
+        var getAnalytics = await tryGetAnalytics;
+
+        return new DataResponse<NormalJobLocationAnalyticsDTO>(new NormalJobLocationAnalyticsDTO(getAnalytics, regionName, String.Join(",", newJobList)));
+    }
     public async Task<Result<DataResponse<NormalJobLocationAnalyticsDTO>>> GetJobAnalyticsLocation(string jobName, string locationName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
     {
         var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);
@@ -328,22 +413,142 @@ public class AnalyticsService : IAnalyticsService
             return Result.Fail(new ErrorResponse(404,
                 "Could not find job", "job_not_found"));
 
-        var getJobType = await _cacheSingletonService.GetJobType(tryGetJobInternalName, token);
+        var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
 
 
-
+        var jobList = new string[] { tryGetJobInternalName };
+        var arrayOfLocs = new string[] { locationName };
 
         Task<NormalJobAnalytics> tryGetAnalytics = null;
 
         if (getJobType.Equals("AI", StringComparison.OrdinalIgnoreCase))
-            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(tryGetJobInternalName, locationName, startDateTime, endDateTime, JobLocationAnalyticsAIConfig, maxPoints, options, token);
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(jobList, arrayOfLocs, startDateTime, endDateTime, JobLocationAnalyticsAIConfig, maxPoints, options, token);
         else if (getJobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
-            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(tryGetJobInternalName, locationName, startDateTime, endDateTime, JobLocationAnalyticsPerfConfig, maxPoints, options, token);
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(jobList, arrayOfLocs, startDateTime, endDateTime, JobLocationAnalyticsPerfConfig, maxPoints, options, token);
         else
-            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(tryGetJobInternalName, locationName, startDateTime, endDateTime, JobLocationAnalyticsWorkersDelayConfig, maxPoints, options, token);
+            tryGetAnalytics = _clickhouseService.GetNormalJobLocationAnalytics(jobList, arrayOfLocs, startDateTime, endDateTime, JobLocationAnalyticsWorkersDelayConfig, maxPoints, options, token);
 
         var getAnalytics = await tryGetAnalytics;
 
         return new DataResponse<NormalJobLocationAnalyticsDTO>(new NormalJobLocationAnalyticsDTO(getAnalytics, locationName, tryGetJobInternalName));
+    }
+
+
+
+
+    public static JobAnalyticsConfiguration JobErrorAnalyticsNormal = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "api_errors_ai",
+        ThirtyMinDataSet = "api_errors_mv_30_mins",
+        TwelthHourDataSet = "api_errors_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+
+        }
+    };
+    public static JobAnalyticsConfiguration JobErrorAnalyticsAI = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_locations_ai",
+        ThirtyMinDataSet = "api_errors_ai_mv_30_mins",
+        TwelthHourDataSet = "api_errors_ai_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+        }
+    };
+
+    public static JobAnalyticsConfiguration JobErrorAnalyticsPerf = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "api_errors_perf",
+        ThirtyMinDataSet = "api_errors_perf_mv_30_mins",
+        TwelthHourDataSet = "api_errors_perf_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+
+        }
+    };
+
+
+    public async Task<Result<DataResponse<ErrorJobAnalyticsDTO>>> GetErrorAnalyticsForJobType(string jobType, DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100)
+    {
+        var tryValidate = ValidateParams(startDateTime, endDateTime, JobAnalyticsRequestOptions.MedianRunLength, maxPoints);
+        if (tryValidate.IsFailed)
+            return Result.Fail(tryValidate.Errors.First());
+
+
+        var jobList = await _cacheSingletonService.GetJobsByType(jobType, token);
+
+
+
+        Task<ErrorJobAnalytics> tryGetAnalytics = null;
+
+        if (jobType.Equals("AI", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetJobErrorAnalytics(jobList, startDateTime, endDateTime, JobErrorAnalyticsAI, maxPoints, token);
+        else if (jobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetJobErrorAnalytics(jobList, startDateTime, endDateTime, JobErrorAnalyticsPerf, maxPoints, token);
+        else
+            tryGetAnalytics = _clickhouseService.GetJobErrorAnalytics(jobList, startDateTime, endDateTime, JobErrorAnalyticsNormal, maxPoints, token);
+
+        var getAnalytics = await tryGetAnalytics;
+
+        var resolveUniqueErrorHashes = getAnalytics.Points.Select(point => point.ErrorHash).Distinct().ToList();
+
+        var allUniqueErrors =
+          await _genericServersContext.JobErrors.Where(jobError => resolveUniqueErrorHashes.Contains(jobError.ErrorHash)).ToListAsync(token);
+
+
+
+        return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, jobType, allUniqueErrors.ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
+    }
+
+
+
+    public async Task<Result<DataResponse<ErrorJobAnalyticsDTO>>> GetErrorAnalyticsForJob(string jobName, DateTime startDateTime, DateTime endDateTime , CancellationToken token, int maxPoints = 100)
+    {
+        var tryValidate = ValidateParams(startDateTime, endDateTime,  JobAnalyticsRequestOptions.MedianRunLength, maxPoints);
+        if (tryValidate.IsFailed)
+            return Result.Fail(tryValidate.Errors.First());
+
+
+        var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+        if (tryGetJobInternalName == null)
+            return Result.Fail(new ErrorResponse(404,
+                "Could not find job", "job_not_found"));
+
+        var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
+
+
+        var jobList = new string[] { tryGetJobInternalName };
+
+
+        Task<ErrorJobAnalytics> tryGetAnalytics = null;
+
+        if (getJobType.Equals("AI", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetJobErrorAnalytics(jobList, startDateTime, endDateTime, JobErrorAnalyticsAI, maxPoints, token);
+        else if (getJobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetJobErrorAnalytics(jobList, startDateTime, endDateTime, JobErrorAnalyticsPerf, maxPoints, token);
+        else
+            tryGetAnalytics = _clickhouseService.GetJobErrorAnalytics(jobList, startDateTime, endDateTime, JobErrorAnalyticsNormal, maxPoints,  token);
+
+        var getAnalytics = await tryGetAnalytics;
+
+        var resolveUniqueErrorHashes = getAnalytics.Points.Select(point => point.ErrorHash).Distinct().ToList();
+
+        var allUniqueErrors =
+          await  _genericServersContext.JobErrors.Where(jobError => resolveUniqueErrorHashes.Contains(jobError.ErrorHash)).ToListAsync(token);
+
+
+
+        return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, tryGetJobInternalName, allUniqueErrors.ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
     }
 }
