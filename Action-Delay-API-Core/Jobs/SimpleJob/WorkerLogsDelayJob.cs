@@ -46,10 +46,12 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 return;
             }
 
-            var data = tryGetAnalytic.Value!.Result!.Events.EventsEvents.First().Timestamp;
-
-            if (DateTime.TryParse(data, out var eventTimeStamp))
+            var data = tryGetAnalytic.Value!.Result!.Events.EventsEvents.First().Timestamp.ToString();
+            long parsedDatetime = -1;
+            if (DateTime.TryParse(data, out var eventTimeStamp) || (long.TryParse(data, out  parsedDatetime) && parsedDatetime > 100001002420 && parsedDatetime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()))
             {
+                if (parsedDatetime != -1 && (eventTimeStamp == DateTime.MinValue || eventTimeStamp == default))
+                    eventTimeStamp = DateTimeOffset.FromUnixTimeMilliseconds(parsedDatetime).DateTime;
 
                 this.JobData.CurrentRunLengthMs = (DateTime.UtcNow - eventTimeStamp).TotalMilliseconds > 0
                     ? (ulong)(DateTime.UtcNow - eventTimeStamp).TotalMilliseconds
@@ -61,9 +63,9 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
             }
             else
             {
-                _logger.LogCritical($"Failure getting  Worker Obs Logs, could not parse event timestamp {eventTimeStamp}");
+                _logger.LogCritical($"Failure getting  Worker Obs Logs, could not parse event timestamp {eventTimeStamp}, {data}");
                 throw new CustomAPIError(
-                    $"Failure getting  Worker Obs Logs, could not parse event timestamp {eventTimeStamp}");
+                    $"Failure getting  Worker Obs Logs, could not parse event timestamp {eventTimeStamp}, {data}");
                 return;
             }
         }
