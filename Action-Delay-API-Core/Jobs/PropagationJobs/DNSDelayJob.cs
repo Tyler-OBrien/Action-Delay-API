@@ -141,12 +141,14 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetAnswer.StartsWith(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{Name}: {location.Name}:{getResponse.TryGetColoId()} sees the change!");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{Name}: {location.Name}:{getResponse.TryGetColoId()} sees the change!");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.TryGetColoId() ?? -1);
             }
             else
             {
-                _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name}:{getResponse.TryGetColoId()} sees {tryGetAnswer} instead of {_valueToLookFor}!");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name}:{getResponse.TryGetColoId()} sees {tryGetAnswer} instead of {_valueToLookFor}!");
                 return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.TryGetColoId() ?? -1);
             }
         }

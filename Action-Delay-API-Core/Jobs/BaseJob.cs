@@ -13,7 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+using Action_Delay_API_Core.Services;
 
 
 public class Status
@@ -58,6 +58,8 @@ public abstract class BaseJob
 
     public abstract int TargetExecutionSecond { get; }
     public abstract bool Enabled { get; }
+
+    public RateLimitedEventLogger RateLimitedEventLogger { get; } =  new RateLimitedEventLogger();
 
 
 

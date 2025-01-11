@@ -143,6 +143,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         }
 
 
+
         public override async Task<RunLocationResult> RunLocation(Location location, CancellationToken token)
         {
             var tryGetResult = await SendRequest(location, token);
@@ -159,12 +160,14 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             if (getResponse.StatusCode == HttpStatusCode.OK && getResponse.Body.StartsWith("Hello World!", StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees the change! Let's remove this and move on..");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees the change! Let's remove this and move on..");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.GetColoId());
             }
             else
             {
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body.Truncate(10)} instead of Hello World!, and {getResponse.StatusCode} instead of {HttpStatusCode.UnsupportedMediaType.ToString()}! Let's try again...");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body.Truncate(10)} instead of Hello World!, and {getResponse.StatusCode} instead of {HttpStatusCode.UnsupportedMediaType.ToString()}! Let's try again...");
                 if (getResponse is { WasSuccess: false, ProxyFailure: true })
                 {
                     _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");

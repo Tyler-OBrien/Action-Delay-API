@@ -126,12 +126,14 @@ namespace Action_Delay_API_Core.Jobs
             if (getResponse.Body.StartsWith(_generatedValue, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees change.");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees change.");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.GetColoId());
             }
             else
             {
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_generatedValue}! Status Code: {getResponse.StatusCode}.");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_generatedValue}! Status Code: {getResponse.StatusCode}.");
                 if (getResponse is { WasSuccess: false, ProxyFailure: true })
                 {
                     _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");

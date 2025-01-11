@@ -131,6 +131,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
             var getResponse = tryGetResult.Value;
             if (tryGetResult.Value.ProxyFailure)
             {
+
                 _logger.LogInformation($"Proxy Failure {getResponse.Info}, aborting loc");
                 return new RunLocationResult("Proxy Failure", null, -1);
             }
@@ -147,12 +148,14 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
             if (tryGetAnswer.StartsWith(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{Name}: {location.Name}:{getResponse.TryGetColoId()} sees the change!");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{Name}: {location.Name}:{getResponse.TryGetColoId()} sees the change!");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.TryGetColoId() ?? -1);
             }
             else
             {
-                _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name}:{getResponse.TryGetColoId()} sees {tryGetAnswer} instead of {_valueToLookFor}!");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name}:{getResponse.TryGetColoId()} sees {tryGetAnswer} instead of {_valueToLookFor}!");
                 return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.TryGetColoId() ?? -1);
             }
         }

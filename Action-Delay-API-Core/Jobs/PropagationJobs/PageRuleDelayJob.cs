@@ -176,13 +176,15 @@ public class PageRuleDelayJob : BasePropagationJob
         if (locationHeader.EndsWith(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
         {
             // We got the right value!
-            _logger.LogInformation(
+            if (RateLimitedEventLogger.ShouldLog())
+                _logger.LogInformation(
                 $"{location.Name}:{getResponse.GetColoId()} sees the change! Let's remove this and move on..");
             return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs,
                 getResponse.GetColoId());
         }
 
-        _logger.LogInformation(
+        if (RateLimitedEventLogger.ShouldLog())
+            _logger.LogInformation(
             $"{location.Name}:{getResponse.GetColoId()} sees {locationHeader} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of {HttpStatusCode.UnsupportedMediaType.ToString()}! Let's try again...");
         if (getResponse is { WasSuccess: false, ProxyFailure: true })
         {

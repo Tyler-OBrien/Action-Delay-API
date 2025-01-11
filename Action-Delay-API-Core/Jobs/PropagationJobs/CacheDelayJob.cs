@@ -98,18 +98,21 @@ namespace Action_Delay_API_Core.Jobs
                             var cacheAge = tryGetCacheAgeHeader.Value;
                             if (String.IsNullOrEmpty(cacheAge) || int.TryParse(cacheAge, out var cacheAgeInt) == false || cacheAgeInt < 10)
                             {
-                                _logger.LogInformation($"Error, cache is too new or missing, cache value {cacheAge}, Cache Status: {tryGetCacheStatus}, location: {location.Name}");
+                                if (RateLimitedEventLogger.ShouldLog())
+                                    _logger.LogInformation($"Error, cache is too new or missing, cache value {cacheAge}, Cache Status: {tryGetCacheStatus}, location: {location.Name}");
                                 continue;
                             }
                             else
                             {
-                                _logger.LogInformation($"{location.Name} pre-warmed, cache age: {cacheAge}, Cache Status: {tryGetCacheStatus}");
+                                if (RateLimitedEventLogger.ShouldLog())
+                                    _logger.LogInformation($"{location.Name} pre-warmed, cache age: {cacheAge}, Cache Status: {tryGetCacheStatus}");
                                 break;
                             }
                         }
                         else
                         {
-                            _logger.LogInformation($"Error, cache is missing, Cache Status: {tryGetCacheStatus}, location: {location.Name}, http status: {result.StatusCode}");
+                            if (RateLimitedEventLogger.ShouldLog())
+                                _logger.LogInformation($"Error, cache is missing, Cache Status: {tryGetCacheStatus}, location: {location.Name}, http status: {result.StatusCode}");
                             continue;
                         }
                     }
@@ -230,12 +233,14 @@ namespace Action_Delay_API_Core.Jobs
             if (getResponse.StatusCode == HttpStatusCode.OK && getResponse.Body.Equals(_valueToLookFor, StringComparison.OrdinalIgnoreCase))
             {
                 // We got the right value!
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees change");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees change");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.GetColoId());
             }
             else
             {
-                _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of 200 / OK!");
+                if (RateLimitedEventLogger.ShouldLog())
+                    _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of 200 / OK!");
                 if (getResponse is { WasSuccess: false, ProxyFailure: true})
                 {
                     _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
