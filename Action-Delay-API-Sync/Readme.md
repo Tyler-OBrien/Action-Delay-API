@@ -1,0 +1,1 @@
+Action-Delay-API-Sync leverages EF Core to sync Postgres to read-only replicas (currently, just one in AMS and one in SIN, pulling from PDX)
