@@ -49,6 +49,8 @@ namespace Action_Delay_API_Worker.Models.API.Request
 
         public bool? AlwaysAllResponseHeadersOnNonSuccessStatusCode { get; set; }
 
+        public bool? DisableAutomaticResponseDecompression { get; set; }
+
     }
 
 }

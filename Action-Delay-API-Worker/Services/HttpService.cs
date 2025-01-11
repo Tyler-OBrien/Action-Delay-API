@@ -1,5 +1,7 @@
-﻿using System.Diagnostics;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.Tracing;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -13,6 +15,7 @@ using Action_Delay_API_Worker.Models.Services;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Extensions.Http;
+using ZstdSharp;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace Action_Delay_API_Worker.Services;
@@ -43,6 +46,7 @@ namespace Action_Delay_API_Worker.Services;
 
         public async Task<SerializableHttpResponse> PerformRequestAsync(SerializableHttpRequest incomingRequest, string source)
         {
+            Decompressor? borrowedCompToReturn = null;
             try
             {
 
@@ -54,7 +58,7 @@ namespace Action_Delay_API_Worker.Services;
                 var url = incomingRequest.URL;
                 var headers = incomingRequest.Headers;
 
-                
+
 
                 var httpVersion = HttpVersion.Version20;
                 if (incomingRequest.HttpType.HasValue)
@@ -68,8 +72,10 @@ namespace Action_Delay_API_Worker.Services;
                 }
 
                 bool wantsBody = incomingRequest.ReturnBody == null || incomingRequest.ReturnBody.Value;
-                bool wantsBodyOnError = incomingRequest.ReturnBodyOnError == null || incomingRequest.ReturnBodyOnError.Value;
-                bool wantsBodyHash = incomingRequest.ReturnBodySha256.HasValue && incomingRequest.ReturnBodySha256.Value;
+                bool wantsBodyOnError =
+                    incomingRequest.ReturnBodyOnError == null || incomingRequest.ReturnBodyOnError.Value;
+                bool wantsBodyHash =
+                    incomingRequest.ReturnBodySha256.HasValue && incomingRequest.ReturnBodySha256.Value;
 
                 string perfInfo = string.Empty;
                 double responseTimeMs = -1;
@@ -106,13 +112,13 @@ namespace Action_Delay_API_Worker.Services;
                                     method = HttpMethod.Get;
                                     break;
                             }
+
                         var request = new HttpRequestMessage(method, url);
                         request.Version = httpVersion;
                         request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
                         if (incomingRequest.EnableConnectionReuse is null or false)
                             request.Headers.ConnectionClose = true;
 
-                    
 
 
                         if (incomingRequest.Body != null)
@@ -154,15 +160,21 @@ namespace Action_Delay_API_Worker.Services;
                             if (request.Headers.TryAddWithoutValidation(header.Key, header.Value) == false)
                                 request.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value);
                         }
+
                         if (request.Headers.Contains("X-Action-Delay-API-Worker-Version") == false)
-                            request.Headers.Add("X-Action-Delay-API-Worker-Version", Assembly.GetCallingAssembly().GetName().Version.ToString());
+                            request.Headers.Add("X-Action-Delay-API-Worker-Version",
+                                Assembly.GetCallingAssembly().GetName().Version.ToString());
                         if (request.Headers.Contains("Worker") == false)
                             request.Headers.Add("Worker", _localConfig.Location.ToUpper());
 
+                        if (incomingRequest.DisableAutomaticResponseDecompression.HasValue == false || incomingRequest.DisableAutomaticResponseDecompression == false)
+                        {
+                            request.Headers.AcceptEncoding.ParseAdd("gzip, br, zstd");
+                        }
 
 
-                        MemoryStream content = null;
-                        HttpClient newClient = null;
+                        MemoryStream? content = null;
+                        HttpClient? newClient = null;
                         try
                         {
                             newClient = NewHttpClient(incomingRequest.EnableConnectionReuse ?? false);
@@ -194,13 +206,29 @@ namespace Action_Delay_API_Worker.Services;
                             else if (timings.Request != null)
                                 responseTimeMs = timings.Request.Value.TotalMilliseconds;
                             responseTimeMs += responseContent.latencyMs;
+                            if (_localConfig.EnableLogsForAllRequests)
                             perfInfo =
                                 $"DNS: {dnsResolveLatency}ms, Connect: {timings.SocketConnect?.TotalMilliseconds ?? 0}ms, SSL: {timings.SslHandshake?.TotalMilliseconds ?? 0}ms, Request: {timings.Request?.TotalMilliseconds ?? 0}ms, Response Headers: {timings.ResponseHeaders?.TotalMilliseconds ?? 0}ms, Response Content: {responseContent.latencyMs}ms.";
                             couldGetBody = responseContent.couldRead;
                             if (couldGetBody)
-                                response.Content = new StreamContent(responseContent.Item1);
+                            {
+                                if (incomingRequest.DisableAutomaticResponseDecompression.HasValue == false || incomingRequest.DisableAutomaticResponseDecompression == false)
+                                {
+
+                                    var tryDecomp =
+                                        ResolveStreamContentAutomaticCompression(responseContent.memStream, response);
+                                    response.Content = tryDecomp.content;
+                                    borrowedCompToReturn = tryDecomp.borrowDecompressor;
+                                }
+                                else
+                                {
+                                    response.Content = new StreamContent(responseContent.memStream);
+                                }
+
+                            }
                             else
                                 response.Content = null;
+
                             return response;
                         }
                         finally
@@ -305,10 +333,67 @@ namespace Action_Delay_API_Worker.Services;
                     Info = "Unhandled Exception :("
                 };
             }
+            finally
+            {
+                if (borrowedCompToReturn != null)
+                    ReturnDecompressor(borrowedCompToReturn);
+            }
 
         }
 
-        public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
+        private static readonly ConcurrentBag<Decompressor> _pool = new ConcurrentBag<Decompressor>();
+
+        public Decompressor GetDecompressor()
+        {
+            if (_pool.TryTake(out var dctx))
+            {
+                return dctx;
+            }
+            else
+            {
+                var newDecomp = new Decompressor();
+                return newDecomp;
+            }
+        }
+
+        public void ReturnDecompressor(Decompressor dctx)
+        {
+            _pool.Add(dctx);
+        }
+
+
+      private  (StreamContent content, Decompressor? borrowDecompressor) ResolveStreamContentAutomaticCompression(MemoryStream content, HttpResponseMessage response)
+        {
+            ICollection<string> contentEncodings = response.Content.Headers.ContentEncoding;
+            if (contentEncodings.Count > 0)
+            {
+                string? last = null;
+                foreach (string encoding in contentEncodings)
+                {
+                    last = encoding;
+                }
+
+                if (string.Equals(last, "gzip", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (new StreamContent(new GZipStream(content, CompressionMode.Decompress)), null);
+                }
+                else if (string.Equals(last, "zstd", StringComparison.OrdinalIgnoreCase))
+                {
+                    var newComp = GetDecompressor();
+
+                    return (new StreamContent(new ZstdSharp.DecompressionStream(content, newComp)), newComp);
+                }
+                else if (string.Equals(last, "br", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (new StreamContent(new BrotliStream(content, CompressionMode.Decompress)), null);
+
+                }
+            }
+
+            return (new StreamContent(content), null);
+        }
+
+    public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
         {
             byte[] randomBytes = new byte[sizeInBytes];
             var newRandom = new Random(seed);

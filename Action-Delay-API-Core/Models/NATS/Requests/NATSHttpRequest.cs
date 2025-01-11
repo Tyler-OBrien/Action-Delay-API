@@ -82,6 +82,9 @@ namespace Action_Delay_API_Core.Models.NATS.Requests
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public bool? AlwaysAllResponseHeadersOnNonSuccessStatusCode { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? DisableAutomaticResponseDecompression { get; set; }
+
         public void SetDefaultsFromLocation(Location location)
         {
             NetType = location.NetType ?? NATS.NetType.Either;
