@@ -11,7 +11,6 @@ using Action_Delay_API_Core.Models.Local;
 using Microsoft.Extensions.Options;
 using NAudio.Wave;
 using SkiaSharp;
-using static Action_Delay_API_Core.Models.CloudflareAPI.GraphQL.ZoneAnalyticsDateTime;
 
 namespace Action_Delay_API_Core.Jobs.AI
 {
@@ -99,14 +98,28 @@ namespace Action_Delay_API_Core.Jobs.AI
                 };
             }
 
+            if (model.Name.Trim().Equals("@cf/openai/whisper-large-v3-turbo", StringComparison.OrdinalIgnoreCase) ||
+                model.Id.Equals("200f0812-148c-48c1-915d-fb3277a94a08", StringComparison.Ordinal))
+            {
+                return new AIJobConfig()
+                {
+                    ModelName = model.Name,
+                    Input = "text",
+                    InputField = "audio",
+                    OutputType = "json",
+                    ContentStr = Convert.ToBase64String(GetNewAudio()),
+                };
+            }
+
 
 
 
             // Automatic Speech Recognition / dfce1c48-2a81-462e-a7fd-de97ce985207 
             if (model.Task.Name.Equals("Automatic Speech Recognition", StringComparison.OrdinalIgnoreCase) || model.Task.Id.Equals("dfce1c48-2a81-462e-a7fd-de97ce985207", StringComparison.Ordinal))
             {
-                // global for now
-                return new AIJobConfig()
+                
+                    // global for now
+                    return new AIJobConfig()
                 {
                     ModelName = model.Name,
                     Input = "uint8array",
