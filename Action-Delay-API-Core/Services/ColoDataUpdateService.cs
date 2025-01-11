@@ -96,6 +96,8 @@ namespace Action_Delay_API_Core.Services
                    tryGetCurrentLocationData.ColoId = tryGetColoId.Value;
                    tryGetCurrentLocationData.IATA = tryGetColoInfo.IATA;
                    tryGetCurrentLocationData.ColoFriendlyLocationName = tryGetColoInfo.FriendlyName;
+                   if (String.IsNullOrWhiteSpace(tryGetCurrentLocationData.Region))
+                    tryGetCurrentLocationData.Region = tryGetColoInfo.CfRegionDo ?? "";
                    tryGetCurrentLocationData.ColoLatitude = tryGetColoInfo.Latitude;
                    tryGetCurrentLocationData.ColoLongitude = tryGetColoInfo.Longitude;
                    tryGetCurrentLocationData.Enabled = !location.Disabled;

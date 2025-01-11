@@ -17,6 +17,8 @@ public class LocationData
 
     public string FriendlyLocationName { get; set; }
 
+    public string Region { get; set; }
+
     public string Provider { get; set; }
 
     public int ASN { get; set; }
