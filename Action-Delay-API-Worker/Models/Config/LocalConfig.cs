@@ -17,5 +17,9 @@
 
         public bool DumpToDirectoryForDictionaryTraining { get; set; }
 
+        public bool EnableLogsForAllRequests { get; set; }
+
+        public bool DisableLogsForErrors { get; set; }
+
     }
 }

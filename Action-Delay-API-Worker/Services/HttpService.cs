@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;
 using System.IO.Compression;
@@ -243,6 +243,7 @@ namespace Action_Delay_API_Worker.Services;
 
                 if (couldGetBody == false && (wantsBody || wantsBodyHash))
                 {
+                    if (_localConfig.DisableLogsForErrors == false)
                     _logger.LogWarning(
                         "({source}): Received Query Request for {url}, h: {headers}, t: {timeout}, nt: {netType}, connectionReuse: {connectionReuse}, the return body was too large, Http Status Code: {httpErrorStatus}",
                         source,
@@ -259,10 +260,11 @@ namespace Action_Delay_API_Worker.Services;
                         ResponseTimeMs = Math.Round(responseTimeMs, 3),
                     };
                 }
-
+                if (_localConfig.EnableLogsForAllRequests)
                 _logger.LogInformation(
                     "({source}): {url}, h: {headers}, t: {timeout}, nt: {netType}, dnsoverride {dnsOverride}, cust ns {nameserverOverride}, status {StatusCode}, httpVersion: {httpVersion}, connectionReuse: {connectionReuse}, Timings: {perfInfo}",
-                    source, url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.DNSResolveOverride, incomingRequest.CustomDNSServerOverride,
+                    source, url, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType,
+                    incomingRequest.DNSResolveOverride, incomingRequest.CustomDNSServerOverride,
                     response.StatusCode, response.Version, incomingRequest.EnableConnectionReuse, perfInfo);
 
                 string? output = null;
@@ -296,7 +298,12 @@ namespace Action_Delay_API_Worker.Services;
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogWarning(ex, "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an HTTP Exception, Http Status Code: {httpErrorStatus}, {HttpRequestError}, {Message}.",source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse, ex.StatusCode, ex.HttpRequestError, ex.Message);
+                if (_localConfig.DisableLogsForErrors == false)
+                _logger.LogWarning(ex,
+                    "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an HTTP Exception, Http Status Code: {httpErrorStatus}, {HttpRequestError}, {Message}.",
+                    source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs,
+                    incomingRequest.NetType, incomingRequest.EnableConnectionReuse, ex.StatusCode, ex.HttpRequestError,
+                    ex.Message);
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,
@@ -309,7 +316,11 @@ namespace Action_Delay_API_Worker.Services;
             }
             catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
             {
-                _logger.LogWarning(ex, "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we timed out.", source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
+                if (_localConfig.DisableLogsForErrors == false)
+                _logger.LogWarning(ex,
+                    "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we timed out.",
+                    source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs,
+                    incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,
@@ -322,7 +333,10 @@ namespace Action_Delay_API_Worker.Services;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an exception.", source,incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs, incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
+                _logger.LogError(ex,
+                    "({source}): Received Query Request for {url}, headers: {headers}, timeout: {timeout}, NetType: {netType}, connectionReuse: {connectionReuse}, we had an exception.",
+                    source, incomingRequest.URL, incomingRequest.Headers.Count, incomingRequest.TimeoutMs,
+                    incomingRequest.NetType, incomingRequest.EnableConnectionReuse);
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,

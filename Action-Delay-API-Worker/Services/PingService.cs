@@ -6,8 +6,10 @@ using Action_Delay_API_Worker.Extensions;
 using Action_Delay_API_Worker.Models;
 using Action_Delay_API_Worker.Models.API.Request;
 using Action_Delay_API_Worker.Models.API.Response;
+using Action_Delay_API_Worker.Models.Config;
 using Action_Delay_API_Worker.Models.Services;
 using DnsClient;
+using Microsoft.Extensions.Options;
 using Polly;
 
 namespace Action_Delay_API_Worker.Services
@@ -16,10 +18,13 @@ namespace Action_Delay_API_Worker.Services
     {
 
         private readonly ILogger _logger;
+        private readonly LocalConfig _localConfig;
 
-        public PingService(ILogger<PingService> logger)
+
+        public PingService(ILogger<PingService> logger, IOptions<LocalConfig> probeConfiguration)
         {
             _logger = logger;
+            _localConfig = probeConfiguration.Value;
         }
 
 
@@ -56,7 +61,8 @@ namespace Action_Delay_API_Worker.Services
                 }
                 catch (Exception ex) when (ex is SocketException or ArgumentOutOfRangeException or ArgumentException)
                 {
-                    _logger.LogWarning(ex,
+                    if (_localConfig.DisableLogsForErrors == false)
+                        _logger.LogWarning(ex,
                         "Received Ping Request for {queryName}, NetType {netType} via  {dnsServer}, we had an error when trying to resolve the nameservers.",
                         request.Hostname, request.NetType, request.CustomDNSServerOverride);
                     return new SerializablePingResponse()
@@ -68,7 +74,8 @@ namespace Action_Delay_API_Worker.Services
                 }
                 catch (Exception ex) when (ex is OperationCanceledException or TaskCanceledException)
                 {
-                    _logger.LogWarning(ex,
+                    if (_localConfig.DisableLogsForErrors == false)
+                        _logger.LogWarning(ex,
                         "Received Ping Request for {queryName}, NetType {netType} via  {dnsServer}, we had a timeout when trying to resolve the hostname.",
                         request.Hostname, request.NetType, request.CustomDNSServerOverride);
                     return new SerializablePingResponse()
@@ -81,7 +88,7 @@ namespace Action_Delay_API_Worker.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,
+                    _logger.LogError(ex,
                         "Received Ping Request for {queryName}, NetType {netType} via  {dnsServer}, we had an error when trying to resolve the hostname.",
                         request.Hostname, request.NetType, request.CustomDNSServerOverride);
                     return new SerializablePingResponse()
@@ -93,7 +100,8 @@ namespace Action_Delay_API_Worker.Services
 
                 if (hostnameAddresses.Length == 0)
                 {
-                    _logger.LogInformation(
+                    if (_localConfig.DisableLogsForErrors == false)
+                        _logger.LogInformation(
                         "Received Ping Request: Unable to resolve hostname: {hostname}, trying to query with override {dnsOverride} for netType {netType}",
                         request.Hostname, request.CustomDNSServerOverride, request.NetType.ToString() ?? "Either");
                     return new SerializablePingResponse()
@@ -146,6 +154,7 @@ namespace Action_Delay_API_Worker.Services
                 if (results.Any())
                 {
                     var averageMs = results.Average();
+                    if (_localConfig.EnableLogsForAllRequests)
                     _logger.LogInformation(
                         "Received Ping Request for {hostname}, pings: {pings}, customns: {customnameserver}, timeout: {timeout}, netType: {netType}, resolved into {address}, average response time: {averageMs}ms and error info: {exceptionInfo}",
                         request.Hostname, request.PingCount ?? 1, request.CustomDNSServerOverride, request.TimeoutMs, request.NetType, address.ToString(), averageMs, exceptionInfo
@@ -159,6 +168,7 @@ namespace Action_Delay_API_Worker.Services
                 }
                 else
                 {
+                    if (_localConfig.EnableLogsForAllRequests)
                     _logger.LogInformation(
                         "Received Ping Request for {hostname} failed, pings: {pings}, customns: {customnameserver}, timeout: {timeout}, netType: {netType}, resolved into {address}, error info: {exceptionInfo}",
                         request.Hostname, request.PingCount ?? 1, request.CustomDNSServerOverride, request.TimeoutMs, request.NetType, address.ToString(), exceptionInfo
