@@ -62,7 +62,7 @@ namespace Action_Delay_API_Core.Services
             return new IntervalToUse(dataSetInfo.DataSet, dataSetInfo.Interval, dataSetInfo.Agg);
         }
 
-        public async Task<NormalJobAnalytics> GetNormalJobAnalytics(string jobName, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
+        public async Task<NormalJobAnalytics> GetNormalJobAnalytics(string[] jobs, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
             bool agg = output.Agg;
@@ -90,9 +90,9 @@ namespace Action_Delay_API_Core.Services
             string commandText = "";
             if (agg == false)
                 commandText =
-                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and run_status = '{config.NormalDataSetRunStatusFilter}' Group by time_period ORDER BY time_period";
+                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} and run_status = '{config.NormalDataSetRunStatusFilter}' Group by time_period ORDER BY time_period";
             else commandText =
-                $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} Group by time_period ORDER BY time_period";
+                $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} Group by time_period ORDER BY time_period";
 
 
             await using var connection = CreateConnection();
@@ -100,7 +100,7 @@ namespace Action_Delay_API_Core.Services
             await using var command = connection.CreateCommand();
             command.AddParameter("startDateTime", "DateTime", startTime);
             command.AddParameter("endDateTime", "DateTime", endTime);
-            command.AddParameter("jobName", "String", jobName);
+            command.AddParameter("jobs", "Array(String)", jobs);
 
             command.CommandText = commandText;
             var result = await command.ExecuteReaderAsync(token);
@@ -116,8 +116,8 @@ namespace Action_Delay_API_Core.Services
                 GroupByMinutesInterval = output.Interval,
             };
         }
-        /*
-        public async Task<NormalJobAnalytics> GetNormalJobErrorAnalytics(string jobName, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default)
+
+        public async Task<ErrorJobAnalytics> GetJobErrorAnalytics(string[] jobs, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
             bool agg = output.Agg;
@@ -131,23 +131,13 @@ namespace Action_Delay_API_Core.Services
 
 
 
-            var columns = ReturnOptionsColumns(agg, config, option);
-
-            if (columns.Any() == false)
-            {
-                return new NormalJobAnalytics()
-                {
-                    Points = new List<NormalJobAnalyticsPoint>(),
-                    GroupByMinutesInterval = output.Interval,
-                };
-            }
 
             string commandText = "";
             if (agg == false)
                 commandText =
-                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and run_status = '{config.NormalDataSetRunStatusFilter}' Group by time_period, error_hash ORDER BY time_period";
+                    $"SELECT job_name, error_hash, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period, count() AS \"failures\" FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} Group by time_period, job_name, error_hash ORDER BY time_period";
             else commandText =
-                $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} Group by time_period, error_hash ORDER BY time_period";
+                $"SELECT job_name, error_hash, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period, countMerge(error_count) AS \"failures\" FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} Group by time_period, job_name, error_hash ORDER BY time_period";
 
 
             await using var connection = CreateConnection();
@@ -155,24 +145,36 @@ namespace Action_Delay_API_Core.Services
             await using var command = connection.CreateCommand();
             command.AddParameter("startDateTime", "DateTime", startTime);
             command.AddParameter("endDateTime", "DateTime", endTime);
-            command.AddParameter("jobName", "String", jobName);
+            command.AddParameter("jobs", "Array(String)", jobs);
 
             command.CommandText = commandText;
             var result = await command.ExecuteReaderAsync(token);
             var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
-            List<NormalJobAnalyticsPoint> data = new List<NormalJobAnalyticsPoint>(predictedPoints);
+            List<ErrorJobAnalyticsPoint> data = new List<ErrorJobAnalyticsPoint>(predictedPoints);
             while (await result.ReadAsync(token))
             {
-                data.Add(NormalJobAnalyticsFromReader(result, option, false));
+                data.Add(GetErrorAnalyticsReader(result, false));
             }
-            return new NormalJobAnalytics()
+            return new ErrorJobAnalytics()
             {
                 Points = data,
                 GroupByMinutesInterval = output.Interval,
             };
         }
-        */
-        public async Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string jobName, string locationName, DateTime startTime, DateTime endTime,JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
+
+        private ErrorJobAnalyticsPoint GetErrorAnalyticsReader(DbDataReader reader, bool locationName)
+        {
+            var newAnalyticsObj = new ErrorJobAnalyticsPoint();
+            newAnalyticsObj.TimePeriod = reader.GetDateTime("time_period");
+            newAnalyticsObj.JobName = reader.GetString("job_name");
+            newAnalyticsObj.ErrorHash = reader.GetString("error_hash");
+            newAnalyticsObj.Count = Convert.ToUInt64(reader.GetValue("failures"));
+
+            return newAnalyticsObj;
+        }
+
+
+        public async Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string[] jobs, string[] locations, DateTime startTime, DateTime endTime,JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
             bool agg = output.Agg;
@@ -191,9 +193,9 @@ namespace Action_Delay_API_Core.Services
             string commandText = "";
             if (agg == false)
                 commandText =
-                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and run_status = 'Deployed' and location_name = {{locationName:String}} Group by time_period  ORDER BY time_period";
+                    $"SELECT {String.Join(",", columns)}, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and  run_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} and run_status = 'Deployed' and location_name in {{locations:Array(String)}}  Group by time_period  ORDER BY time_period";
             else commandText =
-                $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period  FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name = {{jobName:String}} and location_name = {{locationName:String}}  Group by time_period  ORDER BY time_period";
+                $"SELECT {String.Join(",", columns)}, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) as time_period  FROM \"default\".\"{dataSetName}\" WHERE average_time > {{startDateTime:DateTime}} and  average_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} and location_name in {{locations:Array(String)}} Group by time_period  ORDER BY time_period";
 
 
             await using var connection = CreateConnection();
@@ -201,7 +203,10 @@ namespace Action_Delay_API_Core.Services
             await using var command = connection.CreateCommand();
             command.AddParameter("startDateTime", "DateTime", startTime);
             command.AddParameter("endDateTime", "DateTime", endTime);
-            command.AddParameter("jobName", "String", jobName);
+            command.AddParameter("jobs", "Array(String)", jobs);
+            command.AddParameter("locations", "Array(String)", locations);
+
+
 
 
             command.CommandText = commandText;
