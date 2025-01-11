@@ -1,0 +1,27 @@
+name = "bunny-vector-log-ingest"
+main = "src/index.ts"
+compatibility_date = "2024-05-17"
+account_id = "b9e510810e1e12fcd40826d266a1fb12"
+
+
+[observability.logs]
+enabled = true
+
+
+
+[[ analytics_engine_datasets ]]
+binding = "IngestRateBunnyLogs"
+
+
+
+
+[[ d1_databases ]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "bunny-machines"
+database_id = "51ca0241-a5b2-4cdc-8618-541a20c2cca7"
+
+
+[[ d1_databases ]]
+binding = "DB2" # i.e. available in your Worker on env.DB
+database_name = "bunny-machines-v2"
+database_id = "07614e7c-30a4-4e0b-a4d7-2d5f6c77ffe9"
