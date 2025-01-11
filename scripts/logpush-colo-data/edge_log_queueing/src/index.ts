@@ -1,5 +1,3 @@
-import { instrument, ResolveConfigFn } from "@microlabs/otel-cf-workers";
-import { instrumentDO } from "@microlabs/otel-cf-workers";
 import { DurableObject } from "cloudflare:workers";
 
 export interface Env {
@@ -115,7 +113,7 @@ const handler = {
 
 const SECONDS = 1000;
 const countKey = "count";
-class BatcherUnwrapped implements DurableObject {
+class Batcher implements DurableObject {
   queue: object[];
   storage: DurableObjectStorage;
   state: DurableObjectState;
@@ -429,54 +427,7 @@ export class ReadlineTransformer implements Transformer {
 export const readlineStream = () =>
   new TransformStream(new ReadlineTransformer());
 
-const config: ResolveConfigFn = (env: Env, _trigger) => {
-  // if null, we're not going to export any..
-  if (!env.BASELIME_API_KEY) {
-    const headSamplerConfig = {
-      acceptRemote: false, //Whether to accept incoming trace contexts
-      ratio: 0.0, //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
-    };
-    return {
-      sampling: {
-        headSampler: headSamplerConfig,
-      },
-      exporter: {},
-      service: {},
-    };
-  }
-  return {
-    exporter: {
-      url: "https://otel.baselime.io/v1",
-      headers: { "x-api-key": env.BASELIME_API_KEY },
-    },
-    service: { name: env.SERVICE_NAME },
-  };
-};
-const DOconfig: ResolveConfigFn = (env: Env, _trigger) => {
-  // if null, we're not going to export any..
-  if (!env.BASELIME_API_KEY) {
-    const headSamplerConfig = {
-      acceptRemote: false, //Whether to accept incoming trace contexts
-      ratio: 0.0, //number between 0 and 1 that represents the ratio of requests to sample. 0 is none and 1 is all requests.
-    };
-    return {
-      sampling: {
-        headSampler: headSamplerConfig,
-      },
-      exporter: {},
-      service: {},
-    };
-  }
-  return {
-    exporter: {
-      url: "https://otel.baselime.io/v1",
-      headers: { "x-api-key": env.BASELIME_API_KEY },
-    },
-    service: { name: env.SERVICE_NAME + "-do" },
-  };
-};
-const Batcher = instrumentDO(BatcherUnwrapped, DOconfig);
 
 export { Batcher };
 
-export default instrument(handler, config);
+export default handler;
