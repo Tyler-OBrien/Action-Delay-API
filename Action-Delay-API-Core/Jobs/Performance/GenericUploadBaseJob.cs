@@ -446,7 +446,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
                     { "Worker", location.DisplayName ?? location.Name },
                 },
-                URL = job.Endpoint + "/" + $"action-delay-api-uploadtest-{location.NATSName ?? location.Name}",
+                URL = job.Endpoint + "/" + $"action-delay-api-s3uploadtest/action-delay-api-uploadtest-{location.NATSName ?? location.Name}",
                 TimeoutMs = 30_000,
                 EnableConnectionReuse = true,
                 Method = MethodType.PUT,

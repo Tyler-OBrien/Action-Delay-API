@@ -207,11 +207,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     {"Content-MD5", md5Hash},
                 };
 
-                string objectName = $"action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}";
+                string objectName = $"action-delay-api-s3uploadtest/action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}";
 
                 if (s3Job.KeepOldAndDumpToDiskOnMisMatch.HasValue && s3Job.KeepOldAndDumpToDiskOnMisMatch.Value)
                 {
-                    objectName = $"action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}-{Guid.NewGuid().ToString("N")}";
+                    objectName = $"action-delay-api-s3uploadtest/action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}-{Guid.NewGuid().ToString("N")}";
                 }
                 PresignedPutObjectArgs putObjectArgs = new PresignedPutObjectArgs()
                     .WithBucket(s3Job.BucketName)
