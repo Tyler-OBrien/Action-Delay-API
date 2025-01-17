@@ -1,0 +1,12 @@
+name = "hello-python"
+main = "entry.py"
+compatibility_flags = ["python_workers"]
+compatibility_date = "2025-01-12"
+account_id = "b9e510810e1e12fcd40826d266a1fb12"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
+
