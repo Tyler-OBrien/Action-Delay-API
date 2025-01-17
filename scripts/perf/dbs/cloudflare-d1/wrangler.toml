@@ -14,3 +14,8 @@ enabled = true
 binding = "DB"
 database_name = "action-delay-api-perf"
 database_id = "0ff0fadb-0740-4e9b-ae55-f136528a3c87"
+
+[[d1_databases]]
+binding = "DBStorageSelect"
+database_name = "action-delay-api-perf-intensivequery"
+database_id = "540468d4-4f4d-48ec-bb91-8673452dd4e5"
