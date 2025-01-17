@@ -156,33 +156,40 @@ namespace Action_Delay_API_Core.Jobs.Performance
             }
 
             var cancellationTokenSource = new CancellationTokenSource();
-            try
+            if (downloadJobConfig.DisablePrewarmup == false)
             {
-                Dictionary<Location, Task> preInitWarmTasks = new();
-                foreach (var location in locationsToUse)
+                try
                 {
-                    preInitWarmTasks.Add(location, SendRequestWarmup(location, downloadJobConfig, resolvedDnsNameserverIP, CancellationToken.None));
-                }
+                    Dictionary<Location, Task> preInitWarmTasks = new();
+                    foreach (var location in locationsToUse)
+                    {
+                        preInitWarmTasks.Add(location,
+                            SendRequestWarmup(location, downloadJobConfig, resolvedDnsNameserverIP,
+                                CancellationToken.None));
+                    }
 
-                foreach (var preInitTask in preInitWarmTasks)
-                {
-                    try
+                    foreach (var preInitTask in preInitWarmTasks)
                     {
-                        await preInitTask.Value;
+                        try
+                        {
+                            await preInitTask.Value;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogCritical(ex,
+                                $"{name}: Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}, removing from list..");
+                            locationsToUse.Remove(preInitTask.Key);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        _logger.LogCritical(ex,
-                            $"{name}: Failure warming location: {preInitTask.Key.DisplayName ?? preInitTask.Key.Name}, removing from list..");
-                        locationsToUse.Remove(preInitTask.Key);
-                    }
+
+                    _logger.LogInformation(
+                        $"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {string.Join(", ", preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
                 }
-                _logger.LogInformation($"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {string.Join(", ", preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogCritical(ex,
-                    $"Failure running PreWarmAction for {name}");
+                catch (Exception ex)
+                {
+                    _logger.LogCritical(ex,
+                        $"Failure running PreWarmAction for {name}");
+                }
             }
 
             var runningLocations = new Dictionary<Location, Task<Result<SerializableHttpResponse>>>();
@@ -435,7 +442,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 },
                 URL = resolvedUrl.ToString(),
                 TimeoutMs = 10_000,
-                EnableConnectionReuse = true,
+                EnableConnectionReuse = !jobConfig.NoConnectionKeepAlive,
                 ReturnBody = false,
                 ReturnBodyOnError = false,
                 CustomDNSServerOverride = overridenCustomNameServerResolved,
@@ -484,7 +491,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 },
                 URL = jobConfig.Endpoint.ProcessEndpoint(location),
                 TimeoutMs = 30_000,
-                EnableConnectionReuse = true,
+                EnableConnectionReuse = !jobConfig.NoConnectionKeepAlive,
                 ReturnBody = false,
                 RetriesCount = 0,
                 ReturnBodyOnError = true,

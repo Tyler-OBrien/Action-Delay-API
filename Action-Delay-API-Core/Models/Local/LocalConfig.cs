@@ -96,6 +96,10 @@ namespace Action_Delay_API_Core.Models.Local
         public string? DNSResolveOverride { get; set; }
 
         public NetType? ForceNetType { get; set; }
+
+        public bool DisablePrewarmup { get; set; }
+        
+        public bool NoConnectionKeepAlive { get; set; }
     }
 
 
