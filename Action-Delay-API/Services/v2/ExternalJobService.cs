@@ -31,12 +31,26 @@ namespace Action_Delay_API.Services.v2
 
         public async Task<Result<DataResponse<bool>>> SendJobResult(JobResultRequestDTO jobRequest, int coloId, CancellationToken token)
         {
+
+            if (String.IsNullOrWhiteSpace(jobRequest.InternalJobName))
+            {
+                return Result.Fail($"Job Internal Name cannot be null");
+            }
+
+            if (String.IsNullOrWhiteSpace(jobRequest.JobName))
+            {
+                return Result.Fail($"Job Name cannot be null");
+
+            }
+
             var tryGetJob = await _genericServersContext.JobData.FirstOrDefaultAsync(job => job.InternalJobName == jobRequest.InternalJobName, token);
             if (tryGetJob == null)
             {
                 tryGetJob = new JobData();
                 tryGetJob.InternalJobName = jobRequest.InternalJobName;
                 tryGetJob.JobName = jobRequest.JobName;
+                tryGetJob.JobDescription = string.Empty;
+                tryGetJob.JobType = string.Empty;
                 _genericServersContext.JobData.Add(tryGetJob);
             }
             else

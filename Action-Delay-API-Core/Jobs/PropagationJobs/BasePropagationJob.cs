@@ -41,7 +41,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 
 
         // Delay for up to 5 minutes once half are done.
-        public virtual TimeSpan CancelAfterIfHalfDone => TimeSpan.FromMinutes(5);
+        public virtual TimeSpan CancelAfterIfHalfDone { get; private set; } = TimeSpan.FromMinutes(5);
 
         /* Run the Task (DNS or HTTP) Request to get caches warm and such for more consistent results */
         public virtual async Task PreWarmAction()

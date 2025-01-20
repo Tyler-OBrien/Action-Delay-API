@@ -177,7 +177,7 @@ public abstract class BaseJob
             ErrorType = String.IsNullOrWhiteSpace(error.WorkerStatusCode)
                 ? error.StatusCode.ToString()
                 : error.WorkerStatusCode,
-            ErrorDescription = error.SimpleErrorMessage
+            ErrorDescription = error.SimpleErrorMessage ?? error.Message ?? string.Empty
         };
         clickhouseApiError.ErrorHash = ClickhouseAPIError.Sha256Hash(clickhouseApiError.ErrorDescription, clickhouseApiError.ErrorType);
         return InsertTrackedError(context, clickhouseApiError, firstService, logger);

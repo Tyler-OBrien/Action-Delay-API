@@ -50,7 +50,7 @@ public class ExternalJobController : CustomBaseController
     [SwaggerResponse(200, Type = typeof(DataResponse<bool>),
         Description = "On success, return a boolean indicating success")]
 
-    public async Task<IActionResult> GetLocations([FromBody] JobResultRequestDTO jobResult, CancellationToken token)
+    public async Task<IActionResult> SendJobResult([FromBody] JobResultRequestDTO jobResult, CancellationToken token)
     {
         var tryApiKey = CheckAccess();
         if (tryApiKey.IsFailed)
@@ -59,7 +59,7 @@ public class ExternalJobController : CustomBaseController
         }
 
         int coloId = 0;
-        if (this.HttpContext.Request.Headers.TryGetValue("colo", out var coloCode) == false && String.IsNullOrWhiteSpace(coloCode) == false &&
+        if (this.HttpContext.Request.Headers.TryGetValue("colo", out var coloCode) && String.IsNullOrWhiteSpace(coloCode) == false &&
                 int.TryParse(coloCode, out var foundColoId))
         {
             coloId = foundColoId;

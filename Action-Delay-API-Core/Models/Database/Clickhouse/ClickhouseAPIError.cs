@@ -19,7 +19,7 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
             {
                 RunTime = DateTime.UtcNow,
                 JobName = jobName,
-                ErrorDescription = error.SimpleErrorMessage,
+                ErrorDescription = error.SimpleErrorMessage ?? error.Message ?? string.Empty,
                 ErrorType = String.IsNullOrWhiteSpace(error.WorkerStatusCode)
                     ? error.StatusCode.ToString()
                     : error.WorkerStatusCode,
