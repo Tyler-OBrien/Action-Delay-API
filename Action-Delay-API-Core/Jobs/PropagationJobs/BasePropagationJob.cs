@@ -94,6 +94,8 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         {
             using var scope = _logger.BeginScope(Name);
             using var sentryScope = SentrySdk.PushScope();
+            var transaction = SentrySdk.StartTransaction(Name, "Job");
+            SentrySdk.ConfigureScope(scope => scope.Transaction = transaction);
             SentrySdk.AddBreadcrumb($"Starting Job {Name}");
             try
             {
@@ -348,6 +350,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             finally
             {
                 // await _queue.DisposeAsync();
+                transaction.Finish();
             }
         }
 

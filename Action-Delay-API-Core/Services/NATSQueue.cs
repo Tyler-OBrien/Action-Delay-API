@@ -194,6 +194,12 @@ namespace Action_Delay_API_Core.Services
 
         public async Task<Result> SendMessageNoReply<TIn>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30, bool compressed = false)
         {
+            var span = SentrySdk.GetSpan();
+            if (span != null)
+            {
+                span = span.StartChild("nats", subject);
+            }
+
             try
             {
 
@@ -224,12 +230,17 @@ namespace Action_Delay_API_Core.Services
                     }
 
                     if (outgoingData.Length == 0)
+                    {
+                        span?.Finish(SpanStatus.InternalError);
                         return Result.Fail($"Failed to compress");
+                    }
 
 
 
                     await _natsConnection.PublishAsync<Memory<byte>>(subject, outgoingData,
-                        cancellationToken: cancellationToken, headers: new NatsHeaders() { { "Comp", "1" } }, serializer:  NatsDefaultSerializer<Memory<byte>>.Default);
+                        cancellationToken: cancellationToken, headers: new NatsHeaders() { { "Comp", "1" } },
+                        serializer: NatsDefaultSerializer<Memory<byte>>.Default);
+                        span?.Finish();
                     return Result.Ok();
 
                 }
@@ -237,20 +248,29 @@ namespace Action_Delay_API_Core.Services
                 {
                     await _natsConnection.PublishAsync<TIn>(subject, message,
                         cancellationToken: cancellationToken);
+                        span?.Finish();
                     return Result.Ok();
 
                 }
+               
             }
             catch (Exception ex)
             {
+                span?.Finish(ex);
                 _logger.LogWarning(ex, "NATS Connection to {subject} failed.", subject);
             }
+       
 
             return Result.Fail("NATS Connection Failed");
         }
 
         public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30, bool compressed = false)
         {
+            var span = SentrySdk.GetSpan();
+            if (span != null)
+            {
+                span = span.StartChild("nats", subject);
+            }
             try
             {
 
@@ -281,7 +301,10 @@ namespace Action_Delay_API_Core.Services
                     }
 
                     if (outgoingData.Length == 0)
+                    {
+                        span?.Finish(SpanStatus.InternalError);
                         return Result.Fail($"Failed to compress");
+                    }
 
 
 
@@ -297,7 +320,11 @@ namespace Action_Delay_API_Core.Services
                     try
                     {
                         if (tryGetMessage.Error != null)
+                        {
+                            span?.SetExtra("Error", tryGetMessage.Error.Message);
+                            span?.Finish(SpanStatus.InternalError);
                             return Result.Fail($"Failed to get message from {subject}");
+                        }
 
                         Decompressor getDecomp = null;
                         try
@@ -310,6 +337,8 @@ namespace Action_Delay_API_Core.Services
 
                             var deserializedData =
                                 JsonSerializer.Deserialize<tOut>(stringData, DefaultJsonSerializerOptions);
+                            span?.Finish();
+
                             return deserializedData;
                         }
                         finally
@@ -336,13 +365,19 @@ namespace Action_Delay_API_Core.Services
                             IdleTimeout = TimeSpan.FromSeconds(60), ThrowIfNoResponders = true
                         });
                     if (tryGetMessage.Data == null)
-                        return Result.Fail($"Failed to get message from {subject}");
+                    {
+                        span?.Finish(SpanStatus.InternalError);
 
+                        return Result.Fail($"Failed to get message from {subject}");
+                    }
+
+                    span?.Finish();
                     return tryGetMessage.Data;
                 }
             }
             catch (Exception ex)
             {
+                span?.Finish(ex);
                 _logger.LogWarning(ex, "NATS Connection to {subject} failed.", subject);
             }
 

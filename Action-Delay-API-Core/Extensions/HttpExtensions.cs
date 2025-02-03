@@ -7,6 +7,7 @@ using System.Reflection.PortableExecutable;
 using Action_Delay_API_Core.Models.BunnyAPI;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using String = System.String;
+using System.Reactive.Subjects;
 
 namespace Action_Delay_API_Core.Extensions
 {
@@ -15,6 +16,11 @@ namespace Action_Delay_API_Core.Extensions
         public static async Task<Result<ApiResponse<TResult>?>> ProcessHttpRequestAsync<TResult>(
       this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogger logger)
         {
+            var span = SentrySdk.GetSpan();
+            if (span != null)
+            {
+                span = span.StartChild("http", assetName);
+            }
             HttpResponseMessage? httpResponse = null;
             using var listener = new HttpEventListener();
             try
@@ -26,6 +32,7 @@ namespace Action_Delay_API_Core.Extensions
 
                 if (string.IsNullOrWhiteSpace(rawString))
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError(
@@ -40,6 +47,7 @@ namespace Action_Delay_API_Core.Extensions
                 }
                 catch (Exception ex)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
                         rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
@@ -51,6 +59,8 @@ namespace Action_Delay_API_Core.Extensions
 
                 if (response == null)
                 {
+                    span?.Finish(SpanStatus.InternalError);
+
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
                     return Result.Fail((new CustomAPIError(
@@ -65,7 +75,7 @@ namespace Action_Delay_API_Core.Extensions
                     {
                         logger.LogCritical($"Error with {assetName}: {error}");
                     }
-
+                    span?.Finish(SpanStatus.InternalError);
                     return Result.Fail(new CustomAPIError(
                         $"Error with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}",
                         (int)httpResponse.StatusCode,
@@ -84,6 +94,7 @@ namespace Action_Delay_API_Core.Extensions
 
                 if (response.Success == false)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Response Success did not indicate success, status code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError(
@@ -94,21 +105,28 @@ namespace Action_Delay_API_Core.Extensions
 
                 response.ResponseTimeMs = listener.GetTime();
                 response.ColoId = httpResponse.GetColoId();
+                span?.Finish();
                 return response;
             }
     
             catch (HttpRequestException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
+
                 logger.LogCritical(ex, $"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0) , $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (OperationCanceledException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
+
                 logger.LogCritical(ex, $"Unexpected Timeout Error: {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected Timeout Error: {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (Exception ex)
             {
+                span?.Finish(SpanStatus.InternalError);
+
                 logger.LogCritical(ex, $"Unexpected Error: API Returned: {httpResponse?.StatusCode}");
                 return Result.Fail(new CustomAPIError($"Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", listener.GetTime()));
             }
@@ -120,6 +138,11 @@ namespace Action_Delay_API_Core.Extensions
         public static async Task<Result<ApiResponsePaginated<TResult>?>> ProcessHttpRequestPaginatedAsync<TResult>(
 this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogger logger)
         {
+            var span = SentrySdk.GetSpan();
+            if (span != null)
+            {
+                span = span.StartChild("http", assetName);
+            }
             HttpResponseMessage? httpResponse = null;
             using var listener = new HttpEventListener();
             try
@@ -131,6 +154,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (string.IsNullOrWhiteSpace(rawString))
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError(
@@ -145,6 +169,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 }
                 catch (Exception ex)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message,
                         rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
@@ -156,6 +181,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (response == null)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
                     return Result.Fail((new CustomAPIError(
@@ -170,7 +196,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     {
                         logger.LogCritical($"Error with {assetName}: {error}");
                     }
-
+                    span?.Finish(SpanStatus.InternalError);
                     return Result.Fail(new CustomAPIError(
                         $"Error with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}",
                         (int)httpResponse.StatusCode,
@@ -189,6 +215,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (response.Success == false)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Response Success did not indicate success, status code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError(
@@ -199,21 +226,26 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 response.ResponseTimeMs = listener.GetTime();
                 response.ColoId = httpResponse.GetColoId();
+                span?.Finish();
+
                 return response;
             }
 
             catch (HttpRequestException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (OperationCanceledException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected Timeout Error: {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected Timeout Error: {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (Exception ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected Error: API Returned: {httpResponse?.StatusCode}");
                 return Result.Fail(new CustomAPIError($"Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", listener.GetTime()));
             }
@@ -232,6 +264,11 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
         public static async Task<Result<ApiResponse?>> ProcessHttpRequestAsyncNoResponse(
 this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogger logger)
         {
+            var span = SentrySdk.GetSpan();
+            if (span != null)
+            {
+                span = span.StartChild("http", assetName);
+            }
             HttpResponseMessage? httpResponse = null;
             using var listener = new HttpEventListener();
             try
@@ -242,6 +279,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (httpResponse.IsSuccessStatusCode)
                 {
+                    span?.Finish();
 
                     return new ApiResponse()
                     {
@@ -252,6 +290,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (string.IsNullOrWhiteSpace(rawString))
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError($"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime(), httpResponse.GetColoId()));
@@ -264,6 +303,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 }
                 catch (Exception ex)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message, rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError($"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime(), httpResponse.GetColoId()));
@@ -271,6 +311,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (response == null)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
                     return Result.Fail((new CustomAPIError($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime(), httpResponse.GetColoId())));
                 }
@@ -281,7 +322,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     {
                         logger.LogCritical($"Error with {assetName}: {error}");
                     }
-
+                    span?.Finish(SpanStatus.InternalError);
                     return Result.Fail(new CustomAPIError($"Error with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Error: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}", response.Errors?.FirstOrDefault(error => error.Code != null)?.Code.ToString() ?? "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
@@ -295,25 +336,31 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (response.Success == false)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical($"Response Success did not indicate success, status code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError($"Response Success did not indicate success but returned no errors, status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Non-Success with no errors, response body: {rawString}", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
                 response.ResponseTimeMs = listener.GetTime();
                 response.ColoId = httpResponse.GetColoId();
+                span?.Finish();
+
                 return response;
             }
             catch (HttpRequestException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (OperationCanceledException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected Timeout Error: {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected Timeout Error: {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (Exception ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected Error: API Returned: {httpResponse?.StatusCode}");
                 return Result.Fail(new CustomAPIError($"Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", listener.GetTime()));
 
@@ -326,6 +373,11 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
         public static async Task<Result<BunnyAPIResponse?>> ProcessHttpRequestAsyncNoResponseBunny(
 this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogger logger)
         {
+            var span = SentrySdk.GetSpan();
+            if (span != null)
+            {
+                span = span.StartChild("http", assetName);
+            }
             HttpResponseMessage? httpResponse = null;
             using var listener = new HttpEventListener();
             try
@@ -336,6 +388,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (httpResponse.IsSuccessStatusCode)
                 {
+                    span?.Finish();
 
                     return new BunnyAPIResponse()
                     {
@@ -346,6 +399,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (string.IsNullOrWhiteSpace(rawString))
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical(
                         $"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
                     return Result.Fail(new CustomAPIError($"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime(), httpResponse.GetColoId()));
@@ -358,6 +412,7 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 }
                 catch (Exception ex)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     // Better messages for Deserialization errors
                     logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}", ex.Message, rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
                     return Result.Fail(new CustomAPIError($"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime(), httpResponse.GetColoId()));
@@ -365,12 +420,14 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
 
                 if (response == null)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode}");
                     return Result.Fail((new CustomAPIError($"Could not get response {assetName} from API, status code: {httpResponse.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", (int)httpResponse.StatusCode, $"Could not read deseralized response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", listener.GetTime(), httpResponse.GetColoId())));
                 }
 
                 if (String.IsNullOrWhiteSpace(response.Message) == false)
                 {
+                    span?.Finish(SpanStatus.InternalError);
                     logger.LogCritical($"Error with {assetName}: {response.Message}");
                     return Result.Fail(new CustomAPIError($"Error with {assetName}: {response.Message} , status code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, $"Error: {response.Message}", response.ErrorKey ?? "", listener.GetTime(), httpResponse.GetColoId()));
                 }
@@ -378,20 +435,25 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                 response.Success = true;
                 response.ResponseTimeMs = listener.GetTime();
                 response.ColoId = httpResponse.GetColoId();
+                span?.Finish();
+
                 return response;
             }
             catch (HttpRequestException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (OperationCanceledException ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected Timeout Error: {ex.Message}");
                 return Result.Fail(new CustomAPIError($"Unexpected Timeout Error: {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", listener.GetTime()));
             }
             catch (Exception ex)
             {
+                span?.Finish(SpanStatus.InternalError);
                 logger.LogCritical(ex, $"Unexpected Error: API Returned: {httpResponse?.StatusCode}");
                 return Result.Fail(new CustomAPIError($"Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", listener.GetTime()));
 

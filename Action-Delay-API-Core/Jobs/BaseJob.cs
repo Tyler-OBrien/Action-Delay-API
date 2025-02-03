@@ -72,6 +72,8 @@ public abstract class BaseJob
     {
         using var scope = _logger.BeginScope(Name);
         using var sentryScope = SentrySdk.PushScope();
+        var transaction = SentrySdk.StartTransaction(Name, "Job");
+        SentrySdk.ConfigureScope(scope => scope.Transaction = transaction);
         SentrySdk.AddBreadcrumb($"Starting Job {Name}");
         try
         {
@@ -131,6 +133,7 @@ public abstract class BaseJob
         {
             await TrySave(true);
             // await _queue.DisposeAsync();
+            transaction.Finish();
         }
     }
 

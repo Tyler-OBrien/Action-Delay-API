@@ -29,6 +29,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
         {
             using var scope = _logger.BeginScope(Name);
             using var sentryScope = SentrySdk.PushScope();
+
             SentrySdk.AddBreadcrumb($"Starting Job {Name}");
             try
             {
