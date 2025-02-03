@@ -73,7 +73,7 @@ namespace Action_Delay_API_Core.Jobs
             });
 
 
-            var tryPutAPI = await _apiBroker.UploadWorkerScript(workerJsContent, metadataContent, _jobConfig.AccountId,
+            var tryPutAPI = await _apiBroker.UploadWorkerScriptNewVersioning(workerJsContent, metadataContent, _jobConfig.AccountId,
                 _jobConfig.ScriptName, _jobConfig.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)
             {
