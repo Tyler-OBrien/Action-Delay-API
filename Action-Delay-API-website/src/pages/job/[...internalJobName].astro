@@ -164,21 +164,27 @@ if (job.internalJobName === "cron") {
 				<div class="wrapper stack gap-2">
 					<a class="back-link" href="/delay/"><Icon icon="arrow-left" />All Jobs</a>
 					<Hero title={job?.jobName} align="start">
+						<a id="websocket-conn-status">Disconnected</a>
 						<div class="details">
 							<div class="w-full p-12">
 								<div class="container mx-auto max-w-3xl">
 							
 						
-							
+
 									<div class="flex flex-col md:flex-row justify-center items-center mb-8">
-										<div class="text-7xl font-bold text-center md:w-1/2" id=`delayNumber${job.internalJobName}`>{delayTxt} <span class="text-2xl" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span></div> 
+
+
+										<div class="text-7xl font-bold text-center md:w-1/2" id=`delayNumberOuter${job.internalJobName}`><span class="text-7xl font-bold text-center md:w-1/2" id=`delayNumber${job.internalJobName}`>{delayTxt}</span> <span class="text-2xl" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span></div> 
+									</div>
+									<div class="flex flex-col md:flex-row justify-center items-center mb-8">
+										<div class=`${pending.className} text-center mb-2 h-4` id=`pending${job.internalJobName}`>{pending.textContent}</div>
 									</div>
 							
 									<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 mx-auto max-w-3xl">
 										{noLastUpdate ? null : (
 										<div class="flex flex-col items-center">
 											<div class="text-gray-600 text-base">Last Update:</div>
-											<div class="font-semibold text-lg" id=`lastUpdate{job.internalJobName}`>{lastUpdatedTxt}</div> 
+											<div class="font-semibold text-lg" id=`lastUpdate${job.internalJobName}`>{lastUpdatedTxt}</div> 
 										</div>
 										)}
 							
@@ -200,7 +206,7 @@ if (job.internalJobName === "cron") {
 											<div class="font-semibold text-lg" id=`median90d${job.internalJobName}`>{quarterlyMedian}</div> 
 										</div>
 							
-										{/* Add more stats here if needed */}
+										{}
 									</div>
 							
 								</div>
@@ -208,6 +214,7 @@ if (job.internalJobName === "cron") {
 						</div>
 					</Hero>
 				</div>
+				<iframe id="jobmapiframe" src="https://jobmap.cloudflare.chaika.me/" width="100%" style="height: 80vh !important;"></iframe>
 			</header>
 			<main class="wrapper">
 				<div class="stack gap-10 content">
@@ -225,6 +232,14 @@ if (job.internalJobName === "cron") {
 			</main>
 		</div>
 	</div>
+	<script define:vars={{ quickAnalyticsData, job }}>
+globalThis.jobStats = quickAnalyticsData;
+globalThis.jobData = job;
+globalThis.jobName = job.internalJobName;
+</script>
+	<script src="../assets/js/8.0.7/signalr.min.js" is:inline> </script>
+      <script src="../assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
+      <script src="../../scripts/signalr-job-code.js"> </script>
 </BaseLayout>
 
 <style>

@@ -1,0 +1,15 @@
+name = "action-delay-api-jobmap"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+rules = [
+  { type = "Text", globs = ["**/*.js"], fallthrough = true },
+  { type = "Text", globs = ["**/*.css"], fallthrough = true }
+]
+
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
