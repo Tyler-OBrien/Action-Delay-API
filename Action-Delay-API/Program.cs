@@ -132,7 +132,7 @@ public class Program
 
         builder.WebHost.UseKestrel(options => { options.AddServerHeader = false;  });
 
-        builder.Services.AddDbContext<ActionDelayDatabaseContext>(options =>
+        builder.Services.AddDbContextPool<ActionDelayDatabaseContext>(options =>
         {
             options.UseNpgsql(apiConfiguration.PostgresConnectionString);
         });

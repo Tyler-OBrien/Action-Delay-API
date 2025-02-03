@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Sync.Config;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Action_Delay_API_Sync
 {
@@ -25,6 +26,14 @@ namespace Action_Delay_API_Sync
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            var optionsBuilderSrc = new DbContextOptionsBuilder<ActionDelayDatabaseContext>();
+            var optionsBuilderDst = new DbContextOptionsBuilder<ActionDelayDatabaseContext>();
+            optionsBuilderSrc.UseNpgsql(_config.PostgresConnectionStringSrc);
+            optionsBuilderDst.UseNpgsql(_config.PostgresConnectionStringDst);
+
+            var dbContextPoolSrc = new PooledDbContextFactory<ActionDelayDatabaseContext>(optionsBuilderSrc.Options);
+            var dbContextPoolDst = new PooledDbContextFactory<ActionDelayDatabaseContext>(optionsBuilderDst.Options);
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 if (_logger.IsEnabled(LogLevel.Information))
@@ -34,14 +43,12 @@ namespace Action_Delay_API_Sync
                 try
                 {
 
-                    var optionsBuilderSrc = new DbContextOptionsBuilder<ActionDelayDatabaseContext>();
-                    var optionsBuilderDst = new DbContextOptionsBuilder<ActionDelayDatabaseContext>();
-                    optionsBuilderSrc.UseNpgsql(_config.PostgresConnectionStringSrc);
-                    optionsBuilderDst.UseNpgsql(_config.PostgresConnectionStringDst);
 
-                    await using ActionDelayDatabaseContext dbContextSrc = new ActionDelayDatabaseContext(optionsBuilderSrc.Options);
-                    await using ActionDelayDatabaseContext dbContextDst = new ActionDelayDatabaseContext(optionsBuilderDst.Options);
-                    
+
+                    await using ActionDelayDatabaseContext dbContextSrc = dbContextPoolSrc.CreateDbContext();
+                    await using ActionDelayDatabaseContext dbContextDst = dbContextPoolDst.CreateDbContext();
+
+
                     await RunAsync(dbContextSrc, dbContextDst);
 
 

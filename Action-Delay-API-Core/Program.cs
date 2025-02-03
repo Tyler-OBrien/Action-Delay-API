@@ -15,6 +15,7 @@ using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Action_Delay_API_Core.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Polly;
 using Polly.Extensions.Http;
 using Sentry;
@@ -117,10 +118,12 @@ public class Program
 
                 services.AddLogging();
 
-                services.AddDbContext<ActionDelayDatabaseContext>(options =>
+                services.AddDbContextPool<ActionDelayDatabaseContext>(options =>
                 {
                     options.UseNpgsql(baseConfiguration.PostgresConnectionString);
                 });
+
+             
 
                 services.AddSingleton<IClickHouseService, ClickHouseService>();
 
