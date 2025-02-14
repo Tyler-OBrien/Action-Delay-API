@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Latency Status Map</title>
+    <meta http-equiv="Content-Language" content="en">
+    <meta charset="UTF-8">
+    <html lang="en">
+    <link rel="stylesheet" href="/leaflet.min.css" />
+    <style>
+        #map { height: 100vh; width: 80%; float: left; }
+        #info-panel { 
+            height: 100%;
+            width: 20%;
+            float: right;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            background: #1a1a1a;
+            color: white;
+        }
+        .info-card {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .info-title { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; }
+        .location-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .location-item {
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 4px;
+            font-size: 14px;
+            background: #333;
+            display: flex;
+            justify-content: space-between;
+        }
+        .marker-label {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            font-weight: bold;
+            color: white !important;
+            text-shadow: 0 0 3px #000;
+            z-index: 450 !important;
+        }
+        .marker-label div {
+            color: white !important;
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            text-shadow: 0px 0px 3px rgba(0,0,0,0.75);
+        }
+    </style>
+</head>
+<body style="margin: 0; background: #1a1a1a;">
+    <div id="map"></div>
+    
+    <div id="info-panel">
+        <div class="info-card">
+            <div class="info-title">Status Overview</div>
+            <div>Last Updated: <span id="lastUpdated">-</span></div>
+            <div>Median Latency: <span id="medianLatency">-</span>ms</div>
+        </div>
+        <div class="info-card">
+            <div class="info-title">Location Status</div>
+            <div id="locationList" class="location-list"></div>
+        </div>
+    </div>
+
+    <script src="/leaflet.min.js"></script>
+    <script src="/protomaps-leaflet.js"></script>
+    <script>
+        // magic for misaligned
+    (function(){
+        var originalInitTile = L.GridLayer.prototype._initTile
+        L.GridLayer.include({
+            _initTile: function (tile) {
+                originalInitTile.call(this, tile);
+                var tileSize = this.getTileSize();
+                tile.style.width = tileSize.x + 1 + 'px';
+                tile.style.height = tileSize.y + 1 + 'px';
+            }
+        });
+    })()
+
+    async function main() {
+        const map = L.map('map', {
+            minZoom: 2,
+            maxBounds: [[-90, -180], [90, 180]]
+        }).setView([39.8283, -98.5795], 4);
+
+        let locations = new Map();
+        let markers = new Map();
+        let labels = new Map();
+        let medianLatency = 0;
+
+        var layer = protomapsL.leafletLayer({
+            url: '/map.pmtiles',
+            noWrap: true,
+            theme: "dark",
+            maxDataZoom: 8
+        });
+
+        for (const element of layer.labelRules) {
+        if (element.dataLayer == "places") {
+            element.minzoom = 22;
+            element.maxzoom = 0;
+        }
+    }
+
+
+        layer.addTo(map);
+
+        function getLatencyColor(latency, status) {
+            if (status !== 'Success') return '#000000';
+            
+            // First check absolute thresholds that override worse colors
+            if (latency <= 50) return '#44ff44';  // Always green if under 50ms
+            
+            // Check median comparison
+            let medianColor = '#ff4444';  // Default to red
+            if (latency <= medianLatency) {
+                medianColor = '#44ff44';  // Green based on median
+            } else if (latency <= medianLatency * 2) {
+                medianColor = '#ffff44';  // Yellow based on median
+            }
+            
+            // If latency <= 200ms, ensure it's no worse than yellow
+            if (latency <= 200 && medianColor === '#ff4444') {
+                return '#ffff44';
+            }
+            
+            return medianColor;
+        }
+
+        function createMarker(location, latency, status) {
+            const marker = L.marker([location.locationLatitude, location.locationLongitude], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background-color: ${getLatencyColor(latency, status)};
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 50%;"></div>`
+                })
+            });
+
+            const popupContent = `
+                <strong>${location.friendlyLocationName} (${location.locationName})</strong><br>
+                Status: ${status}<br>
+                Latency: ${latency}ms<br>
+            `;
+            
+            marker.bindPopup(popupContent).addTo(map);
+            markers.set(location.locationName, marker);
+            return marker;
+        }
+
+        function createLabel(location) {
+            const label = L.marker([location.locationLatitude, location.locationLongitude], {
+                icon: L.divIcon({
+                    className: 'marker-label',
+                    html: location.locationName,
+                    iconSize: [40, 20],
+                    iconAnchor: [20, -10]
+                })
+            }).addTo(map);
+
+            labels.set(location.locationName, label);
+            return label;
+        }
+
+        function updateMarker(location, latency, status) {
+            const marker = markers.get(location.locationName);
+            if (!marker) return;
+
+            marker.setIcon(L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="background-color: ${getLatencyColor(latency, status)};
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;"></div>`
+            }));
+
+            const popupContent = `
+                <strong>${location.friendlyLocationName} (${location.locationName})</strong><br>
+                Status: ${status}<br>
+                Latency: ${latency}ms<br>
+            `;
+            
+            marker.getPopup().setContent(popupContent);
+        }
+
+        function updateLocationList(locationData) {
+            const locationList = document.getElementById('locationList');
+            locationList.innerHTML = '';
+
+            locationData.forEach(loc => {
+                const item = document.createElement('div');
+                item.className = 'location-item';
+                item.innerHTML = `
+                    <span>${loc.locationName}</span>
+                    <span>${loc.currentRunStatus === 'Success' ? loc.currentRunLengthMs + 'ms' : loc.currentRunStatus}</span>
+                `;
+                locationList.appendChild(item);
+            });
+        }
+
+        // Initial location setup
+        const locResponse = await fetch('https://delay.cloudflare.chaika.me/v2/locations');
+        const locData = await locResponse.json();
+        
+        locData.data.filter(loc => loc.enabled).forEach(loc => {
+            locations.set(loc.locationName, loc);
+        });
+
+        // Get job name from URL
+        function getJobNameFromUrl() {
+            const path = new URL(document.location.toString()).search;
+            return path.substring(1); 
+        }
+
+        async function updateStatus() {
+            try {
+                const jobName = getJobNameFromUrl();
+                const response = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${jobName}/locations`);
+                const data = await response.json();
+
+                const successLatencies = data.data
+                    .filter(loc => loc.currentRunStatus === 'Success')
+                    .map(loc => loc.currentRunLengthMs)
+                    .sort((a, b) => a - b);
+                
+                medianLatency = successLatencies[Math.floor(successLatencies.length / 2)] || 0;
+                
+                document.getElementById('medianLatency').textContent = medianLatency;
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+
+                data.data.forEach(loc => {
+                    const location = locations.get(loc.locationName);
+                    if (!location) return;
+
+                    if (!markers.has(loc.locationName)) {
+                        createMarker(location, loc.currentRunLengthMs, loc.currentRunStatus);
+                        createLabel(location);
+                    } else {
+                        updateMarker(location, loc.currentRunLengthMs, loc.currentRunStatus);
+                    }
+                });
+
+                updateLocationList(data.data);
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
+        }
+
+        await updateStatus();
+
+        // Update every minute
+        setInterval(updateStatus, 60000);
+    }
+
+    main();
+    </script>
+</body>
+</html> 

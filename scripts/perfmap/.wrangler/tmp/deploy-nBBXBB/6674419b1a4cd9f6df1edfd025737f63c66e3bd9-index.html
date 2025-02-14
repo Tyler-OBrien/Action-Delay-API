@@ -6,7 +6,7 @@
     <style>
         #map { height: 100vh; width: 80%; float: left; }
         #info-panel { 
-            height: 100%;
+            height: 100vh;
             width: 20%;
             float: right;
             padding: 20px;
@@ -85,7 +85,7 @@
         !-->
         <div class="info-card">
             <div class="info-title">Current Job Status</div>
-            <div id="jobStatus">Waiting for next run....</div>
+            <div id="jobStatus">No job selected</div>
         </div>
         <div class="info-card">
             <div class="info-title">Undeployed Locations</div>
@@ -171,7 +171,7 @@ async function main() {
         return colors[status] || '#ff4444';
     }
 
-    const locResponse = await fetch('https://delay.cloudflare.chaika.me/v2/locations');
+    const locResponse = await fetch('https://delay.cloudflare.chaika.me/v2/locations?supersecretnocachelol');
     const locData = await locResponse.json();
 
     locData.data.filter(loc => loc.enabled).forEach(loc => {
@@ -184,7 +184,6 @@ async function main() {
         });
         if (loc.locationName === 'PDX') {
             pdxLocation = loc;
-            //console.log(`found pdx loc to draw from`)
         }
     });
 
@@ -273,34 +272,33 @@ async function main() {
     async function updateJobStatus(job) {
         try {
             /*
-            const jobResponse = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${internalJobName}`);
+            const jobResponse = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${internalJobName}?supersecretnocachelol`);
             const jobData = await jobResponse.json();
             */
 
-            if (currentRunTime != job.RunTime) {
-                //console.log("New run detected", job.RunTime, currentRunTime);
-                currentRunTime = job.RunTime.toString();
+            if (currentRunTime !== job.RunTime) {
+                console.log("New run detected", job.RunTime);
+                currentRunTime = job.RunTime;
                 deployedLocations.clear();
                 locations.forEach((location, locationName) => {
-                    location.status = "Undeployed";
-                    location.lengthMs = null;
-                    updateMarkerStatus(location, location.status);
-
+                    updateLocationStatus({
+                        Status: 'Undeployed',
+                        RunTime: new Date(),
+                        LocationName: locationName,
+                    })
                 });
-                updateStatusLists();
-
             }
 
             const jobStatus = document.getElementById('jobStatus');
             jobStatus.innerHTML = `
                 <div>Status: ${job.Status}</div>
                 <div>Run Started: ${new Date(job.RunTime).toLocaleString()}</div>
-                ${job.RunLength ? `<div>Current Delay: ${job.RunLength}ms</div>` : ''}
+                ${job.RunLength ? `<div>Current Length: ${job.RunLength}ms</div>` : ''}
             `;
 
             return {
                 status: job.Status,
-                currentRunTime: job.RunTime.toString()
+                currentRunTime: job.RunTime
             };
         } catch (error) {
             console.error('Error polling job status:', error);
@@ -310,7 +308,7 @@ async function main() {
     async function updateLocationStatus(loc) {
         try {
             /*
-            const response = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${internalJobName}/locations`);
+            const response = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${internalJobName}/locations?supersecretnocachelol`);
             const data = await response.json();
 */
                 const location = locations.get(loc.LocationName);
@@ -321,23 +319,15 @@ async function main() {
 
                 // Update location status
                 location.status = loc.Status;
-                location.lengthMs = loc.RunLength;
+                location.lengthMs = loc.RunTime;
 
-
-                /*
-                console.log(`new loc update ${loc.LocationName}, wasUndeployed ${wasUndeployed}, new status ${loc.Status}, should draw new line ${wasUndeployed && 
-                    loc.Status === 'Deployed' && 
-                    pdxLocation && 
-                    !deployedLocations.has(`${loc.LocationName}-${currentRunTime}`)}  str '${loc.LocationName}-${currentRunTime}'' `)
-                console.log(loc);
-                */
                 // Only animate if location was not deployed and is now deployed
                 if (wasUndeployed && 
                     loc.Status === 'Deployed' && 
                     pdxLocation && 
-                    !deployedLocations.has(`${loc.LocationName}-${currentRunTime}`)) {
+                    !deployedLocations.has(`${loc.locationName}-${currentRunTime}`)) {
                     createBeam(pdxLocation, location);
-                    deployedLocations.add(`${loc.LocationName}-${currentRunTime}`);
+                    deployedLocations.add(`${loc.locationName}-${currentRunTime}`);
                 }
 
                 updateMarkerStatus(location, loc.Status);
@@ -359,10 +349,11 @@ async function main() {
         console.log(`event of type ${event.data.call} that we do not know how to handle`);
     }
 });
+console.log(`Subscribed to message event...`)
 
 
     /*
-    const jobsResponse = await fetch('https://delay.cloudflare.chaika.me/v2/jobs');
+    const jobsResponse = await fetch('https://delay.cloudflare.chaika.me/v2/jobs?supersecretnocachelol');
     const jobsData = await jobsResponse.json();
     
     const jobSelector = document.getElementById('jobSelector');
@@ -378,22 +369,16 @@ async function main() {
             const label = labels.get(locationName);
             if (!label) return;
 
-
-            label.addTo(map);
-
-            /*
             if (map.getZoom() < 4) {
                 label.remove();
             } else {
                 label.addTo(map);
             }
-            */
         });
     });
     clearIntervals();
     currentRunTime = null;
     deployedLocations.clear();
-    updateStatusLists();
 /*
     jobSelector.addEventListener('change', async (e) => {
         clearIntervals();
