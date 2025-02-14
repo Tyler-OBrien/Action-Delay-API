@@ -52,9 +52,37 @@ export default {
 		} else if (request.method == 'GET') {
 			var startReq = performance.now();
 			try {
-				if (url.pathname == '/storageselect') {
+				if (url.pathname == '/prewarmupload') {
+					var outputPrewarm = await env.DB.prepare(`Select 1`).all();
+					var getDur = performance.now() - startReq;
+					console.log(`got prewarm request for upload, done in ${getDur}`)
+					return new Response('', {
+						headers: {
+							'x-adp-dur': getDur.toString(),
+							'x-db-internal-dur': outputPrewarm.meta.duration.toString(),
+						},
+					});
+				}
+				else if (url.pathname == '/storageselect') {
+
+
+
+					if (url.search == "?prewarm") {
+						var outputPrewarm = await env.DBStorageSelect.prepare(`Select 1`).all();
+						var getDur = performance.now() - startReq;
+						console.log(`got prewarm request for storageselect, done in ${getDur}`)
+						return new Response('', {
+							headers: {
+								'x-adp-dur': getDur.toString(),
+								'x-db-internal-dur': outputPrewarm.meta.duration.toString(),
+							},
+						});
+					}
+
+
 					var newRandomNum = crypto.randomUUID();
-					var outputGet = await env.DBStorageSelect.prepare(`WITH matches AS (
+					var outputGet = await env.DBStorageSelect.prepare(
+						`WITH matches AS (
  SELECT id, 
  CASE WHEN json_extract(data, '$[0][0]') LIKE '%AA%' THEN 1 ELSE 0 END +
  CASE WHEN json_extract(data, '$[0][1]') LIKE '%BB%' THEN 1 ELSE 0 END +
@@ -83,9 +111,12 @@ export default {
 )
 SELECT *, ?1 as '${newRandomNum}'  FROM matches 
 WHERE score Like '43%'
-limit 1;`).bind(newRandomNum).all()
+limit 1;`
+					)
+						.bind(newRandomNum)
+						.all();
 					var getDur = performance.now() - startReq;
-					var newOutput = outputGet.meta.rows_read >= 2000
+					var newOutput = outputGet.meta.rows_read >= 2000;
 					if (!newOutput) {
 						return new Response(`Error D1 GET Storage Select: Did not look at least 2k rows, returned ${newOutput}`, {
 							status: 500,
@@ -105,9 +136,28 @@ limit 1;`).bind(newRandomNum).all()
 					}
 						*/
 				} else {
+					var tryGetD1Db = env[url.pathname.slice(1)] as D1Database | null;
+					if (!tryGetD1Db) {
+						console.log(`Could not get d1 db for region ${url.pathname.slice(1)}`)
+						return new Response(`Could not get d1 db for region ${url.pathname.slice(1)}`, { status: 404})
+						
+					}
+					if (url.search == "?prewarm") {
+						var outputPrewarm = await tryGetD1Db.prepare(`Select 1`).all();
+						var getDur = performance.now() - startReq;
+						console.log(`got prewarm request for ${url.pathname.slice(1)}, done in ${getDur}`)
+						return new Response('', {
+							headers: {
+								'x-adp-dur': getDur.toString(),
+								'x-db-internal-dur': outputPrewarm.meta.duration.toString(),
+							},
+						});
+					}
+
 					var newRandomNum = crypto.randomUUID();
-					var outputGet = await env.DB.prepare(`Select ?1`).bind(newRandomNum).all();
+					var outputGet = await tryGetD1Db.prepare(`Select ?1, Key, Value from ReadTest`).bind(newRandomNum).all();
 					var getDur = performance.now() - startReq;
+					console.log(`got normal test request for ${url.pathname.slice(1)}, done in ${getDur}`)
 					var newOutput = outputGet.results[0]['?1'].toString();
 					if (newOutput != newRandomNum) {
 						return new Response(`Error D1 GET: Did not return our input, returned ${newOutput}`, {
@@ -119,7 +169,7 @@ limit 1;`).bind(newRandomNum).all()
 					}
 				}
 
-				return new Response("", {
+				return new Response('', {
 					headers: {
 						'x-adp-dur': getDur.toString(),
 						'x-db-internal-dur': outputGet.meta.duration.toString(),

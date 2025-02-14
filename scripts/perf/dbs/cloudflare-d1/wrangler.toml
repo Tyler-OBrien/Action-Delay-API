@@ -19,3 +19,35 @@ database_id = "0ff0fadb-0740-4e9b-ae55-f136528a3c87"
 binding = "DBStorageSelect"
 database_name = "action-delay-api-perf-intensivequery"
 database_id = "540468d4-4f4d-48ec-bb91-8673452dd4e5"
+
+
+
+[[d1_databases]]
+binding = "enam"
+database_name = "action-delay-api-perf-enam"
+database_id = "d253d3da-fa04-44c0-aff0-8ca5e55548a0"
+
+[[d1_databases]]
+binding = "wnam"
+database_name = "action-delay-api-perf-wnam"
+database_id = "d19f5a9f-1d19-40e9-9eaf-45b42b513987"
+
+[[d1_databases]]
+binding = "weur"
+database_name = "action-delay-api-perf-weur"
+database_id = "e4c7ab45-5e96-40d1-a51b-23bda15cf697"
+
+[[d1_databases]]
+binding = "eeur"
+database_name = "action-delay-api-perf-eeur"
+database_id = "7e7bd767-6258-4230-ae7e-a70bb370bc10"
+
+[[d1_databases]]
+binding = "apac"
+database_name = "action-delay-api-perf-apac"
+database_id = "c4c06861-22ee-4ea3-97fc-72a6ee2c3f13"
+
+[[d1_databases]]
+binding = "oc"
+database_name = "action-delay-api-perf-oc"
+database_id = "4cef6afd-a48d-4489-b04b-ffeef067422a"
