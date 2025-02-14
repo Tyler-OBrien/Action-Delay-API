@@ -2,14 +2,11 @@
 import SmartGraph from '../../components/graph/SmartGraph.js';
 
 
-const jobObj = {
-  jobName: Astro.params.type,
-  internalJobName: Astro.params.type,
-}
+console.log(Astro.params)
 
-const { type } = Astro.params;
 ---
 <div>
   <!-- @ts-ignore -->
-<SmartGraph job={jobObj} client:only="preact"/>
+<SmartGraph endpoint={Astro.url.searchParams.get("endpoint")} label={Astro.url.searchParams.get("label")} options={Astro.url.searchParams.get("options")} fullscreen="true" client:only="preact"/>
+
 </div>

@@ -8,6 +8,7 @@ import Icon from '../../components/Icon.astro';
 import Pill from '../../components/Pill.astro';
 import type { Job } from '../../../models/cloudflare/job';
 import SmartGraph from '../../components/graph/SmartGraph.js';
+import ErrorGraph from '../../components/graph/ErrorGraph';
 
 
 
@@ -215,12 +216,13 @@ if (job.internalJobName === "cron") {
 					 -->
 					<div class="content">
 						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
-
+						<ErrorGraph endpoint=`v2/jobs/${job.internalJobName}/erroranalytics` label={job.jobName} options={["AvgApiResponseLatency" ]} client:only="preact"/> 
 					</div>
 
 					
 				</div>
 			</main>
+			<iframe id="jobmapiframe" src={`https://perfmap.cloudflare.chaika.me/?${job.internalJobName}`} width="100%" style="height: 80vh !important;"></iframe>
 		</div>
 	</div>
 </BaseLayout>

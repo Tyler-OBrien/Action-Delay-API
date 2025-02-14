@@ -1,5 +1,4 @@
 ---
-import { getCollection } from "astro:content";
 
 import BaseLayout from "../layouts/BaseLayout.astro";
 
@@ -9,6 +8,7 @@ import Grid from "../components/Grid.astro";
 import type { QuickStats } from "../../models/cloudflare/quickstat";
 import type { Job } from "../../models/cloudflare/job";
 import SmartGraph from "../components/graph/SmartGraph";
+import ErrorGraph from "../components/graph/ErrorGraph";
 
 const getJobs = async () => {
   return (
@@ -104,7 +104,7 @@ globalThis.jobStats = stats;
       <script src="/assets/js/8.0.7/signalr.min.js" is:inline> </script>
       <script src="/assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
       <script src="../scripts/signalr-delay-code.js"> </script>
-	  <SmartGraph endpoint=`/v2/jobs/analytics/type/CloudflareDelay` label=`Overall Cloudflare Delay Job API Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+
     </main>
   </div>
 </BaseLayout>

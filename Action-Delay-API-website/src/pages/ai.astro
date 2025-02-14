@@ -8,6 +8,8 @@ import Hero from '../components/Hero.astro';
 import Grid from '../components/Grid.astro';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
 import type { Job } from '../../models/cloudflare/job';
+import ErrorGraph from '../components/graph/ErrorGraph';
+import SmartGraph from '../components/graph/SmartGraph';
 
 
 const getJobs = async () => {
@@ -46,5 +48,6 @@ const stats: QuickStats[] = await getAnalyticsTask;
 				}
 			</Grid>
 		</main>
+
 	</div>
 </BaseLayout>

@@ -8,6 +8,8 @@ import Icon from '../../components/Icon.astro';
 import Pill from '../../components/Pill.astro';
 import type { Job } from '../../../models/cloudflare/job';
 import SmartGraph from '../../components/graph/SmartGraph.js';
+import ErrorGraph from '../../components/graph/ErrorGraph';
+import OriginalSmartGraph from '../../components/graph/OriginalSmartGraph';
 
 
 
@@ -21,7 +23,11 @@ const { internalJobName } = Astro.params;
 
 const url = "https://delay.cloudflare.chaika.me/v2/jobs/" + internalJobName;
 
-const job : Job = (await (await fetch(url)).json()).data;
+let job : Job = (await (await fetch(url)).json()).data;
+if (!job) {
+	job = { internalJobName: internalJobName }
+	console.log(`job was null`)
+}
 //console.log(`Got data: ${JSON.stringify(job)}, got name: ${internalJobName}, nope! ${internalJobName}, ${JSON.stringify(Astro.props)}, ${JSON.stringify(Astro.params)}`)
 //console.log(`tried fetching: ${url}`)
 
@@ -69,8 +75,7 @@ let hours = minutes / 60;
 return [hours.toFixed(2), `hour(s)`];
 }
 
-//console.log(job);
-const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + job.internalJobName ?? job.jobName);
+const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + (job?.internalJobName ?? job?.jobName));
 let quickAnalyticsData = []
 if (quickAnalyticsResponse.ok) {
 quickAnalyticsData = await quickAnalyticsResponse.json();
@@ -214,22 +219,21 @@ if (job.internalJobName === "cron") {
 						</div>
 					</Hero>
 				</div>
-				<iframe id="jobmapiframe" src="https://jobmap.cloudflare.chaika.me/" width="100%" style="height: 80vh !important;"></iframe>
 			</header>
 			<main class="wrapper">
 				<div class="stack gap-10 content">
-					<!--{entry.data.img && <img src={entry.data.img} alt={entry.data.img_alt || ''} />}
-					 -->
+					
 					<div class="content">
 						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} client:only="preact"/>
 						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
-						<!-- <SmartGraph endpoint=`v2/jobs/${job.internalJobName}/erroranalytics` label={job.jobName} options={["AvgApiResponseLatency" ]} client:only="preact"/> -->
+						<ErrorGraph endpoint=`v2/jobs/${job.internalJobName}/erroranalytics` label={job.jobName} options={["AvgApiResponseLatency" ]} client:only="preact"/> 
 
 					</div>
 
 					
 				</div>
 			</main>
+			<iframe id="jobmapiframe" src="https://jobmap.cloudflare.chaika.me/" width="100%" style="height: 80vh !important;"></iframe>
 		</div>
 	</div>
 	<script define:vars={{ quickAnalyticsData, job }}>
