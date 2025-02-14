@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -50,6 +50,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
             SentrySdk.AddBreadcrumb($"Starting Job {Name}");
 
             _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
+            var prefetchJobData = await _dbContext.JobData.AsTracking().Where(job => job.JobType == JobType).ToListAsync();
+            var listOfJobNames = new List<string>(prefetchJobData.Select(job => job.InternalJobName));
+            var prefetchJobLocsData = await _dbContext.JobLocations.AsTracking().Where(job => listOfJobNames.Contains(job.InternalJobName)).ToListAsync();
 
             var getDownloadTasks = _config.PerfConfig!.UploadJobs;
 
@@ -94,6 +97,33 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             tryGetJob.CurrentRunLengthMs =
                                 run.ResponseLatency; // for Perf jobs, Latency = Latency
                             tryGetJob.CurrentRunStatus = run.RunStatus;
+                        }
+
+                        foreach (var location in Locations)
+                        {
+                            var tryGetLocation = await _dbContext.JobLocations.AsTracking()
+                                .FirstOrDefaultAsync(job => job.InternalJobName == location.JobName && job.LocationName == location.LocationName);
+                            if (tryGetLocation == null)
+                            {
+                                var newJobData = tryGetLocation = new JobDataLocation()
+                                {
+                                    JobName = location.JobName,
+                                    InternalJobName = location.JobName,
+                                    LocationName = location.LocationName
+                                };
+                                _dbContext.JobLocations.Add(newJobData);
+                            }
+                            else
+                            {
+                                tryGetLocation.LastRunStatus = tryGetLocation.CurrentRunStatus;
+                                tryGetLocation.LastRunLengthMs = tryGetLocation.CurrentRunLengthMs;
+                                tryGetLocation.LastRunTime = tryGetLocation.CurrentRunTime;
+                            }
+
+                            tryGetLocation.CurrentRunTime = location.RunTime;
+                            tryGetLocation.CurrentRunLengthMs =
+                                location.ResponseLatency; // for Perf jobs, Latency = Latency
+                            tryGetLocation.CurrentRunStatus = location.RunStatus;
                         }
 
                         await TrySave(true);

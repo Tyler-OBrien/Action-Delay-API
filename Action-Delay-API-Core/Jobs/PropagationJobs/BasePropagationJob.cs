@@ -102,6 +102,11 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 var cancellationTokenSource = new CancellationTokenSource();
                 // Pre-init job and locations in database
                 _logger.LogInformation($"Trying to find job {Name} in dbContext {_dbContext.ContextId}");
+                var prefetchJobData = await _dbContext.JobData.AsTracking().Where(job => job.InternalJobName == InternalName).ToListAsync();
+                var listOfJobNames = new List<string>(prefetchJobData.Select(job => job.InternalJobName));
+                var prefetchJobLocsData = await _dbContext.JobLocations.AsTracking().Where(job => job.InternalJobName == InternalName).ToListAsync();
+
+
                 // We always want NonTracking Here because we'll manually push back the changes we make in a semaphore, preventing issues with the ChangeTracker Dict being modified mid-save
                 JobData = await _dbContext.JobData.AsNoTracking().FirstOrDefaultAsync(job => job.InternalJobName == InternalName);
                 if (JobData == null)
@@ -132,9 +137,13 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 JobData.CurrentRunTime = DateTime.UtcNow;
                 _ = PushJobUpdateEvent();
                 SentrySdk.AddBreadcrumb($"Got Job Data: {JobData.CurrentRunStatus}");
+
+
+                var jobLocs = await _dbContext.JobLocations.AsNoTracking().Where(job => job.InternalJobName == InternalName).ToListAsync();
+
                 foreach (var location in _config.Locations.Where(location => location.Disabled == false))
                 {
-                    var tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstOrDefaultAsync(dbLocation =>
+                    var tryFindLocation = jobLocs.FirstOrDefault(dbLocation =>
                         dbLocation.InternalJobName == InternalName && dbLocation.LocationName == location.Name);
                     if (tryFindLocation == null)
                     {
@@ -146,8 +155,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                         };
                         _dbContext.JobLocations.Add(newLocation);
                         await TrySave(true);
-                        tryFindLocation = await _dbContext.JobLocations.AsNoTracking().FirstAsync(dbLocation =>
-                           dbLocation.InternalJobName == InternalName && dbLocation.LocationName == location.Name);
+                        tryFindLocation = newLocation.Clone();
                     }
                     else
                     {

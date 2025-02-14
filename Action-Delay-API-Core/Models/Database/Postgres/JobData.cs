@@ -105,4 +105,21 @@ public class JobDataLocation
         this.ColoId = data.ColoId;
     }
 
+    public JobDataLocation Clone()
+    {
+        var newJobDataLocation = new JobDataLocation();
+        newJobDataLocation.JobName = this.JobName;
+        newJobDataLocation.InternalJobName = this.InternalJobName;
+        newJobDataLocation.LocationName = this.LocationName;
+        newJobDataLocation.LastRunTime = this.LastRunTime;
+        newJobDataLocation.LastRunLengthMs = this.LastRunLengthMs;
+        newJobDataLocation.LastRunStatus = this.LastRunStatus;
+        newJobDataLocation.CurrentRunTime = this.CurrentRunTime;
+        newJobDataLocation.CurrentRunLengthMs = this.CurrentRunLengthMs;
+        newJobDataLocation.CurrentRunStatus = this.CurrentRunStatus;
+        newJobDataLocation.ResponseTimeUtc = this.ResponseTimeUtc;
+        newJobDataLocation.ColoId = this.ColoId;
+        return newJobDataLocation;
+    }
+
 }
