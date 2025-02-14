@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -190,7 +190,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 }
 
                 _logger.LogInformation(
-                    $"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully. Failed Locations: {string.Join(", ", preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
+                    $"Finished Pre-Warm: {preInitWarmTasks.Count(task => task.Value.IsCompletedSuccessfully)} Locations Completely Successfully for {job.Name}. Failed Locations: {string.Join(", ", preInitWarmTasks.Where(task => task.Value.IsFaulted).Select(task => task.Key.DisplayName ?? task.Key.Name))}");
             }
             catch (Exception ex)
             {
@@ -433,27 +433,44 @@ namespace Action_Delay_API_Core.Jobs.Performance
         private async Task<Result<SerializableHttpResponse>> SendRequestWarmup(Location location, UploadJobGeneric job,
             CancellationToken token)
         {
-            // just send to no path/root to warm up conn
-            var resolvedUrl = new UriBuilder(job.Endpoint)
-            {
-                Scheme = Uri.UriSchemeHttps,
-                Port = -1
-            };
 
-            resolvedUrl.Path = "/";
+
+            string prewarmUrl = job.PrewarmEndpoint;
+
+            if (string.IsNullOrEmpty(prewarmUrl))
+            {
+                // just send to no path/root to warm up conn
+                var resolvedUrl = new UriBuilder(job.Endpoint)
+                {
+                    Scheme = Uri.UriSchemeHttps,
+                    Port = -1
+                };
+
+                resolvedUrl.Path = "/";
+                prewarmUrl = resolvedUrl.ToString();
+            }
+
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
                 },
-                URL = resolvedUrl.ToString(),
+                URL = prewarmUrl,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = true,
                 ReturnBody = false,
                 ReturnBodyOnError = false,
                 NoResponseHeaders = true
             };
+            if (String.IsNullOrWhiteSpace(job.PrewarmEndpoint) == false) // align with legacy behavior, no auth headers unless manually set
+            {
+                foreach (var customHeaderKvp in job.CustomHeaders)
+                {
+                    newRequest.Headers[customHeaderKvp.Key] = customHeaderKvp.Value;
+                }
+            }
+
             newRequest.SetDefaultsFromLocation(location);
             if (job.ForceNetType.HasValue)
                 newRequest.NetType = job.ForceNetType.Value;

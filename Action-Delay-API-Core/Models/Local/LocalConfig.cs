@@ -87,6 +87,8 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string Endpoint { get; set; }
 
+        public string PrewarmEndpoint { get; set; }
+
         public Dictionary<string, string>? CustomHeaders { get; set; }
 
         public string[]? AllowedEdgeLocations { get; set; }
@@ -108,6 +110,9 @@ namespace Action_Delay_API_Core.Models.Local
         public string Name { get; set; }
 
         public string Endpoint { get; set; }
+
+        public string PrewarmEndpoint { get; set; }
+
 
         public Dictionary<string, string> CustomHeaders { get; set; }
 

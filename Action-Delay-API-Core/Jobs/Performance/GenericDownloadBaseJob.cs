@@ -1,4 +1,4 @@
-using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -455,14 +455,22 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         private async Task<Result<SerializableHttpResponse>> SendRequestWarmup(Location location, DownloadJobGeneric jobConfig, string? overridenCustomNameServerResolved, CancellationToken token)
         {
-            // just send to no path/root to warm up conn
-            var resolvedUrl = new UriBuilder(jobConfig.Endpoint)
-            {
-                Scheme = Uri.UriSchemeHttps,
-                Port = -1
-            };
 
-            resolvedUrl.Path = "/";
+            string prewarmUrl = jobConfig.PrewarmEndpoint;
+
+            if (string.IsNullOrEmpty(prewarmUrl))
+            {
+                // just send to no path/root to warm up conn
+                var resolvedUrl = new UriBuilder(jobConfig.Endpoint)
+                {
+                    Scheme = Uri.UriSchemeHttps,
+                    Port = -1
+                };
+
+                resolvedUrl.Path = "/";
+                prewarmUrl = resolvedUrl.ToString();
+            }
+
             var newRequest = new NATSHttpRequest()
             {
                 Headers = new Dictionary<string, string>()
@@ -470,7 +478,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
                     { "APIKEY", _config.PerfConfig.Secret}
                 },
-                URL = resolvedUrl.ToString(),
+                URL = prewarmUrl,
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = !jobConfig.NoConnectionKeepAlive,
                 ReturnBody = false,
