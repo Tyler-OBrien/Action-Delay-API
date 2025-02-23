@@ -1,12 +1,21 @@
-﻿{
-  "$schema": "http://json.schemastore.org/launchsettings.json",
+{
   "profiles": {
     "Action_Delay_API_Worker": {
       "commandName": "Project",
-      "dotnetRunMessages": true,
       "environmentVariables": {
         "DOTNET_ENVIRONMENT": "Development"
-      }
+      },
+      "dotnetRunMessages": true
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker",
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
+      "environmentVariables": {
+        "ASPNETCORE_HTTP_PORTS": "8080"
+      },
+      "publishAllPorts": true,
+      "useSSL": false
     }
-  }
+  },
+  "$schema": "http://json.schemastore.org/launchsettings.json"
 }
