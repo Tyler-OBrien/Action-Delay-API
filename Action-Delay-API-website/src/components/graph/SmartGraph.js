@@ -82,8 +82,8 @@ const EnhancedTimeGraph = (props) => {
     setDataPoints([]); 
     fetchData(endpoint, startDate, endDate, displayOption)
       .then(response => {
-        setIsLoading(false); /
-        setDataPoints(response); /
+        setIsLoading(false); 
+        setDataPoints(response); 
       })
       .catch(error => {
         console.error('Error fetching data:', error);
