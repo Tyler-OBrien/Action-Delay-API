@@ -42,7 +42,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override async Task PreWarmRunLocation(Location location)
         {
-            await SendLocation(location, CancellationToken.None);
+            await SendLocation(location, CancellationToken.None, true);
         }
 
         public override async Task JobInit()
@@ -90,7 +90,7 @@ namespace Action_Delay_API_Core.Jobs
             _logger.LogInformation("Changed WfP User script...");
         }
 
-        private async Task<Result<SerializableHttpResponse>> SendLocation(Location location, CancellationToken token)
+        private async Task<Result<SerializableHttpResponse>> SendLocation(Location location, CancellationToken token, bool prewarm = false)
         {
             var newRequest = new NATSHttpRequest()
             {
@@ -99,12 +99,16 @@ namespace Action_Delay_API_Core.Jobs
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
                 },
                 URL = _config.WfPJob.ScriptUrl + $"/?scriptName={_scriptName}",
-                TimeoutMs = 10_000,
-                EnableConnectionReuse = false,
+                TimeoutMs = 14_000,
+                RetriesCount = 1,
+                EnableConnectionReuse = true,
                 ReturnBody = true,
                 NoResponseHeaders = true,
             };
             newRequest.SetDefaultsFromLocation(location);
+
+            if (prewarm)
+                newRequest.URL = $"{_config.WfPJob.ScriptUrl}/";
 
             return await _queue.HTTP(newRequest, location, token);
         }
