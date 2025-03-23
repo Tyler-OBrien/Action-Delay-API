@@ -141,8 +141,7 @@ namespace Action_Delay_API_Core
 
                         // now execute
                         memoryJob.Scope = jobScope;
-                        var task = RunJobAsync(job, memoryJob);
-                        memoryJob.RunningTask = task;
+                        memoryJob.RunningTask = RunJobAsync(job, memoryJob, jobScope);
                     }
                 }
             }
@@ -154,50 +153,65 @@ namespace Action_Delay_API_Core
         }
 
 
-        private async Task RunJobAsync(BaseJob job, MemoryJob memoryJob)
+        private async Task RunJobAsync(BaseJob job, MemoryJob memoryJob, IServiceScope jobScope)
         {
             const int maxRetries = 3;
             const int baseDelayMs = 500;
             const int maxDelayMs = 5000;
             Stopwatch startTime = Stopwatch.StartNew();
-            for (int attempt = 0; attempt < maxRetries; attempt++)
+
+
+            memoryJob.Scope = jobScope;
+            try
             {
-                try
+                for (int attempt = 0; attempt < maxRetries; attempt++)
                 {
-                    _logger.LogInformation($"Running {job.Name}");
-                    await job.BaseRun();
-                    _logger.LogInformation($"Completed {job.Name}");
-                    break;
-                }
-                catch (Exception ex)
-                {
-                    if (ex is CustomAPIError)
-                        _logger.LogError(ex, $"Failure API Job {job.Name} had api issues and failed");
-                    else 
-                        _logger.LogError(ex, $"Failure Job {job.Name} failed");
-                    SentrySdk.CaptureException(ex);
-
-                    if (attempt == maxRetries - 1)
+                    try
                     {
-                        _logger.LogError($"All {maxRetries} attempts failed for {job.Name}");
+                        _logger.LogInformation($"Running: {job.Name}");
+                        var task = job.BaseRun();
+                        await task;
+                        _logger.LogInformation($"Completed Successfully: {job.Name} ");
                         break;
                     }
-
-                    if (startTime.ElapsedMilliseconds > 50_000)
+                    catch (Exception ex)
                     {
-                        _logger.LogError($"Aborting retrying {job.Name} due to timeout"); // we'll relaunch the job the normal way soon anyway
-                        break;
+                        if (ex is CustomAPIError)
+                            _logger.LogError(ex, $"Failure API Job {job.Name} had api issues and failed");
+                        else
+                            _logger.LogError(ex, $"Failure Job {job.Name} failed");
+                        SentrySdk.CaptureException(ex);
+
+                        if (attempt == maxRetries - 1)
+                        {
+                            _logger.LogError($"All {maxRetries} attempts failed for {job.Name}");
+                            break;
+                        }
+
+                        if (startTime.ElapsedMilliseconds > 50_000)
+                        {
+                            _logger.LogError(
+                                $"Aborting retrying {job.Name} due to timeout"); // we'll relaunch the job the normal way soon anyway
+                            break;
+                        }
+
+                        int delayMs = Math.Min((baseDelayMs * (int)Math.Pow(4, attempt)), maxDelayMs);
+                        _logger.LogInformation(
+                            $"Retrying {job.Name} in {delayMs}ms, attempt {attempt + 1}..");
+                        await Task.Delay(delayMs);
+
+                        memoryJob.Scope?.Dispose();
+                        // re-resolve job
+                        memoryJob.Scope = _scopeFactory.CreateScope();
+                        job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as BaseJob;
+
                     }
-                    int delayMs = Math.Min( (baseDelayMs * (int)Math.Pow(4, attempt)), maxDelayMs); 
-                    _logger.LogInformation($"Retrying {job.Name} in {delayMs}ms, attempt {attempt + 1}..");
-                    await Task.Delay(delayMs);
-                }
-                finally
-                {
-                    memoryJob?.Scope.Dispose();
                 }
             }
-     
+            finally
+            {
+                memoryJob?.Scope?.Dispose();
+            }
         }
     }
 }
