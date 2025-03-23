@@ -1,9 +1,21 @@
 name = "action-delay-api-wfp-worker"
 main = "src/index.ts"
-compatibility_date = "2023-11-12"
+compatibility_date = "2025-02-26"
 workers_dev = false
+
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+
 
 
 [[dispatch_namespaces]]
 binding = "dispatcher"
 namespace = "action-delay-api"
+
+
+[[analytics_engine_datasets]]
+binding = "AE"
+dataset = "action-delay-api-wfp"
