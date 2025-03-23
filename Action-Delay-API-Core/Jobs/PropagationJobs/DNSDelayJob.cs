@@ -123,14 +123,14 @@ namespace Action_Delay_API_Core.Jobs
             var tryGetResult = await SendRequest(location, token);
             if (tryGetResult.IsFailed)
             {
-                _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
+                _logger.LogInformation($"{location.Name}: Error getting response for {location.Name}: {tryGetResult.Errors.FirstOrDefault()?.Message}");
                 return new RunLocationResult("Queue Error", null, -1);
             }
 
             var getResponse = tryGetResult.Value;
             if (tryGetResult.Value.ProxyFailure)
             {
-                _logger.LogInformation($"Proxy Failure {getResponse.Info}, aborting loc");
+                _logger.LogInformation($"{location.Name}: Proxy Failure for {location.Name}: {getResponse.Info}, aborting loc");
                 return new RunLocationResult("Proxy Failure", null, -1);
             }
 
@@ -142,13 +142,13 @@ namespace Action_Delay_API_Core.Jobs
             {
                 // We got the right value!
                 if (RateLimitedEventLogger.ShouldLog())
-                    _logger.LogInformation($"{Name}: {location.Name}:{getResponse.TryGetColoId()} sees the change!");
+                    _logger.LogInformation($"{location.Name}: {location.Name}:{getResponse.TryGetColoId()} sees the change!");
                 return new RunLocationResult(true, "Deployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.TryGetColoId() ?? -1);
             }
             else
             {
                 if (RateLimitedEventLogger.ShouldLog())
-                    _logger.LogInformation($"{Name}: {location.DisplayName ?? location.Name}:{getResponse.TryGetColoId()} sees {tryGetAnswer} instead of {_valueToLookFor}!");
+                    _logger.LogInformation($"{location.Name}: {location.DisplayName ?? location.Name}:{getResponse.TryGetColoId()} sees {tryGetAnswer} instead of {_valueToLookFor}!");
                 return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.TryGetColoId() ?? -1);
             }
         }
