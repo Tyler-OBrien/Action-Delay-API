@@ -34,6 +34,7 @@ namespace Action_Delay_API_Core.Services
             catch (Exception ex)
             {
                 _logger.LogCritical(ex, "Failure to write to Clickhouse InsertGeneric");
+                SentrySdk.CaptureException(ex);
                 throw;
             }
 
@@ -61,7 +62,7 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime, server.RunLength,
-                                    server.RunStatus, server.ResponseLatency, server.ColoId
+                                    server.RunStatus, server.ResponseLatency, (uint)server.ColoId
                                 })
                                 .ToArray(), token);
                     }
@@ -69,6 +70,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs_locations");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
 
@@ -95,6 +97,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
                 try
@@ -121,6 +124,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse api_errors");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
             }
@@ -149,7 +153,7 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime, server.RunLength,
-                                    server.RunStatus, server.ResponseLatency, server.ColoId, server.BindingResponseLatency
+                                    server.RunStatus, server.ResponseLatency, (Int32)server.ColoId, server.BindingResponseLatency
                                 })
                                 .ToArray(), token);
                     }
@@ -157,6 +161,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs_locations_ai");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
 
@@ -180,6 +185,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs_ai");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
                 try
@@ -204,6 +210,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse api_errors_ai");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
             }
@@ -240,6 +247,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
                 try
@@ -265,6 +273,7 @@ namespace Action_Delay_API_Core.Services
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse job_runs_locations_perf");
                     _logger.LogCritical($"Attempted input: {System.Text.Json.JsonSerializer.Serialize(locations)}");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
 
@@ -292,6 +301,7 @@ namespace Action_Delay_API_Core.Services
                 catch (Exception ex)
                 {
                     _logger.LogCritical(ex, "Failure to write to Clickhouse api_errors_perf");
+                    SentrySdk.CaptureException(ex);
                     throw;
                 }
             }
