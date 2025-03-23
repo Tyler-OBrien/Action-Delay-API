@@ -251,18 +251,18 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 
                             FinishedLocationStatus.Add(completedLocation, taskResult);
 
-                            //  if more then half are done, we just say the entire job is.
+                            //  if more then 80% are done, we just say the entire job is.
 
                             if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                _config.Locations.Count(location => location.Disabled == false) / 2 ||
+                                _config.Locations.Count(location => location.Disabled == false) * 0.80 ||
                                 RunningLocations.Count <= 0)
                             {
                                 if (JobData.CurrentRunStatus.Equals(Status.STATUS_UNDEPLOYED,
                                         StringComparison.OrdinalIgnoreCase))
                                 {
-                                    // Success, at least half are success
+                                    // Success, at least 75% are success
                                     if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                        _config.Locations.Count(location => location.Disabled == false) / 2)
+                                        _config.Locations.Count(location => location.Disabled == false) * 0.75)
                                     {
                                         _logger.LogInformation(
                                             $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
