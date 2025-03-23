@@ -438,7 +438,7 @@ public class AnalyticsService : IAnalyticsService
 
     public static JobAnalyticsConfiguration JobErrorAnalyticsNormal = new JobAnalyticsConfiguration()
     {
-        NormalDataSet = "api_errors_ai",
+        NormalDataSet = "api_errors",
         ThirtyMinDataSet = "api_errors_mv_30_mins",
         TwelthHourDataSet = "api_errors_mv_12_hours",
         ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
@@ -452,7 +452,7 @@ public class AnalyticsService : IAnalyticsService
     };
     public static JobAnalyticsConfiguration JobErrorAnalyticsAI = new JobAnalyticsConfiguration()
     {
-        NormalDataSet = "job_runs_locations_ai",
+        NormalDataSet = "api_errors_ai",
         ThirtyMinDataSet = "api_errors_ai_mv_30_mins",
         TwelthHourDataSet = "api_errors_ai_mv_12_hours",
         ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
