@@ -246,6 +246,28 @@ namespace Action_Delay_API_Core.Jobs.AI
             // Text Embeddings / 0137cdcf-162a-4108-94f2-1ca59e8c65ee 
             else if (model.Task.Name.Equals("Text Embeddings", StringComparison.OrdinalIgnoreCase) || model.Task.Id.Equals("0137cdcf-162a-4108-94f2-1ca59e8c65ee", StringComparison.Ordinal))
             {
+
+                if (model.Name.Equals("@cf/baai/bge-m3", StringComparison.OrdinalIgnoreCase) || model.Id.Equals("eed32bc1-8775-4985-89ce-dd1405508ad8", StringComparison.Ordinal))
+                {
+                    return new AIJobConfig()
+                    {
+                        ModelName = model.Name,
+                        Input = "raw",
+                        InputField = "n/a",
+                        OutputType = "json",
+                        ContentStr = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            contexts = new[]
+                            {
+                                new
+                                {
+                                    text = GetText(),
+                                }
+                            }
+                        }),
+                    };
+                }
+
                 return new AIJobConfig()
                 {
                     ModelName = model.Name,
