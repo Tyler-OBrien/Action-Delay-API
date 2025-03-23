@@ -48,11 +48,13 @@ public class ErrorResponse : IError, IResponse
 
     public ErrorResponse(HttpStatusCode code, string message, string type)
     {
+        Message = message;
         Error = new GenericError(code, message, type);
     }
 
     public ErrorResponse(int code, string message, string type)
     {
+        Message = message;
         Error = new GenericError(code, message, type);
     }
 
