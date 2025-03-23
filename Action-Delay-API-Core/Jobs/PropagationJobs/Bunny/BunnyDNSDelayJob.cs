@@ -124,7 +124,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
             var tryGetResult = await SendRequest(location, token);
             if (tryGetResult.IsFailed)
             {
-                _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
+                _logger.LogInformation($"{location.Name}: Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
                 return new RunLocationResult("Queue Error", null, -1);
             }
 
@@ -132,12 +132,12 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
             if (tryGetResult.Value.ProxyFailure)
             {
 
-                _logger.LogInformation($"Proxy Failure {getResponse.Info}, aborting loc");
+                _logger.LogInformation($"{location.Name}: Proxy Failure {getResponse.Info}, aborting loc");
                 return new RunLocationResult("Proxy Failure", null, -1);
             }
             if (tryGetResult.Value.ResponseCode != "NoError" && (getResponse.Answers == null || getResponse.Answers.Any() == false ) )
             {
-                _logger.LogInformation($"Proxy Failure {getResponse.Info} based on response {getResponse.ResponseCode}, aborting loc");
+                _logger.LogInformation($"{location.Name}: Proxy Failure {getResponse.Info} based on response {getResponse.ResponseCode}, aborting loc");
                 return new RunLocationResult("Proxy Failure", null, -1);
             }
 

@@ -50,6 +50,8 @@ namespace Action_Delay_API_Core.Models.Local
         public DNSDelayJobConfig? DNSJobFree { get; set; }
 
         public DNSDelayJobConfig? BunnyDNSJob { get; set; }
+        public BunnyEdgeScriptDelayJobConfig? BunnyEdgeScriptJob { get; set; }
+        public BunnyUploadReplicationDelayJobConfig? BunnyUploadReplicationJob { get; set; }
 
 
         public CustomRuleUpdateConfig? WAFJob { get; set; }
@@ -246,6 +248,27 @@ namespace Action_Delay_API_Core.Models.Local
 
 
         public string ScriptUrl { get; set; }
+
+    }
+
+    public class BunnyEdgeScriptDelayJobConfig : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string ScriptId { get; set; }
+
+        public string ScriptUrl { get; set; }
+
+    }
+
+
+    public class BunnyUploadReplicationDelayJobConfig : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string StorageAccount { get; set; }
+
+        public string Url { get; set; }
 
     }
 

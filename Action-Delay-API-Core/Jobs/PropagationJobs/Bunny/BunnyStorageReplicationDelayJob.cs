@@ -15,14 +15,15 @@ using Microsoft.Extensions.Options;
 
 namespace Action_Delay_API_Core.Jobs
 {
-    public class BunnyEdgeScriptDelayJob : BasePropagationJob
+    public class BunnyStorageReplicationDelayJob : BasePropagationJob
     {
         private readonly IBunnyAPIBroker _apiBroker;
 
         private string _generatedValue { get; set; }
+        private readonly string fileName = "ADPFile.txt";
         private int _repeatedRunCount = 1;
 
-        internal BunnyEdgeScriptDelayJobConfig? _jobConfig;
+        internal BunnyUploadReplicationDelayJobConfig? _jobConfig;
 
         public override bool Enabled => _jobConfig != null && (_jobConfig.Enabled.HasValue == false || _jobConfig is { Enabled: true });
 
@@ -31,19 +32,19 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public BunnyEdgeScriptDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyEdgeScriptDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public BunnyStorageReplicationDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyStorageReplicationDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
         {
             if (_jobConfig == null)
-                _jobConfig = _config.BunnyEdgeScriptJob;
+                _jobConfig = _config.BunnyUploadReplicationJob;
             _apiBroker = apiBroker;
         }
 
-        public override string Name => "Bunny Edge Script Delay Job";
-        public override string InternalName => "bunnyedgescript";
+        public override string Name => "Bunny Edge Storage Replication Delay Job";
+        public override string InternalName => "bunnystoragereplication";
 
         public override string JobType => "BunnyDelay";
 
-        public override string JobDescription => "Delay of an edge script update being reflected on Edge";
+        public override string JobDescription => "Delay of an edge storage update being reflected on Edge";
 
         public override async Task PreWarmRunLocation(Location location)
         {
@@ -52,32 +53,26 @@ namespace Action_Delay_API_Core.Jobs
 
         public override async Task RunAction()
         {
-            _logger.LogInformation("Running Edge Scripts Delay Job");
+            _logger.LogInformation("Running Storage Replication Delay Job");
             _generatedValue = $"{Guid.NewGuid()}-Cookies-Uploaded At {DateTime.UtcNow.ToString("R")} by Action-Delay-API {Program.VERSION} {_config.Location} ";
             await RunRepeatableAction();
         }
-        // 20933
         public override async Task RunRepeatableAction()
         {
-            // Appending 'worker.js' field
-            string workerJsContent = $@"Bunny.v1.serve( () => {{
-    return new Response('{_generatedValue} {_repeatedRunCount++}');
-}});".ReplaceLineEndings(" ");
 
+            var uploadText = $"{_generatedValue} {_repeatedRunCount++}";
 
-
-            var tryPutAPI = await _apiBroker.UploadEdgeScript(workerJsContent, _jobConfig.ScriptId,
-                _jobConfig.API_Key, CancellationToken.None);
+            var tryPutAPI = await _apiBroker.UploadFileStorageZone(_jobConfig.StorageAccount, fileName, uploadText, _jobConfig.API_Key, CancellationToken.None);
             if (tryPutAPI.IsFailed)
             {
-                _logger.LogCritical($"Failure updating edge script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
+                _logger.LogCritical($"Failure uploading storage file, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 if (tryPutAPI.Errors?.FirstOrDefault() is CustomAPIError apiError) throw apiError;
                 throw new CustomAPIError(
-                    $"Failure updating edge script, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
+                    $"Failure uploading storage file, logs: {tryPutAPI.Errors?.FirstOrDefault()?.Message}");
                 return;
             }
             this.JobData.APIResponseTimeUtc = tryPutAPI.Value.ResponseTimeMs;
-            _logger.LogInformation("Changed Edge script...");
+            _logger.LogInformation("Uploaded Storage File...");
         }
 
         private async Task<Result<SerializableHttpResponse>> SendLocation(Location location, CancellationToken token)
@@ -88,7 +83,7 @@ namespace Action_Delay_API_Core.Jobs
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
                 },
-                URL = _jobConfig.ScriptUrl,
+                URL = _jobConfig.Url + $"/{fileName}",
                 TimeoutMs = 10_000,
                 EnableConnectionReuse = false,
                 NoResponseHeaders = true,
