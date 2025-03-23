@@ -1,0 +1,35 @@
+
+CREATE TABLE yabs_results
+(
+    `source` LowCardinality(String),
+    `timestamp` DateTime CODEC(Delta(4), ZSTD(1)),
+    `colo` LowCardinality(String),
+    `cpumodel` LowCardinality(String),
+    `distro` LowCardinality(String),
+    `oskernel` LowCardinality(String),
+    `freq` UInt32,
+    `ram` UInt32,
+    `disk` UInt32,
+    `speedrw` UInt32,
+    `iorw` UInt32,
+    `geekbenchsingle` UInt32,
+    `geekbenchmulti` UInt32,
+    `startdelay` UInt32,
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+PRIMARY KEY (timestamp, source)
+ORDER BY (timestamp, source)
+
+
+
+CREATE TABLE cron
+(
+    `source` LowCardinality(String),
+    `timestamp` DateTime CODEC(Delta(4), ZSTD(1)),
+    `colo` LowCardinality(String),
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+PRIMARY KEY (timestamp, source)
+ORDER BY (timestamp, source)

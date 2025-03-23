@@ -10,6 +10,7 @@ using System.Xml.Linq;
 using System.Text.Json.Serialization;
 using Action_Delay_API.Models.API.Requests.DTOs;
 using Action_Delay_API.Models.Services.v2;
+using System.Text.Json.Nodes;
 
 namespace Action_Delay_API.Services.v2
 {
@@ -28,6 +29,111 @@ namespace Action_Delay_API.Services.v2
             _genericServersContext = genericServersContext;
             _logger = logger;
         }
+
+        public async Task<Result<DataResponse<bool>>> IngestGenericMetric(GenericDataIngestDTO jobRequest, 
+            CancellationToken token)
+        {
+            try
+            {
+                foreach (var dataByType in jobRequest.Data.GroupBy(data => data.InputType))
+                {
+                    // Process each group of data points with the same input type
+                    var processedData = ProcessDataGroup(dataByType);
+
+                    await _clickHouseService.InsertGeneric(
+                        processedData.DataRows,
+                        processedData.ColumnNames,
+                        dataByType.Key,
+                        token
+                    );
+
+                }
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inserting run failure for error cause: {errorCause}",  ex.Message);
+
+                return Result.Fail(new ErrorResponse(500,
+                    "Internal Error on inserting into Clickhouse", "internal_error"));
+            }
+            return new DataResponse<bool>(true);
+        }
+
+
+        public (List<object[]> DataRows, string[] ColumnNames) ProcessDataGroup(IGrouping<string, GenericDataPoint> dataGroup)
+        {
+            var dataRows = new List<object[]>();
+            string[] columnNames = null;
+
+            foreach (var dataPoint in dataGroup)
+            {
+                // Ensure the data is a JsonObject
+                if (dataPoint.Data is not JsonObject jsonObject)
+                {
+                    _logger.LogWarning($"Skipping non-object data for type {dataPoint.InputType}");
+                    continue;
+                }
+
+                // Extract column names (lowercase) on the first iteration
+                if (columnNames == null)
+                {
+                    columnNames = jsonObject.Select(p => p.Key).ToArray();
+                }
+
+                // Extract values, preserving their original types
+                var rowValues = new object[columnNames.Length];
+                for (int i = 0; i < columnNames.Length; i++)
+                {
+                    var propertyName = columnNames[i];
+                    var jsonValue = jsonObject[propertyName];
+
+                    rowValues[i] = ConvertJsonNodeToValue(jsonValue);
+                }
+
+                dataRows.Add(rowValues);
+            }
+
+            return (dataRows, columnNames);
+        }
+
+        private static readonly string[] DateTimeFormats = new[]
+        {
+            "yyyy-MM-ddTHH:mm:ssZ",     // ISO 8601 UTC 
+            "yyyy-MM-ddTHH:mm:ss.FFFZ",  // ISO 8601 with milliseconds
+            "o",  // Round-trip date/time pattern
+            "yyyy-MM-dd'T'HH:mm:sszzz",   // ISO 8601 with timezone
+        };
+        private object TryParseDatetime(string strValue)
+        {
+            if (DateTime.TryParseExact(strValue, DateTimeFormats,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out DateTime parsedDateTime))
+            {
+                return parsedDateTime;
+            }
+            return null;
+        }
+
+
+        public object ConvertJsonNodeToValue(JsonNode jsonValue)
+        {
+            if (jsonValue == null) return DBNull.Value;
+
+            return jsonValue switch
+            {
+                JsonValue jv when jv.TryGetValue<string>(out var strValue) =>
+                    TryParseDatetime(strValue) ?? strValue,
+                JsonValue jv when jv.TryGetValue<long>(out var longValue) => longValue,
+                JsonValue jv when jv.TryGetValue<double>(out var doubleValue) => doubleValue,
+                JsonValue jv when jv.TryGetValue<bool>(out var boolValue) => boolValue,
+                JsonArray ja => ja.Select(ConvertJsonNodeToValue).ToArray(),
+                JsonObject jo => jo, 
+                _ => jsonValue.ToString()
+            };
+        }
+
 
         public async Task<Result<DataResponse<bool>>> SendJobResult(JobResultRequestDTO jobRequest, int coloId, CancellationToken token)
         {

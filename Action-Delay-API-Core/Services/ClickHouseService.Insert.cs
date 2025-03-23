@@ -11,6 +11,37 @@ namespace Action_Delay_API_Core.Services
     public partial class ClickHouseService
     {
 
+        public async Task InsertGeneric(List<object[]> data, string[] columns, string table, CancellationToken token = default)
+        {
+            await using var connection = CreateConnection();
+            try
+            {
+
+                using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
+                {
+                    DestinationTableName = table,
+                    ColumnNames = columns,
+                    BatchSize = 100000
+                };
+
+
+                await bulkCopyInterface.InitAsync();
+                
+                await bulkCopyInterface.WriteToServerAsync(
+                    data, token);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Failure to write to Clickhouse InsertGeneric");
+                throw;
+            }
+
+        }
+
+
+
+
         public async Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, ClickhouseAPIError? apiError = null, CancellationToken token = default)
         {
             try

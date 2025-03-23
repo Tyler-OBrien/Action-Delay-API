@@ -7,6 +7,8 @@ namespace Action_Delay_API_Core.Models.Services
 {
     public interface IClickHouseService
     {
+        public  Task InsertGeneric(List<object[]> data, string[] columns, string table,
+            CancellationToken token = default);
         Task InsertRun(ClickhouseJobRun run, List<ClickhouseJobLocationRun>? locations, ClickhouseAPIError? apiError,
             CancellationToken token = default);
 

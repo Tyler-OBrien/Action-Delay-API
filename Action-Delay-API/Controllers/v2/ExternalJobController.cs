@@ -58,7 +58,7 @@ public class ExternalJobController : CustomBaseController
             return tryApiKey.MapToResult();
         }
 
-        int coloId = 0;
+        int coloId = 0; 
         if (this.HttpContext.Request.Headers.TryGetValue("colo", out var coloCode) && String.IsNullOrWhiteSpace(coloCode) == false &&
                 int.TryParse(coloCode, out var foundColoId))
         {
@@ -67,5 +67,25 @@ public class ExternalJobController : CustomBaseController
 
         return (await _externalJobService.SendJobResult(jobResult, coloId, token)).MapToResult();
     }
+
+
+    [HttpPost("IngestMetrics")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<bool>),
+        Description = "On success, return a boolean indicating success")]
+
+    public async Task<IActionResult> IngestMetrics([FromBody] GenericDataIngestDTO jobResult, CancellationToken token)
+    {
+        var tryApiKey = CheckAccess();
+        if (tryApiKey.IsFailed)
+        {
+            return tryApiKey.MapToResult();
+        }
+
+
+
+        return (await _externalJobService.IngestGenericMetric(jobResult, token)).MapToResult();
+    }
+
+    
 
 }

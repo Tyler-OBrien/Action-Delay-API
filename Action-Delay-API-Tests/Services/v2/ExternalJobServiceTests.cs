@@ -7,6 +7,7 @@ using Action_Delay_API.Services.v2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System.Text.Json.Nodes;
 
 namespace Action_Delay_API_Tests.Services.v2;
 
@@ -225,6 +226,389 @@ public class ExternalJobServiceTests : IDisposable
         Assert.Equal(500, error.Error.Code);
         Assert.Equal("internal_error", error.Error.Type);
     }
+
+
+    [Fact]
+    public void ConvertJsonNodeToValue_NullValue_ReturnsDBNull()
+    {
+        // Arrange
+        JsonNode nullNode = null;
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(nullNode);
+
+        // Assert
+        Assert.Equal(DBNull.Value, result);
+    }
+
+    [Theory]
+    [InlineData("test string")]
+    [InlineData("")]
+    public void ConvertJsonNodeToValue_StringValue_ReturnsString(string inputString)
+    {
+        // Arrange
+        JsonNode stringNode = JsonValue.Create(inputString);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(stringNode);
+
+        // Assert
+        Assert.Equal(inputString, result);
+    }
+
+    [Theory]
+    [InlineData(42L)]
+    [InlineData(-100L)]
+    public void ConvertJsonNodeToValue_LongValue_ReturnsLong(long inputLong)
+    {
+        // Arrange
+        JsonNode longNode = JsonValue.Create(inputLong);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(longNode);
+
+        // Assert
+        Assert.Equal(inputLong, result);
+    }
+
+    [Theory]
+    [InlineData(3.14)]
+    [InlineData(-0.001)]
+    public void ConvertJsonNodeToValue_DoubleValue_ReturnsDouble(double inputDouble)
+    {
+        // Arrange
+        JsonNode doubleNode = JsonValue.Create(inputDouble);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(doubleNode);
+
+        // Assert
+        Assert.Equal(inputDouble, result);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ConvertJsonNodeToValue_BoolValue_ReturnsBool(bool inputBool)
+    {
+        // Arrange
+        JsonNode boolNode = JsonValue.Create(inputBool);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(boolNode);
+
+        // Assert
+        Assert.Equal(inputBool, result);
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_JsonArray_ReturnsConvertedArray()
+    {
+        // Arrange
+        var jsonArray = new JsonArray
+        {
+            JsonValue.Create("test"),
+            JsonValue.Create(42L),
+            JsonValue.Create(3.14)
+        };
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(jsonArray);
+
+        // Assert
+        Assert.IsType<object[]>(result);
+        var convertedArray = result as object[];
+        Assert.NotNull(convertedArray);
+        Assert.Equal(3, convertedArray.Length);
+        Assert.Equal("test", convertedArray[0]);
+        Assert.Equal(42L, convertedArray[1]);
+        Assert.Equal(3.14, convertedArray[2]);
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_JsonObject_ReturnsJsonObject()
+    {
+        // Arrange
+        var jsonObject = new JsonObject
+        {
+            ["key1"] = "value1",
+            ["key2"] = 42L
+        };
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(jsonObject);
+
+        // Assert
+        Assert.Equal(jsonObject, result);
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_UnknownType_ReturnsStringRepresentation()
+    {
+        // Arrange
+        var complexNode = JsonValue.Create(new { test = 7 });
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(complexNode);
+
+        // Assert
+        Assert.Equal(complexNode.ToString(), result);
+    }
+
+    [Fact]
+    public void ProcessDataGroup_SingleGroup_CorrectlyProcessesData()
+    {
+        // Arrange
+        var dataPoints = new List<GenericDataPoint>
+        {
+            new GenericDataPoint
+            {
+                InputType = "type1",
+                Data = new JsonObject
+                {
+                    ["Name"] = "John",
+                    ["Age"] = 30L,
+                    ["IsActive"] = true
+                }
+            }
+        };
+        var grouping = dataPoints.GroupBy(d => d.InputType).First();
+
+        // Act
+        var (dataRows, columnNames) = _service.ProcessDataGroup(grouping);
+
+        // Assert
+        Assert.Equal(new[] { "Name", "Age", "IsActive" }, columnNames);
+        Assert.Single(dataRows);
+        var row = dataRows[0];
+        Assert.Equal(new object[] { "John", 30L, true }, row);
+    }
+
+    [Fact]
+    public void ProcessDataGroup_MultipleGroups_CorrectlyProcessesData()
+    {
+        // Arrange
+        var dataPoints = new List<GenericDataPoint>
+        {
+            new GenericDataPoint
+            {
+                InputType = "type1",
+                Data = new JsonObject
+                {
+                    ["Name"] = "John",
+                    ["Age"] = 30L
+                }
+            },
+            new GenericDataPoint
+            {
+                InputType = "type1",
+                Data = new JsonObject
+                {
+                    ["Name"] = "Jane",
+                    ["Age"] = 25L
+                }
+            }
+        };
+        var grouping = dataPoints.GroupBy(d => d.InputType).First();
+
+        // Act
+        var (dataRows, columnNames) = _service.ProcessDataGroup(grouping);
+
+        // Assert
+        Assert.Equal(new[] { "Name", "Age" }, columnNames);
+        Assert.Equal(2, dataRows.Count);
+        Assert.Equal(new object[] { "John", 30L }, dataRows[0]);
+        Assert.Equal(new object[] { "Jane", 25L }, dataRows[1]);
+    }
+
+    [Fact]
+    public void ProcessDataGroup_NonJsonObjectData_LogsWarningAndSkips()
+    {
+        // Arrange
+        var dataPoints = new List<GenericDataPoint>
+        {
+            new GenericDataPoint
+            {
+                InputType = "type1",
+                Data = JsonValue.Create("not an object")
+            }
+        };
+        var grouping = dataPoints.GroupBy(d => d.InputType).First();
+
+        // Act
+        var (dataRows, columnNames) = _service.ProcessDataGroup(grouping);
+
+        // Assert
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Skipping non-object data for type type1")),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()
+            ),
+            Times.Once
+        );
+        Assert.Empty(dataRows);
+        Assert.Null(columnNames);
+    }
+
+    [Fact]
+    public async Task IngestGenericMetric_SuccessfulInsertion_ReturnsTrue()
+    {
+        // Arrange
+        var jobRequest = new GenericDataIngestDTO
+        {
+            Data = new List<GenericDataPoint>
+            {
+                new GenericDataPoint
+                {
+                    InputType = "type1",
+                    Data = new JsonObject
+                    {
+                        ["Name"] = "John",
+                        ["Age"] = 30L
+                    }
+                },
+                new GenericDataPoint
+                {
+                    InputType = "type2",
+                    Data = new JsonObject
+                    {
+                        ["City"] = "New York",
+                        ["Population"] = 8_400_000L
+                    }
+                }
+            }
+        };
+        _mockClickHouseService
+            .Setup(x => x.InsertGeneric(
+                It.IsAny<List<object[]>>(),
+                It.IsAny<string[]>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _service.IngestGenericMetric(jobRequest,  _cancellationToken);
+
+        // Assert
+        Assert.True(result.Value.Data);
+        _mockClickHouseService.Verify(
+            x => x.InsertGeneric(
+                It.IsAny<List<object[]>>(),
+                It.IsAny<string[]>(),
+                It.Is<string>(t => t == "type1" || t == "type2"),
+                _cancellationToken
+            ),
+            Times.Exactly(2)
+        );
+    }
+
+    [Fact]
+    public async Task IngestGenericMetric_ExceptionThrown_ReturnsFailureResult()
+    {
+        // Arrange
+        var jobRequest = new GenericDataIngestDTO
+        {
+            Data = new List<GenericDataPoint>
+            {
+                new GenericDataPoint
+                {
+                    InputType = "type1",
+                    Data = new JsonObject
+                    {
+                        ["Name"] = "John"
+                    }
+                }
+            }
+        };
+        _mockClickHouseService
+            .Setup(x => x.InsertGeneric(
+                It.IsAny<List<object[]>>(),
+                It.IsAny<string[]>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Test exception"));
+
+        // Act
+        var result = await _service.IngestGenericMetric(jobRequest, _cancellationToken);
+
+        // Assert
+        Assert.True(result.IsFailed);
+        Assert.Equal("Internal Error on inserting into Clickhouse", result.Errors.First().Message);
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Error inserting run failure")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception, string>>()
+            ),
+            Times.Once
+        );
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_ISODateTimeUTC_ReturnsParsedDateTime()
+    {
+        // Arrange
+        string isoDateTime = "2023-06-15T14:30:00Z";
+        JsonNode dateNode = JsonValue.Create(isoDateTime);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(dateNode);
+
+        // Assert
+        Assert.IsType<DateTime>(result);
+        Assert.Equal(DateTime.Parse(isoDateTime), result);
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_ISODateTimeJS_ReturnsParsedDateTime()
+    {
+        // Arrange
+        string isoDateTime = "2025-03-16T05:59:12.275Z";
+        JsonNode dateNode = JsonValue.Create(isoDateTime);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(dateNode);
+
+        // Assert
+        Assert.IsType<DateTime>(result);
+        Assert.Equal(DateTime.Parse(isoDateTime), result);
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_ISODateTimeWithMilliseconds_ReturnsParsedDateTime()
+    {
+        // Arrange
+        string isoDateTime = "2023-06-15T14:30:00.123Z";
+        JsonNode dateNode = JsonValue.Create(isoDateTime);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(dateNode);
+
+        // Assert
+        Assert.IsType<DateTime>(result);
+        Assert.Equal(DateTime.Parse(isoDateTime), result);
+    }
+
+    [Fact]
+    public void ConvertJsonNodeToValue_InvalidDateTimeString_ReturnsOriginalString()
+    {
+        // Arrange
+        string invalidDateTime = "2023/06/15 14:30:00";
+        JsonNode dateNode = JsonValue.Create(invalidDateTime);
+
+        // Act
+        var result = _service.ConvertJsonNodeToValue(dateNode);
+
+        // Assert
+        Assert.IsType<string>(result);
+        Assert.Equal(invalidDateTime, result);
+    }
+
 
 
     public void Dispose()
