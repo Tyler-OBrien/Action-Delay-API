@@ -112,6 +112,34 @@ namespace Action_Delay_API_Core.Jobs.AI
             }
 
 
+            if (model.Name.Equals("@cf/meta/llama-guard-3-8b",
+                    StringComparison.OrdinalIgnoreCase) || model.Id.Equals("cc80437b-9a8d-4f1a-9c77-9aaf0d226922",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var newConfig = new AIJobConfig()
+                {
+                    ModelName = model.Name,
+                    Input = "raw",
+                    InputField = "n/a",
+                    OutputType = "json",
+                };
+
+
+                newConfig.ContentStr = System.Text.Json.JsonSerializer.Serialize(new MessagePrompt()
+                {
+                    Messages =
+                    [
+                        new Message()
+                        {
+                            Role = "user",
+                            Content = GetText()
+                        }
+                    ]
+                });
+                return newConfig;
+            }
+
+
 
 
             // Automatic Speech Recognition / dfce1c48-2a81-462e-a7fd-de97ce985207 
@@ -259,6 +287,8 @@ namespace Action_Delay_API_Core.Jobs.AI
                 {
                     question = GetText();
                 }
+
+
 
                 newConfig.ContentStr = System.Text.Json.JsonSerializer.Serialize(new MessagePrompt()
                 {
