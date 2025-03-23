@@ -264,7 +264,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         {
                             finishedLocationStatus.Add(completedLocation,
                                 new UploadPerformanceLocationReturn(tryGetValue.WasSuccess,
-                                    (ulong)tryGetValue.ResponseTimeMs.Value,
+                                    (uint)tryGetValue.ResponseTimeMs.Value,
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
                                     GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
 
@@ -286,7 +286,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             }
                             finishedLocationStatus.Add(completedLocation,
                                 new UploadPerformanceLocationReturn(tryGetValue.WasSuccess,
-                                    (ulong)(tryGetValue?.ResponseTimeMs.HasValue == false
+                                    (uint)(tryGetValue?.ResponseTimeMs.HasValue == false
                                         ? 0
                                         : tryGetValue!.ResponseTimeMs!.Value),
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
@@ -317,19 +317,19 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             try
             {
-                ulong averageBindingLatencyOfSuccessful = 0;
-                ulong averageOfSuccessFull = 0;
+                uint averageBindingLatencyOfSuccessful = 0;
+                uint averageOfSuccessFull = 0;
                 if (finishedLocationStatus.Any(kvp => kvp.Value.Success))
                 {
                     var tryGetSuccessful = finishedLocationStatus.Where(kvp => kvp.Value.Success)
                         .Select(kvp => (double)kvp.Value.Duration).ToList();
-                    if (tryGetSuccessful.Any()) averageOfSuccessFull = (ulong)tryGetSuccessful.Median();
+                    if (tryGetSuccessful.Any()) averageOfSuccessFull = (uint)tryGetSuccessful.Median();
 
                     var tryGetBindingLatenciesToUse = finishedLocationStatus.Where(kvp => kvp.Value.Success)
                         .Where(kvp => kvp.Value.BindingDuration != null)
                         .Select(kvp => (double)kvp.Value.BindingDuration!.Value).ToList();
                     if (tryGetBindingLatenciesToUse.Any())
-                        averageBindingLatencyOfSuccessful = (ulong)tryGetBindingLatenciesToUse
+                        averageBindingLatencyOfSuccessful = (uint)tryGetBindingLatenciesToUse
                             .Median();
 
                 }
@@ -394,14 +394,14 @@ namespace Action_Delay_API_Core.Jobs.Performance
         }
 
 
-        public static ulong? TryGetBindingDir(Dictionary<string, string> headers)
+        public static uint? TryGetBindingDir(Dictionary<string, string> headers)
         {
             if (headers != null)
             {
                 var tryGetHeader = headers.FirstOrDefault(headerKvp =>
                     headerKvp.Key.Equals("x-adp-dur", StringComparison.OrdinalIgnoreCase));
                 if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false &&
-                    ulong.TryParse(tryGetHeader.Value, out var parsedDur))
+                    uint.TryParse(tryGetHeader.Value, out var parsedDur))
                     return parsedDur;
             }
 
@@ -584,7 +584,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
     public class UploadPerformanceLocationReturn
     {
-        public UploadPerformanceLocationReturn(bool success, ulong duration, DateTime responseUtc, string? locationId, ulong? bindingDuration)
+        public UploadPerformanceLocationReturn(bool success, uint duration, DateTime responseUtc, string? locationId, uint? bindingDuration)
         {
             Success = success;
             Duration = duration;
@@ -595,11 +595,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         public bool Success { get; set; }
 
-        public ulong Duration { get; set; }
+        public uint Duration { get; set; }
 
         public DateTime ResponseUtc { get; set; }
 
-        public ulong? BindingDuration { get; set; }
+        public uint? BindingDuration { get; set; }
 
         public string? LocationId { get; set; }
 

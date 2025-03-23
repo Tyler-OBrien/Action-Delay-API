@@ -69,7 +69,7 @@ namespace Action_Delay_API_Core.Models.Database.Clickhouse
 
         public string ErrorHash { get; set; }
 
-        public UInt64 ResponseLatency { get; set; }
+        public UInt32 ResponseLatency { get; set; }
 
         public int? ColoId { get; set; }
     }

@@ -76,7 +76,11 @@ public class Program
                            options.IsGlobalModeEnabled = true;
                            options.SetBeforeSend((sentryEvent, hint) =>
                            {
-                               if (sentryEvent.Level == SentryLevel.Warning &&  sentryEvent.EventId.ToString().Contains("InboxSubscription", StringComparison.OrdinalIgnoreCase) && (sentryEvent?.Message?.Message?.Contains("Unregistered message inbox received", StringComparison.OrdinalIgnoreCase) ?? false))
+                               if (sentryEvent.Level == SentryLevel.Warning &&
+                                   sentryEvent.EventId.ToString().Contains("InboxSubscription",
+                                       StringComparison.OrdinalIgnoreCase) &&
+                                   (sentryEvent?.Message?.Message?.Contains("Unregistered message inbox received",
+                                       StringComparison.OrdinalIgnoreCase) ?? false))
                                {
                                    return null; // Don't send this event to Sentry
                                }

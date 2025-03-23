@@ -10,8 +10,8 @@
         public UInt64 RunLength { get; set; }
         public string RunStatus { get; set; }
 
-        public UInt64 ResponseLatency { get; set; }
-        public UInt64 BindingResponseLatency { get; set; }
+        public UInt32 ResponseLatency { get; set; }
+        public UInt32 BindingResponseLatency { get; set; }
         public int ColoId { get; set; }
 
     }

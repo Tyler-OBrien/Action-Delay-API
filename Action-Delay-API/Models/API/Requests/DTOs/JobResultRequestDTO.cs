@@ -31,5 +31,5 @@ public class JobResultRequestDTO
     public bool CalculateColoIdFromRequestHeader { get; set; }
 
     [JsonPropertyName("apiResponseLatency")]
-    public ulong? APIResponseLatency { get; set; }
+    public uint? APIResponseLatency { get; set; }
 }
