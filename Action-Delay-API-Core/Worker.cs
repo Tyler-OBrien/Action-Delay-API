@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.Reflection;
+using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
@@ -154,21 +156,48 @@ namespace Action_Delay_API_Core
 
         private async Task RunJobAsync(BaseJob job, MemoryJob memoryJob)
         {
-            try
+            const int maxRetries = 3;
+            const int baseDelayMs = 500;
+            const int maxDelayMs = 5000;
+            Stopwatch startTime = Stopwatch.StartNew();
+            for (int attempt = 0; attempt < maxRetries; attempt++)
             {
-                _logger.LogInformation($"Running {job.Name}");
-                await job.BaseRun();
-                _logger.LogInformation($"Completed {job.Name}");
+                try
+                {
+                    _logger.LogInformation($"Running {job.Name}");
+                    await job.BaseRun();
+                    _logger.LogInformation($"Completed {job.Name}");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    if (ex is CustomAPIError)
+                        _logger.LogError(ex, $"Failure API Job {job.Name} had api issues and failed");
+                    else 
+                        _logger.LogError(ex, $"Failure Job {job.Name} failed");
+                    SentrySdk.CaptureException(ex);
+
+                    if (attempt == maxRetries - 1)
+                    {
+                        _logger.LogError($"All {maxRetries} attempts failed for {job.Name}");
+                        break;
+                    }
+
+                    if (startTime.ElapsedMilliseconds > 50_000)
+                    {
+                        _logger.LogError($"Aborting retrying {job.Name} due to timeout"); // we'll relaunch the job the normal way soon anyway
+                        break;
+                    }
+                    int delayMs = Math.Min( (baseDelayMs * (int)Math.Pow(4, attempt)), maxDelayMs); 
+                    _logger.LogInformation($"Retrying {job.Name} in {delayMs}ms, attempt {attempt + 1}..");
+                    await Task.Delay(delayMs);
+                }
+                finally
+                {
+                    memoryJob?.Scope.Dispose();
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"{job.Name} failed");
-                SentrySdk.CaptureException(ex);
-            }
-            finally
-            {
-                memoryJob?.Scope.Dispose();
-            }
+     
         }
     }
 }
