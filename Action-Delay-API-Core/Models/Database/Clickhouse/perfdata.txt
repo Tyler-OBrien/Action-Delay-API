@@ -1,9 +1,10 @@
 CREATE TABLE job_runs_perf
 (
- `job_name` String,
- `run_time` DateTime,
- `run_status` String,
+ `job_name` LowCardinality(String),
+ `run_time` DateTime CODEC(Delta, ZSTD),
+ `run_status` LowCardinality(String),
  `average_response_latency` UInt32,
+ `average_binding_response_latency` UInt32
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name)
@@ -12,14 +13,14 @@ ORDER BY (run_time, job_name);
 
 CREATE TABLE api_errors_perf
 (
- `job_name` String,
- `location_name` String,
- `run_time` DateTime,
- `error_type` String,
+ `job_name` LowCardinality(String),
+ `location_name` LowCardinality(String),
+ `run_time` DateTime CODEC(Delta, ZSTD),
+ `error_type` LowCardinality(String),
  `error_description` String,
  `error_hash` String, 
  `response_latency` UInt32,
- `location_id` String,
+ `location_id` LowCardinality(String),
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, error_hash)
@@ -30,12 +31,13 @@ ORDER BY (run_time, error_hash);
 
 CREATE TABLE job_runs_locations_perf
 (
- `job_name` String,
- `location_name` String,
- `run_time` DateTime,
- `run_status` String,
+ `job_name` LowCardinality(String),
+ `location_name` LowCardinality(String),
+ `run_time` DateTime CODEC(Delta, ZSTD),
+ `run_status` LowCardinality(String),
  `response_latency` UInt32,
- `location_id` String
+ `location_id` LowCardinality(String),
+ `binding_response_latency` UInt32
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name, location_name)
@@ -43,45 +45,6 @@ PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
 
 
-
-
-ALTER TABLE job_runs_perf
-    MODIFY COLUMN `job_name` LowCardinality(String),
-    MODIFY COLUMN `run_status` LowCardinality(String),
-    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD)
-
-
-
-ALTER TABLE  api_errors_perf
-    MODIFY COLUMN `job_name` LowCardinality(String),
-    MODIFY COLUMN `location_name` LowCardinality(String),
-    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD),
-    MODIFY COLUMN `error_type` LowCardinality(String),
-	MODIFY COLUMN `location_id` LowCardinality(String);
-
-
-
-
-
-ALTER TABLE job_runs_locations_perf
-    MODIFY COLUMN `job_name` LowCardinality(String),
-    MODIFY COLUMN `location_name` LowCardinality(String),
-    MODIFY COLUMN `run_status` LowCardinality(String),
-    MODIFY COLUMN `location_id` LowCardinality(String),
-    MODIFY COLUMN `run_time` CODEC(Delta, ZSTD)
-
-
-
-ALTER TABLE job_runs_locations_perf
-    MODIFY COLUMN `location_id` LowCardinality(String);
-
-
-
-ALTER TABLE job_runs_locations_perf RENAME COLUMN colo_id TO location_id
-
-
-ALTER TABLE job_runs_locations_perf ADD COLUMN binding_response_latency UInt32;
-ALTER TABLE job_runs_perf ADD COLUMN average_binding_response_latency UInt32;
 
 
 CREATE MATERIALIZED VIEW job_runs_perf_mv_30_mins
@@ -97,7 +60,7 @@ AS SELECT
     quantilesState(0.5, 0.9, 0.99)(average_response_latency) as quan_average_response_latency
 FROM job_runs_perf
 where run_status = 'Success'
-GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time;
 
 
 
@@ -114,7 +77,7 @@ AS SELECT
     quantilesState(0.5, 0.9, 0.99)(average_response_latency) as quan_average_response_latency
 FROM job_runs_perf
 where run_status = 'Success'
-GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+GROUP BY job_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time;
 
 
 
@@ -134,7 +97,7 @@ AS SELECT
     quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM job_runs_locations_perf
 where run_status = 'Success'
-GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time;
 
 
 
@@ -152,7 +115,7 @@ AS SELECT
     quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM job_runs_locations_perf
 where run_status = 'Success'
-GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+GROUP BY job_name, location_name, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time;
 
 
 
@@ -172,7 +135,7 @@ AS SELECT
     avgState(response_latency) as avg_response_latency,
     quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM api_errors_perf
-GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time
+GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 30 minute) as average_time;
 
 
 
@@ -192,5 +155,5 @@ AS SELECT
     avgState(response_latency) as avg_response_latency,
     quantilesState(0.5, 0.9, 0.99)(response_latency) as quan_response_latency
 FROM api_errors_perf
-GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time
+GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time;
 

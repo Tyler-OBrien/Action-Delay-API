@@ -12,6 +12,9 @@
 
         public string ClickhouseConnectionString { get; set; }
 
+        public bool SendClickhouseResultsToNATS { get; set; }
+
+
         public string ExternalJobAPIKey { get; set; }
 
         public string CoreName { get; set; }

@@ -18,6 +18,7 @@ namespace Action_Delay_API_Core.Models.NATS
     [JsonSerializable(typeof(SerializableHttpResponse))]
     [JsonSerializable(typeof(SerializableDNSResponse))]
     [JsonSerializable(typeof(SerializablePingResponse))]
+    [JsonSerializable(typeof(ClickhouseRow))]
     [JsonSerializable(typeof(string))]
     [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, AllowTrailingCommas = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault)]
 

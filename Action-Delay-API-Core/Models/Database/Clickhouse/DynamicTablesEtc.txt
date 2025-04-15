@@ -19,7 +19,7 @@ CREATE TABLE yabs_results
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)
 PRIMARY KEY (timestamp, source)
-ORDER BY (timestamp, source)
+ORDER BY (timestamp, source);
 
 
 
@@ -32,4 +32,4 @@ CREATE TABLE cron
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)
 PRIMARY KEY (timestamp, source)
-ORDER BY (timestamp, source)
+ORDER BY (timestamp, source);

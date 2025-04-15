@@ -67,7 +67,6 @@ public class BaseJobTests : IDisposable
         _configMock = new Mock<IOptions<LocalConfig>>();
         _configMock.Setup(x => x.Value).Returns(new LocalConfig
         {
-            // Add required configuration here
         });
 
         _loggerMock = new Mock<ILogger<BaseJob>>();

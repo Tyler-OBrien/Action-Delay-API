@@ -85,6 +85,7 @@ public class Program
             ClickhouseConnectionString = apiConfiguration.ClickhouseConnectionString,
             PostgresConnectionString = apiConfiguration.PostgresConnectionString,
             NATSConnectionURL = apiConfiguration.NATSConnectionURL,
+            SendClickhouseResultsToNATS = apiConfiguration.SendClickhouseResultsToNATS
         };
 
         builder.Services.AddSingleton<LocalConfig>(newLocalConfig);
@@ -137,7 +138,7 @@ public class Program
             options.UseNpgsql(apiConfiguration.PostgresConnectionString);
         });
 
-        builder.Services.AddScoped<IClickHouseService, ClickHouseService>();
+        builder.Services.AddSingleton<IClickHouseService, ClickHouseService>();
         builder.Services.AddScoped<ICompatibleJobAnalyticsService, CompatibleJobAnalyticsService>();
         builder.Services.AddScoped<IQuickAPIService, QuickAPIService>();
         builder.Services.AddScoped<ICacheSingletonService, CacheSingletonService>();

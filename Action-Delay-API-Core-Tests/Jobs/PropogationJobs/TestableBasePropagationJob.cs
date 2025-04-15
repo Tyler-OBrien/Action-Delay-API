@@ -228,7 +228,7 @@ public class PropagationJobTests : IDisposable
         Assert.NotNull(jobData);
         Assert.Equal(Status.STATUS_DEPLOYED, jobData.CurrentRunStatus);
 
-        // Verify clicks to insert run data
+        // Verify  insert run data
         _clickhouseMock.Verify(x => x.InsertRun(
             It.Is<ClickhouseJobRun>(r => r.RunStatus == Status.STATUS_DEPLOYED),
             It.IsAny<List<ClickhouseJobLocationRun>>(),
