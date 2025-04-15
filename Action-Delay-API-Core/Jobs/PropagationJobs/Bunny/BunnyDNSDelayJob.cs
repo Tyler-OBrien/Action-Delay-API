@@ -53,22 +53,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
 
 
 
-        // This job is always slow, so doing tons of requests in the first second when it's never been that fast in its entire life is just a waste.
-        public override TimeSpan CalculateBackoff(double totalWaitTimeInSeconds)
-        {
-            double secondsUntilNextAlarm = totalWaitTimeInSeconds switch
-            {
-                > 1800 => 30,
-                > 600 => 15,
-                > 120 => 10,
-                > 60 => 4,
-                > 30 => 2,
-                > 5 => 0.5,
-                > 2 => 0.5,
-                _ => 0.5,
-            };
-            return TimeSpan.FromSeconds(secondsUntilNextAlarm);
-        }
+
 
 
         public override async Task HandleCompletion()
