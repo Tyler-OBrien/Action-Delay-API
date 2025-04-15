@@ -53,17 +53,6 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         public AIJobConfig? GetConfig(AIGetModelsResponse.AIGetModelsResponseDTO model)
         {
-            if (model.Properties != null)
-                foreach (var modelProperty in model.Properties)
-                {
-                    if (modelProperty.PropertyId.Equals("private", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (modelProperty.Value.Equals("true", StringComparison.OrdinalIgnoreCase))
-                        {
-                            return null;
-                        }
-                    }
-                }
 
 
 
