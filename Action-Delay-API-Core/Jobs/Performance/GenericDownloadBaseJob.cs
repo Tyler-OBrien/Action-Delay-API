@@ -479,7 +479,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     { "APIKEY", _config.PerfConfig.Secret}
                 },
                 URL = prewarmUrl,
-                TimeoutMs = 10_000,
+                TimeoutMs = 15_000,
                 EnableConnectionReuse = !jobConfig.NoConnectionKeepAlive,
                 ReturnBody = false,
                 ReturnBodyOnError = false,
