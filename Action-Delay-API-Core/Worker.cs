@@ -202,8 +202,8 @@ namespace Action_Delay_API_Core
 
                         memoryJob.Scope?.Dispose();
                         // re-resolve job
-                        memoryJob.Scope = _scopeFactory.CreateScope();
-                        job = jobScope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as BaseJob;
+                        memoryJob.Scope  = _scopeFactory.CreateScope();
+                        job = memoryJob.Scope.ServiceProvider.GetRequiredService(memoryJob.JobType)! as BaseJob;
 
                     }
                 }
