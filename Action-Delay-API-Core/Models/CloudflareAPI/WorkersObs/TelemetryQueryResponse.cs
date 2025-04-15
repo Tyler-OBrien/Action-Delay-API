@@ -25,7 +25,7 @@ namespace Action_Delay_API_Core.Models.CloudflareAPI.WorkersObs
 
     public partial class EventElement
     {
-        [JsonPropertyName("_timestamp")]
+        [JsonPropertyName("timestamp")]
         [JsonConverter(typeof(StringOrNumberConverter))]
         public string Timestamp { get; set; }
     }

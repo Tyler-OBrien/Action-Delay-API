@@ -37,10 +37,10 @@ namespace Action_Delay_API_Core.Broker
                     {
                         new TelemetryQueryRequestDtoFilter()
                         {
-                            Key = $"$baselime.service",
+                            Key = $"$metadata.service",
                             Type = "string",
                             Value = scriptName,
-                            Operation = "=",
+                            Operation = "eq",
                         }
                     }
                 }

@@ -24,7 +24,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
         public override bool Enabled => _config.WorkerLogsDelayJob != null && (_config.WorkerLogsDelayJob.Enabled.HasValue == false || _config.WorkerLogsDelayJob is { Enabled: true });
         public override async Task RunAction()
         {
-            var dateTimeLessThen = TimeProvider.System.GetUtcNow().AddDays(-5);
+            var dateTimeLessThen = TimeProvider.System.GetUtcNow().AddDays(-2);
             var datetimeGreaterThan = TimeProvider.System.GetUtcNow().AddHours(2);
 
 
