@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres
 {
-    public class LocationServiceData
+    public class LocationServiceData : BaseEntityClass
     {
         [Required]
         [Key]

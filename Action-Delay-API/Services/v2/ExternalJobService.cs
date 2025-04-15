@@ -201,6 +201,21 @@ namespace Action_Delay_API.Services.v2
                 return Result.Fail(new ErrorResponse(500,
                     "Internal Error on inserting into Clickhouse", "internal_error"));
             }
+
+            try
+            {
+                foreach (var entry in _genericServersContext.ChangeTracker.Entries()
+                             .Where(e => e.State == EntityState.Modified))
+                {
+                    entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                    entry.Property("LastEditDate").IsModified = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SentrySdk.CaptureException(ex);
+            }
+
             try
             {
                 await _genericServersContext.SaveChangesAsync();

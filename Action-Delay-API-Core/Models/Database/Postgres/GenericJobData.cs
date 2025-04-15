@@ -2,7 +2,7 @@
 
 namespace Action_Delay_API_Core.Models.Database.Postgres
 {
-    public class GenericJobData
+    public class GenericJobData : BaseEntityClass
     {
         [Required]
         [Key]

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres
 {
-    public class JobError
+    public class JobError : BaseEntityClass
     {
         [Required]
         [Key]

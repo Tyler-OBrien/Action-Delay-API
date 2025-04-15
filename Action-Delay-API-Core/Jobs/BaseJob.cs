@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Services;
+using Polly;
 
 
 public class Status
@@ -65,6 +66,21 @@ public abstract class BaseJob
 
     public virtual async Task TrySave(bool force)
     {
+        try
+        {
+
+            foreach (var entry in _dbContext.ChangeTracker.Entries()
+                         .Where(e => e.State == EntityState.Modified))
+            {
+                entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                entry.Property("LastEditDate").IsModified = true;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            SentrySdk.CaptureException(ex);
+        }
         await _dbContext.SaveChangesAsync();
     }
 
@@ -204,6 +220,21 @@ public abstract class BaseJob
                     FirstService = firstService
                 };
                 context.JobErrors.Add(newError);
+
+                try
+                {
+                    foreach (var entry in context.ChangeTracker.Entries()
+                                 .Where(e => e.State == EntityState.Modified))
+                    {
+                        entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                        entry.Property("LastEditDate").IsModified = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                }
+
                 await context.SaveChangesAsync();
             }
         }
@@ -239,6 +270,21 @@ public abstract class BaseJob
 
             if (errorsNotFound.Any())
             {
+                try
+                {
+
+                    foreach (var entry in context.ChangeTracker.Entries()
+                                 .Where(e => e.State == EntityState.Modified))
+                    {
+                        entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                        entry.Property("LastEditDate").IsModified = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SentrySdk.CaptureException(ex);
+                    logger.LogError(ex, "Error updating LastEditDate");
+                }
                 await context.SaveChangesAsync();
             }
 

@@ -113,6 +113,7 @@ namespace Action_Delay_API_Sync
                     services.AddLogging();
 
 
+
                     services.AddHostedService<Worker>();
                 })
                 .UseSerilog()

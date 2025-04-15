@@ -120,6 +120,20 @@ namespace Action_Delay_API_Core.Services
                 }
             }
 
+            try
+            {
+                foreach (var entry in _context.ChangeTracker.Entries()
+                             .Where(e => e.State == EntityState.Modified))
+                {
+                    entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                    entry.Property("LastEditDate").IsModified = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SentrySdk.CaptureException(ex);
+            }
+
             await _context.SaveChangesAsync();
             _logger.LogInformation($"Finished running colo data update..");
         }
@@ -245,6 +259,21 @@ namespace Action_Delay_API_Core.Services
                     getExistingColoData.Update(coloData);
                 }
             }
+
+            try
+            {
+                foreach (var entry in _context.ChangeTracker.Entries()
+                             .Where(e => e.State == EntityState.Modified))
+                {
+                    entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                    entry.Property("LastEditDate").IsModified = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SentrySdk.CaptureException(ex);
+            }
+
             await _context.SaveChangesAsync();
 
         }
@@ -281,7 +310,19 @@ namespace Action_Delay_API_Core.Services
                     }
                 }
             }
-
+            try
+            {
+                foreach (var entry in _context.ChangeTracker.Entries()
+                             .Where(e => e.State == EntityState.Modified))
+                {
+                    entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                    entry.Property("LastEditDate").IsModified = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SentrySdk.CaptureException(ex);
+            }
             await _context.SaveChangesAsync();
 
         }

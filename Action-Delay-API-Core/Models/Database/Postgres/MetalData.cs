@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres
 {
-    public class MetalData
+    public class MetalData : BaseEntityClass
     {
         public MetalData()
         {

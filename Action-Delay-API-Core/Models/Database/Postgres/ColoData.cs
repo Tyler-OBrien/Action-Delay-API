@@ -10,7 +10,7 @@ using Action_Delay_API_Core.Models.API.ColoAPI;
 
 namespace Action_Delay_API_Core.Models.Database.Postgres
 {
-    public class ColoData
+    public class ColoData : BaseEntityClass
     {
         public ColoData()
         {

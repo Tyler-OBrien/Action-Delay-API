@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Action_Delay_API_Core.Models.Database.Postgres;
 
 [Index(nameof(InternalJobName))]
-public class JobData
+public class JobData : BaseEntityClass
 {
 
     public string JobName { get; set; }
@@ -61,7 +61,7 @@ public class JobData
 }
 
 [Index(nameof(InternalJobName))]
-public class JobDataLocation
+public class JobDataLocation : BaseEntityClass
 {
     public string JobName { get; set; }
 

@@ -576,6 +576,21 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                             getTrackedLocation.Update(dataKvp.Value);
                     }
 
+                    try
+                    {
+                        foreach (var entry in _dbContext.ChangeTracker.Entries()
+                                     .Where(e => e.State == EntityState.Modified))
+                        {
+                            entry.Property("LastEditDate").CurrentValue = DateTime.UtcNow;
+                            entry.Property("LastEditDate").IsModified = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        SentrySdk.CaptureException(ex);
+                        _logger.LogError(ex, "Error updating LastEditDate");
+                    }
+
                     await _dbContext.SaveChangesAsync();
                 }
                 catch (Exception ex)
