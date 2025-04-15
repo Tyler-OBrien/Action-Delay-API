@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35825.156
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-Api-Internal-Monitoring", "Action-Delay-Api-Internal-Monitoring.csproj", "{A74194BC-97CF-43E3-AB88-9DD36A35618D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Core", "..\..\Action-Delay-API-Core\Action-Delay-API-Core.csproj", "{52540363-2748-298B-95C3-C7D3C04349A8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A74194BC-97CF-43E3-AB88-9DD36A35618D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A74194BC-97CF-43E3-AB88-9DD36A35618D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A74194BC-97CF-43E3-AB88-9DD36A35618D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A74194BC-97CF-43E3-AB88-9DD36A35618D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{52540363-2748-298B-95C3-C7D3C04349A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52540363-2748-298B-95C3-C7D3C04349A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52540363-2748-298B-95C3-C7D3C04349A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52540363-2748-298B-95C3-C7D3C04349A8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5B41A52A-93D1-414E-910F-8FC26A3D805E}
+	EndGlobalSection
+EndGlobal

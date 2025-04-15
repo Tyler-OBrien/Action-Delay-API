@@ -17,6 +17,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Tests", "A
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Core-Tests", "Action-Delay-API-Core-Tests\Action-Delay-API-Core-Tests.csproj", "{BCE7BA44-BE57-4F25-99D9-963F7F5B01DF}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sync", "Sync", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Clickhouse-Sync", "Action-Delay-API-Clickhouse-Worker\Action-Delay-API-Clickhouse-Sync.csproj", "{2C9CC764-A281-498A-816C-89F32E0B01CA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,13 +51,19 @@ Global
 		{BCE7BA44-BE57-4F25-99D9-963F7F5B01DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BCE7BA44-BE57-4F25-99D9-963F7F5B01DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BCE7BA44-BE57-4F25-99D9-963F7F5B01DF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C9CC764-A281-498A-816C-89F32E0B01CA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C9CC764-A281-498A-816C-89F32E0B01CA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C9CC764-A281-498A-816C-89F32E0B01CA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C9CC764-A281-498A-816C-89F32E0B01CA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{BD851F95-FDE7-406C-AA02-9985CBE35B10} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{59B8BA37-C999-46D7-BC71-A56B076D8084} = {AA239E0E-02AB-49FE-AFDF-D09385DC735C}
 		{BCE7BA44-BE57-4F25-99D9-963F7F5B01DF} = {AA239E0E-02AB-49FE-AFDF-D09385DC735C}
+		{2C9CC764-A281-498A-816C-89F32E0B01CA} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {0DA232B0-9E99-4E9A-8AA0-937D1E55EF4B}

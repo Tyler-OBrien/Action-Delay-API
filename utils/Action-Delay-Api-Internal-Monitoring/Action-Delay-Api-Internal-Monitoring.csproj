@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-Action_Delay_Api_Incidient_Monitoring-5148e352-612d-49d8-ab9f-19ba73ed1640</UserSecretsId>
+    <RootNamespace>Action_Delay_Api_Incidient_Monitoring</RootNamespace>
+	  <Deterministic>true</Deterministic>
+	  <DebugType>portable</DebugType>
+	  <NeutralLanguage>en</NeutralLanguage>
+	  <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <DockerfileContext>.</DockerfileContext>
+	  <SelfContained>true</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="FluentResults" Version="3.16.0" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.4" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.4">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	  </PackageReference>
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.4" />
+	  <PackageReference Include="NATS.Net" Version="2.5.15" />
+	  <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
+	  <PackageReference Include="Sentry" Version="5.5.1" />
+	  <PackageReference Include="Sentry.AspNetCore" Version="5.5.1" />
+	  <PackageReference Include="Sentry.Serilog" Version="5.5.1" />
+	  <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+	  <PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
+	  <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+	  <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+	  <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.1" />
+	  <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="8.1.1" />
+	  <PackageReference Include="Swashbuckle.AspNetCore.Filters" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Action-Delay-API-Core\Action-Delay-API-Core.csproj" />
+  </ItemGroup>
+</Project>

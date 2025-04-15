@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "WSL": {
+      "commandName": "WSL2",
+      "distributionName": ""
+    },
+    "Dig": {
+      "commandName": "Project",
+      "commandLineArgs": "dig All chaika.me A"
+    },
+    "Http": {
+      "commandName": "Project",
+      "commandLineArgs": "http PDX https://chaika.me/50MB.bin GET Either location --short --keepalive"
+    }
+  }
+}
