@@ -23,6 +23,9 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string PostgresConnectionString { get; set; }
 
+
+        public bool SendClickhouseResultsToNATS { get; set; }
+
         public string ClickhouseConnectionString { get; set; }
 
         public string ActionDelayProxySecret { get; set; }
@@ -51,6 +54,7 @@ namespace Action_Delay_API_Core.Models.Local
 
         public DNSDelayJobConfig? BunnyDNSJob { get; set; }
         public BunnyEdgeScriptDelayJobConfig? BunnyEdgeScriptJob { get; set; }
+        public BunnyEdgeRuleDelayJobConfig? BunnyEdgeRuleJob { get; set; }
         public BunnyUploadReplicationDelayJobConfig? BunnyUploadReplicationJob { get; set; }
 
 
@@ -258,6 +262,19 @@ namespace Action_Delay_API_Core.Models.Local
         public string ScriptId { get; set; }
 
         public string ScriptUrl { get; set; }
+
+    }
+
+    public class BunnyEdgeRuleDelayJobConfig : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string ZoneId { get; set; }
+
+        public string TargetBaseHostname { get; set; }
+
+
+        public string EdgeRuleGuid { get; set; }
 
     }
 
