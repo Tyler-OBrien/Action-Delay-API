@@ -206,7 +206,7 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
                 newJobDataResponse.PredictedRunStatus = data.LastRunStatus;
             }
 
-                return newJobDataResponse;
+            return newJobDataResponse;
         }
 
     }
