@@ -65,7 +65,7 @@ namespace Action_Delay_API_Core.Services
             }
             catch (Exception ex)
             {
-                _logger.LogCritical(ex, "Failure to write to Clickhouse InsertGeneric");
+                _logger.LogCritical(ex, $"Failure to write to Clickhouse InsertGeneric, columns: {columns}, table: {table}");
                 SentrySdk.CaptureException(ex);
                 throw;
             }

@@ -28,8 +28,16 @@ CREATE TABLE cron
     `source` LowCardinality(String),
     `timestamp` DateTime CODEC(Delta(4), ZSTD(1)),
     `colo` LowCardinality(String),
+    `coloid` UInt32,
+    `machine` Int32,
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)
 PRIMARY KEY (timestamp, source)
 ORDER BY (timestamp, source);
+
+
+
+
+
+
