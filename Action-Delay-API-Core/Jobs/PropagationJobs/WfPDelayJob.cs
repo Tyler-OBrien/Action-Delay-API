@@ -38,7 +38,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string JobType => "CloudflareDelay";
 
-        public override string JobDescription => "Delay of a new user script being served on edge.";
+        public override string JobDescription => "Delay of a new user script being served on edge. We deploy a new WfP Script and fetch until it is seen.";
 
         public override async Task PreWarmRunLocation(Location location)
         {

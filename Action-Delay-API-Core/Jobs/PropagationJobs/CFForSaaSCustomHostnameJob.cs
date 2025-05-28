@@ -55,7 +55,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 
         public override string JobType => "CloudflareDelay";
 
-        public override string JobDescription => "Delay of setting up a new Custom Hostname Without TLS";
+        public override string JobDescription => "Delay of setting up a new Custom Hostname Without TLS. Records already pointed at it, two different Cloudflare accounts.";
 
 
         public override TimeSpan RepeatActionAfter => TimeSpan.FromDays(30);

@@ -43,7 +43,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string JobType => "BunnyDelay";
 
-        public override string JobDescription => "Delay of an edge script update being reflected on Edge";
+        public override string JobDescription => "Update an edge script which returns a static embedded response, and we check until the new response is being served on edge";
 
         public override async Task PreWarmRunLocation(Location location)
         {

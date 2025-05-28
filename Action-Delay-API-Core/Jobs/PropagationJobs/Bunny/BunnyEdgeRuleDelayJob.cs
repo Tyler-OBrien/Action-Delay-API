@@ -42,8 +42,8 @@ namespace Action_Delay_API_Core.Jobs
         public override string InternalName => "bunnyedgerule";
 
         public override string JobType => "BunnyDelay";
-
-        public override string JobDescription => "Delay of an edge rule update being reflected on Edge";
+        
+        public override string JobDescription => "Update an Edge Rule which performs a redirect, changing the redirect to a different target, and then running requests until the location header is updated";
 
 
 

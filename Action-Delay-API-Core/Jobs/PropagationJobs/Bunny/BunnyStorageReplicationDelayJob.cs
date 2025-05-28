@@ -44,7 +44,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string JobType => "BunnyDelay";
 
-        public override string JobDescription => "Delay of an edge storage update being reflected on Edge";
+        public override string JobDescription => "Delay of an edge storage update being reflected on Edge, using SSD Storage with all regions on standard tier. Upload a small ~20 KB file with random values, and check until updated on edge, no caching.";
 
         public override async Task PreWarmRunLocation(Location location)
         {

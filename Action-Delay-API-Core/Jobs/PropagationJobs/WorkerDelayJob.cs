@@ -42,7 +42,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string JobType => "CloudflareDelay";
 
-        public override string JobDescription => "Delay of a worker script update being reflected on Edge";
+        public override string JobDescription => "Delay of a worker script update being reflected on Edge. The script returns a static text response, we update it and wait until the new text is seen on edge.";
 
         public override async Task PreWarmRunLocation(Location location)
         {

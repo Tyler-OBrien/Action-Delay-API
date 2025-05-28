@@ -17,6 +17,9 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string InternalName => "dnsfree";
 
+        public override string JobDescription => "Delay of an updated DNS Record being reflected on Edge on a free zone. We update a TXT Record with random values and wait until it is updated on edge.";
+
+
 
         public override int TargetExecutionSecond => 55;
 

@@ -44,7 +44,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string JobType => "CloudflareDelay";
 
-        public override string JobDescription => "Delay of Updating a Custom WAF Rule";
+        public override string JobDescription => "Delay of Updating a Custom WAF Rule. The rule matches on hostname and path, and we update the path and request it on edge until we see the block.";
 
 
 

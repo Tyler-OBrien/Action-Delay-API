@@ -39,7 +39,7 @@ public class PageRuleDelayJob : BasePropagationJob
 
     public override string JobType => "CloudflareDelay";
 
-    public override string JobDescription => "Delay of a Page Rule Update being reflected on Edge";
+    public override string JobDescription => "Delay of a Page Rule Update being reflected on Edge. We update a page rule which does a redirect with a new target, and wait until the new location header is being served.";
 
 
 

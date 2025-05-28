@@ -39,7 +39,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override string JobType => "CloudflareDelay";
 
-        public override string JobDescription => "Cache Purging Delay";
+        public override string JobDescription => "Warm up an endpoint until all locations see cache response headers, update the endpoint's response text, call Purge Single URL API and check until the new text is being served on edge";
 
         public override int TargetExecutionSecond => 40;
 

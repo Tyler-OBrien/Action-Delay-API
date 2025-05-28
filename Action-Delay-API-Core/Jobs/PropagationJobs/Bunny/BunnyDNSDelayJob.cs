@@ -48,7 +48,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
 
         public override string JobType => "BunnyDelay";
 
-        public override string JobDescription => "Delay of an updated DNS Record being reflected on Edge";
+        public override string JobDescription => "Delay of an updated DNS Record being reflected on Edge, updating a simple TXT Record on an otherwise unused hostname";
 
 
 
