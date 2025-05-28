@@ -299,6 +299,11 @@ namespace Action_Delay_API_Core.Jobs.AI
                     question = GetText();
                 }
 
+                if (model.Name.Equals("@cf/google/gemma-2b-it-lora") ||
+                    model.Id.Equals("7a143886-c9bb-4a1c-be95-377b1973bc3b", StringComparison.OrdinalIgnoreCase))
+                {
+                    newConfig.OutputType = "json";
+                }
 
 
                 newConfig.ContentStr = System.Text.Json.JsonSerializer.Serialize(new MessagePrompt()
@@ -432,7 +437,7 @@ namespace Action_Delay_API_Core.Jobs.AI
         }
         public string GetText()
         {
-            return $"Hello from Action-Delay-Api AI tests. The current time is {DateTime.UtcNow.ToString("G")}. Please explain in much detail how computers work." ;
+            return $"The current time is {DateTime.UtcNow.ToString("G")}. Please explain in much detail how computers work, or at least a paragraph overview." ;
         }
      
         public byte[] GetNewImage()
