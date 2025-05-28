@@ -74,9 +74,33 @@ public class CacheSingletonService : ICacheSingletonService
         return jobType;
     }
 
+    public async ValueTask<string?> ResolveJobType(string jobType, CancellationToken token)
+    {
+        await CacheJobNames(token);
+
+        if (RESOLVE_TYPE.TryGetValue(jobType, out var resolvedType)) return resolvedType;
+
+        return null;
+    }
+
     public async ValueTask<string?> GetJobTypeFromName(string jobName, CancellationToken token)
     {
         await CacheJobNames(token);
+
+        if (PUBLIC_TO_INTERNAL_NAMES.TryGetValue(jobName, out var internalName))
+        {
+            if (INTERNAL_JOB_NAME_TO_TYPE.TryGetValue(internalName, out var foundInternalJobType))
+                return foundInternalJobType;
+        }
+
+
+        if (INTERNAL_JOB_NAME_TO_TYPE.TryGetValue(jobName, out var foundJobType))
+            return foundJobType;
+        return null;
+    }
+
+    public string? GetJobTypeFromNameSync(string jobName, CancellationToken token)
+    {
 
         if (PUBLIC_TO_INTERNAL_NAMES.TryGetValue(jobName, out var internalName))
         {

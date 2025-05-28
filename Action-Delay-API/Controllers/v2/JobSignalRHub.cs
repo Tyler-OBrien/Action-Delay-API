@@ -28,4 +28,11 @@ public class JobSignalRHub : Hub
         if (tryGetInternalJobName != null)
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"job_{tryGetInternalJobName}", CancellationToken.None);
     }
+
+    public async Task SubscribeToType(string typeName)
+    {
+        var tryGetInternalJobName = await _cacheSingletonService.ResolveJobType(typeName, CancellationToken.None);
+        if (String.IsNullOrWhiteSpace(tryGetInternalJobName) == false)
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"type_{tryGetInternalJobName}", CancellationToken.None);
+    }
 }

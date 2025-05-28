@@ -4,6 +4,7 @@ namespace Action_Delay_API.Models.Services.v2
 {
     public interface ICacheSingletonService
     {
+        public ValueTask CacheJobNames(CancellationToken token);
         public void CacheJobNames(List<JobData> jobs);
 
         public void CacheLocationNames(List<LocationData> locationNames);
@@ -16,8 +17,12 @@ namespace Action_Delay_API.Models.Services.v2
 
         public ValueTask<Dictionary<string, string[]>> GetRegions(CancellationToken token);
 
-
+        public string? GetJobTypeFromNameSync(string jobName, CancellationToken token);
         public ValueTask<string?> GetJobTypeFromName(string jobName, CancellationToken token);
+
+
+        public ValueTask<string?> ResolveJobType(string jobType, CancellationToken token);
+
 
 
         public ValueTask<string> GetJobType(string jobType, CancellationToken token);

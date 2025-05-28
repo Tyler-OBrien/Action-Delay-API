@@ -1,22 +1,23 @@
-﻿using Action_Delay_API_Core.Models.Local;
+﻿using Action_Delay_API.Controllers.v2;
+using Action_Delay_API.Models.API.Local;
+using Action_Delay_API.Models.Services.v2;
+using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.NATS;
+using Action_Delay_API_Core.Models.NATS.Event;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using Action_Delay_API_Core.Models.Services;
 using FluentResults;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NATS.Client.Core;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Text.Json.Serialization;
-using System.Text.Json;
 using System.Text;
-using Action_Delay_API_Core.Models.NATS;
-using Action_Delay_API_Core.Models.NATS.Event;
-using Action_Delay_API.Controllers.v2;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using ZstdSharp;
-using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
-using Action_Delay_API.Models.API.Local;
 
 namespace Action_Delay_API.Services.v2;
 
@@ -86,9 +87,11 @@ public class NATSHubService
 
 
     private readonly ILogger _logger;
+    private readonly ICacheSingletonService _cacheSingletonService;
 
-    public NATSHubService(ILogger<NATSHubService> logger, IOptions<APIConfig> baseConfiguration, ILoggerFactory loggerFactory, IHubContext<JobSignalRHub> hubContext)
+    public NATSHubService(ILogger<NATSHubService> logger, IOptions<APIConfig> baseConfiguration, ILoggerFactory loggerFactory, IHubContext<JobSignalRHub> hubContext, ICacheSingletonService cacheSingletonService)
     {
+        _cacheSingletonService = cacheSingletonService;
         _hubContext = hubContext;
         _configuration = baseConfiguration.Value;
         _logger = logger;
@@ -129,7 +132,7 @@ public class NATSHubService
 
     public async Task Run(CancellationToken stoppingToken)
     {
-
+        await _cacheSingletonService.CacheJobNames(stoppingToken);
         await _natsConnection.ConnectAsync();
 
         await Task.Run(async () =>
@@ -201,6 +204,11 @@ public class NATSHubService
 
                 await _hubContext.Clients.Groups("all_jobs").SendAsync("ReceiveJobUpdate", msg.Subject, deserializedData, cancellationToken: stoppingToken);
                 await _hubContext.Clients.Groups($"job_{jobName}").SendAsync("ReceiveJobUpdate", msg.Subject, deserializedData, cancellationToken: stoppingToken);
+
+                var resolveType =  _cacheSingletonService.GetJobTypeFromNameSync(jobName, stoppingToken);
+                if (String.IsNullOrWhiteSpace(resolveType) == false)
+                    await _hubContext.Clients.Groups($"type_{resolveType}").SendAsync("ReceiveJobUpdate", msg.Subject, deserializedData, cancellationToken: stoppingToken);
+
 
             }
         }
