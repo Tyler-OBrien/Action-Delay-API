@@ -37,11 +37,11 @@ namespace Action_Delay_API_Worker
             TaskScheduler.UnobservedTaskException += TaskSchedulerOnUnobservedTaskException;
 
 
-            var lookupClientOptionsAny = new LookupClientOptions(CloudflareV6, Quad9V6);
+            var lookupClientOptionsAny = new LookupClientOptions(CloudflareV6, ControlDV4);
             lookupClientOptionsAny.UseCache = true;
             lookupClientOptionsAny.UseRandomNameServer = false;
             StaticLookupClientAny = new LookupClient(lookupClientOptionsAny);
-            var lookupClientOptionsV4 = new LookupClientOptions(CloudflareV4, Quad9V4);
+            var lookupClientOptionsV4 = new LookupClientOptions(CloudflareV4, ControlDV6);
             lookupClientOptionsAny.UseCache = true;
             lookupClientOptionsAny.UseRandomNameServer = false;
             StaticLookupClientV4 = new LookupClient(lookupClientOptionsV4);
@@ -336,8 +336,8 @@ namespace Action_Delay_API_Worker
         public static readonly IPAddress CloudflareV4 = IPAddress.Parse("1.1.1.1");
         public static readonly IPAddress CloudflareV6 = IPAddress.Parse("1.1.1.1");
 
-        public static readonly IPAddress Quad9V4 = IPAddress.Parse("9.9.9");
-        public static readonly IPAddress Quad9V6 = IPAddress.Parse("9.9.9.9");
+        public static readonly IPAddress ControlDV4 = IPAddress.Parse("76.76.2.0");
+        public static readonly IPAddress ControlDV6 = IPAddress.Parse("76.76.2.0");
 
 
         public static LookupClient StaticLookupClientAny;
