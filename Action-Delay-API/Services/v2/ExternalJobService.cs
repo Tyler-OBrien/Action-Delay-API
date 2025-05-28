@@ -35,15 +35,18 @@ namespace Action_Delay_API.Services.v2
         {
             try
             {
-                foreach (var dataByType in jobRequest.Data.GroupBy(data => data.InputType))
+                foreach (var dataByType in jobRequest.Data.GroupBy(data => data.InputType + GetColumnNames(data)))
                 {
+                    var tableKey = dataByType.First().InputType;
                     // Process each group of data points with the same input type
                     var processedData = ProcessDataGroup(dataByType);
+
+               
 
                     await _clickHouseService.InsertGeneric(
                         processedData.DataRows,
                         processedData.ColumnNames,
-                        dataByType.Key,
+                        tableKey,
                         token
                     );
 
@@ -60,6 +63,20 @@ namespace Action_Delay_API.Services.v2
             return new DataResponse<bool>(true);
         }
 
+
+        public string GetColumnNames(
+            GenericDataPoint dataPoint)
+        {
+            // Ensure the data is a JsonObject
+            if (dataPoint.Data is not JsonObject jsonObject)
+            {
+                _logger.LogWarning($"Skipping non-object data for type {dataPoint.InputType}");
+                return "";
+            }
+
+            return String.Join("|", jsonObject.Select(p => p.Key).Order());
+
+        }
 
         public (List<object[]> DataRows, string[] ColumnNames) ProcessDataGroup(IGrouping<string, GenericDataPoint> dataGroup)
         {
