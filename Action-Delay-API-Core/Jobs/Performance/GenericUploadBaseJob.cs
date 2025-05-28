@@ -179,7 +179,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 {
                     try
                     {
-                        await preInitTask.Value;
+                        await preInitTask.Value.WaitAsync(TimeSpan.FromMinutes(2), cancellationTokenSource.Token);
                     }
                     catch (Exception ex)
                     {
@@ -230,7 +230,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         Result<SerializableHttpResponse>? taskResult = null;
                         try
                         {
-                            taskResult = await completedTask;
+                            taskResult = await completedTask.WaitAsync(TimeSpan.FromMinutes(2), cancellationTokenSource.Token); 
                         }
                         catch (OperationCanceledException ex)
                         {
@@ -433,7 +433,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
         private async Task<Result<SerializableHttpResponse>> SendRequestWarmup(Location location, UploadJobGeneric job,
             CancellationToken token)
         {
-
 
             string prewarmUrl = job.PrewarmEndpoint;
 

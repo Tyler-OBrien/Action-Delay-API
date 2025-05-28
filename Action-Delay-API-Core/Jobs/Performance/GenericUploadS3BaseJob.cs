@@ -17,6 +17,7 @@ using System.Net;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Minio.Handlers;
+using System.Xml.Linq;
 
 namespace Action_Delay_API_Core.Jobs.Performance
 {
@@ -284,7 +285,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         Result<SerializableHttpResponse> taskResult = null;
                         try
                         {
-                            taskResult = await completedTask;
+                            taskResult = await completedTask.WaitAsync(TimeSpan.FromMinutes(2), cancellationTokenSource.Token);
                         }
                         catch (OperationCanceledException ex)
                         {
@@ -520,123 +521,148 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(IMinioClient client, Location location,
             string objectName, byte[] randomBytes, int seed,  string md5Hash, string putUrl, string getUrl, UploadS3Job job, CancellationToken token)
         {
-
-            var newRequest = new NATSHttpRequest()
+            try
             {
-                Headers = new Dictionary<string, string>()
+                var newRequest = new NATSHttpRequest()
                 {
-                    { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
-                    { "Content-MD5", md5Hash}
-                },
-                URL = putUrl,
-                TimeoutMs = 30_000,
-                EnableConnectionReuse = true,
-                Method = MethodType.PUT,
-                ReturnBody = false,
-                RetriesCount = 0,
-                ReturnBodyOnError = true,
-                ResponseHeaders = new List<string>()
-                {
-                    "content-length",
-                    "x-amz-version-id",
-                    "colo",
-                    "server",
-                },
-                RandomSeed = seed,
-                RandomBytesBody = 10_000,
-            };
-
-
-            newRequest.SetDefaultsFromLocation(location);
-            if (job.ForceNetType.HasValue)
-                newRequest.NetType = job.ForceNetType.Value;
-            var tryPut = await _queue.HTTP(newRequest, location, token);
-
-            if (job is { CheckUploadedContentHash: true } && tryPut is { IsSuccess: true, ValueOrDefault.WasSuccess: true })
-            {
-                try
-                {
-                    var getBytesSha256 = Convert.ToHexString(SHA256.HashData(randomBytes));
-                    // if this worked, let's pull it back and look at what we get back!
-                    newRequest.URL = getUrl;
-                    newRequest.Method = MethodType.GET;
-                    newRequest.Headers.Remove("Content-MD5");
-                    newRequest.ReturnBodySha256 = true;
-                    newRequest.ReturnBodyOnError = false;
-                    var tryGet = await _queue.HTTP(newRequest, location, token);
-                    if (tryGet.ValueOrDefault != null && tryGet is { IsSuccess: true, ValueOrDefault.WasSuccess: true } && tryGet.Value.BodySha256 != null)
+                    Headers = new Dictionary<string, string>()
                     {
-                        if (tryGet.ValueOrDefault!.BodySha256!.Equals(getBytesSha256, StringComparison.OrdinalIgnoreCase) == false)
-                        {
-                            tryPut.Value.WasSuccess = false;
-                            tryPut.Value.StatusCode = HttpStatusCode.PreconditionFailed;
-                            tryPut.Value.Body =
-                                $"Uploaded Content Hash was different then retrieved.";
-                            var tryGetHeader = tryGet.ValueOrDefault.Headers.FirstOrDefault(headerkvp =>
-                                headerkvp.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase));
-                            if (String.IsNullOrEmpty(tryGetHeader.Key) == false &&
-                                int.TryParse(tryGetHeader.Value, out var parsedContentLength) &&
-                                parsedContentLength != randomBytes.Length)
-                                tryPut.Value.Body += $" Content Length Different then expected: {parsedContentLength}";
+                        { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}" },
+                        { "Content-MD5", md5Hash }
+                    },
+                    URL = putUrl,
+                    TimeoutMs = 30_000,
+                    EnableConnectionReuse = true,
+                    Method = MethodType.PUT,
+                    ReturnBody = false,
+                    RetriesCount = 0,
+                    ReturnBodyOnError = true,
+                    ResponseHeaders = new List<string>()
+                    {
+                        "content-length",
+                        "x-amz-version-id",
+                        "colo",
+                        "server",
+                    },
+                    RandomSeed = seed,
+                    RandomBytesBody = 10_000,
+                };
 
-                            try
+
+                newRequest.SetDefaultsFromLocation(location);
+                if (job.ForceNetType.HasValue)
+                    newRequest.NetType = job.ForceNetType.Value;
+                var tryPut = await _queue.HTTP(newRequest, location, token);
+
+                if (job is { CheckUploadedContentHash: true } &&
+                    tryPut is { IsSuccess: true, ValueOrDefault.WasSuccess: true })
+                {
+                    try
+                    {
+                        var getBytesSha256 = Convert.ToHexString(SHA256.HashData(randomBytes));
+                        // if this worked, let's pull it back and look at what we get back!
+                        newRequest.URL = getUrl;
+                        newRequest.Method = MethodType.GET;
+                        newRequest.Headers.Remove("Content-MD5");
+                        newRequest.ReturnBodySha256 = true;
+                        newRequest.ReturnBodyOnError = false;
+                        var tryGet = await _queue.HTTP(newRequest, location, token);
+                        if (tryGet.ValueOrDefault != null &&
+                            tryGet is { IsSuccess: true, ValueOrDefault.WasSuccess: true } &&
+                            tryGet.Value.BodySha256 != null)
+                        {
+                            if (tryGet.ValueOrDefault!.BodySha256!.Equals(getBytesSha256,
+                                    StringComparison.OrdinalIgnoreCase) == false)
                             {
-                                if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue &&
-                                    job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                                tryPut.Value.WasSuccess = false;
+                                tryPut.Value.StatusCode = HttpStatusCode.PreconditionFailed;
+                                tryPut.Value.Body =
+                                    $"Uploaded Content Hash was different then retrieved.";
+                                var tryGetHeader = tryGet.ValueOrDefault.Headers.FirstOrDefault(headerkvp =>
+                                    headerkvp.Key.Equals("content-length", StringComparison.OrdinalIgnoreCase));
+                                if (String.IsNullOrEmpty(tryGetHeader.Key) == false &&
+                                    int.TryParse(tryGetHeader.Value, out var parsedContentLength) &&
+                                    parsedContentLength != randomBytes.Length)
+                                    tryPut.Value.Body +=
+                                        $" Content Length Different then expected: {parsedContentLength}";
+
+                                try
                                 {
-                                    if (Directory.Exists("HashMissMash") == false)
-                                        Directory.CreateDirectory("HashMissMash");
-                                    await File.WriteAllBytesAsync($"HashMissMash/{objectName}", randomBytes, CancellationToken.None);
-                                    await File.WriteAllTextAsync($"HashMissMash/{objectName}",
-                                        $"{tryPut.Value.Body}. I thought we uploaded {getBytesSha256} but we actually got {tryGet.ValueOrDefault!.BodySha256}, md5: {md5Hash}, other response headers: {String.Join(" | ", tryGet.Value.Headers.Select(kvp => $"[{kvp.Key}] = [{kvp.Value}]"))}", CancellationToken.None);
+                                    if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue &&
+                                        job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                                    {
+                                        if (Directory.Exists("HashMissMash") == false)
+                                            Directory.CreateDirectory("HashMissMash");
+                                        await File.WriteAllBytesAsync($"HashMissMash/{objectName}", randomBytes,
+                                            CancellationToken.None);
+                                        await File.WriteAllTextAsync($"HashMissMash/{objectName}",
+                                            $"{tryPut.Value.Body}. I thought we uploaded {getBytesSha256} but we actually got {tryGet.ValueOrDefault!.BodySha256}, md5: {md5Hash}, other response headers: {String.Join(" | ", tryGet.Value.Headers.Select(kvp => $"[{kvp.Key}] = [{kvp.Value}]"))}",
+                                            CancellationToken.None);
+                                    }
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, "Error on KeepOldAndDumpToDiskOnMisMatch ");
-                                SentrySdk.CaptureException(ex);
-                            }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Error on KeepOldAndDumpToDiskOnMisMatch ");
+                                    SentrySdk.CaptureException(ex);
+                                }
 
 
-                            return tryPut;
+                                return tryPut;
+                            }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error pulling back upload info");
-                    SentrySdk.CaptureException(ex);
-                }
-
-                try
-                {
-                    if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue && job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                    catch (Exception ex)
                     {
-
-                        var deleteArgs = new RemoveObjectArgs().WithBucket(job.BucketName).WithObject(objectName);
-                        var tryGetHeader = tryPut.Value.Headers.FirstOrDefault(headerKvp =>
-                            headerKvp.Key.Equals("x-amz-version-id", StringComparison.OrdinalIgnoreCase));
-
-                        if ( String.IsNullOrWhiteSpace(tryGetHeader.Value) == false)
-                        {
-                            deleteArgs.WithVersionId(tryGetHeader.Value);
-                        }
-
-                        await client.RemoveObjectAsync(deleteArgs, CancellationToken.None);
-
+                        _logger.LogError(ex, "Error pulling back upload info");
+                        SentrySdk.CaptureException(ex);
                     }
 
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error pulling back upload info");
-                    SentrySdk.CaptureException(ex);
+                    try
+                    {
+                        if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue && job.KeepOldAndDumpToDiskOnMisMatch.Value)
+                        {
+
+                            var deleteArgs = new RemoveObjectArgs().WithBucket(job.BucketName).WithObject(objectName);
+                            var tryGetHeader = tryPut.Value.Headers.FirstOrDefault(headerKvp =>
+                                headerKvp.Key.Equals("x-amz-version-id", StringComparison.OrdinalIgnoreCase));
+
+                            if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false)
+                            {
+                                deleteArgs.WithVersionId(tryGetHeader.Value);
+                            }
+
+                            await client.RemoveObjectAsync(deleteArgs, CancellationToken.None);
+
+                        }
+
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error pulling back upload info");
+                        SentrySdk.CaptureException(ex);
+                    }
+
+
                 }
 
+                return tryPut;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex,
+                    $"{job.Name} had {location.Name} time out.");
+                return Result.Fail($"{job.Name} had {location.Name} time out.");
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    $"{job.Name} had {location.Name} error out.");
+                return Result.Fail($"{job.Name} had {location.Name} error out.");
 
             }
 
-            return tryPut;
+            return Result.Fail("");
         }
 
         public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
