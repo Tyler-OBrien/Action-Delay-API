@@ -27,6 +27,8 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
         public DbSet<MetalData> MetalData { get; set; }
         public DbSet<JobError> JobErrors { get; set; }
 
+        public DbSet<Incident> Incidents { get; set; }
+
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -103,6 +105,18 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             modelBuilder.Entity<JobError>().ToTable("JobErrors");
             modelBuilder.Entity<JobError>().HasKey(job => job.ErrorHash);
             modelBuilder.Entity<JobError>()
+                .Property(e => e.LastEditDate)
+
+                .HasDefaultValueSql("NOW()")
+                .ValueGeneratedOnAdd();
+
+            modelBuilder.Entity<Incident>().ToTable("Incident");
+            modelBuilder.Entity<Incident>().HasKey(incident => incident.Id);
+            modelBuilder.Entity<Incident>().HasIndex(incident => incident.RuleId);
+            modelBuilder.Entity<Incident>().HasIndex(incident => incident.Active);
+            modelBuilder.Entity<Incident>().HasIndex(incident => incident.StartedAt);
+            modelBuilder.Entity<Incident>().HasIndex(incident => incident.Type);
+            modelBuilder.Entity<Incident>()
                 .Property(e => e.LastEditDate)
 
                 .HasDefaultValueSql("NOW()")

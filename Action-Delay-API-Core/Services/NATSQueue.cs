@@ -110,7 +110,7 @@ namespace Action_Delay_API_Core.Services
             var myRegistry = new MixedSerializerRegistry();
 
 
-            var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout  = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), InboxPrefix = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "_INBOX_ActionDelayAPI" : $"_INBOX_{_configuration.CoreName}", Name = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "Action-Delay-API-Core" : _configuration.CoreName, SubPendingChannelCapacity = 10_000, SubscriptionCleanUpInterval  = TimeSpan.FromMinutes(2), MaxReconnectRetry = -1};
+            var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout  = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), InboxPrefix = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "_INBOX_ActionDelayAPI" : $"_INBOX_{_configuration.CoreName}", Name = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "Action-Delay-API-Core" : _configuration.CoreName, SubPendingChannelCapacity = 10_000, SubscriptionCleanUpInterval  = TimeSpan.FromMinutes(2), MaxReconnectRetry = -1, RequestReplyMode = NatsRequestReplyMode.Direct};
             _natsConnection = new NatsConnection(options);
 
             _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.ConnectionState}");

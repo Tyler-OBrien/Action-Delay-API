@@ -3,6 +3,7 @@ using System;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,13 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Action_Delay_API_Core.Migrations
 {
     [DbContext(typeof(ActionDelayDatabaseContext))]
-    partial class ActionDelayDatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20250519013323_Incidents")]
+    partial class Incidents
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.5")
+                .HasAnnotation("ProductVersion", "9.0.4")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -130,10 +133,6 @@ namespace Action_Delay_API_Core.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Active");
@@ -141,8 +140,6 @@ namespace Action_Delay_API_Core.Migrations
                     b.HasIndex("RuleId");
 
                     b.HasIndex("StartedAt");
-
-                    b.HasIndex("Type");
 
                     b.ToTable("Incident", (string)null);
                 });
