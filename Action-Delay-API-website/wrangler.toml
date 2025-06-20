@@ -1,6 +1,6 @@
 name = "action-delay-api-website"
 main = "./dist/_worker.js/index.js"
-compatibility_date = "2025-04-13"
+compatibility_date = "2025-06-19"
 compatibility_flags = [ "nodejs_compat" ]
 
 [assets]
