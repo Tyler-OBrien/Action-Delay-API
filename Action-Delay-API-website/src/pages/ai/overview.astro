@@ -1,0 +1,30 @@
+---
+import type { Job } from "../../../models/cloudflare/job";
+import ErrorGraph from "../../components/graph/ErrorGraph";
+import SmartGraph from "../../components/graph/SmartGraph";
+import Grid from "../../components/Grid.astro";
+import Hero from "../../components/Hero.astro";
+import JobDisplay from "../../components/JobDisplay.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+
+---
+
+<BaseLayout
+  title="Cloudflare AI Monitoring"
+  description="See Cloudflare AI Monitoring Overview"
+>
+  <div class="stack gap-20">
+    <main class="wrapper stack gap-8">
+      <Hero
+        title="Cloudflare AI Jobs"
+        tagline="See Cloudflare AI Monitoring Jobs"
+        align="start"
+      >
+            <a href="/ai/">AI Jobs</a>
+      </Hero>
+			<SmartGraph endpoint=`/v2/jobs/analytics/type/ai` label=`Overall Cloudflare AI Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/ai` label=`Overall Cloudflare AI Errors` options={["AvgApiResponseLatency" ]} client:only="preact"/> 
+    </main>
+  </div>
+</BaseLayout>

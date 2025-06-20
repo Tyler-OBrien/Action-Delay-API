@@ -1,15 +1,5 @@
-import { useEffect, useMemo, useCallback, memo, useReducer, useRef } from 'react';
-import Chart from 'react-apexcharts';
-
-const FORMATTERS = {
-  date: new Intl.DateTimeFormat('default'),
-  monthDay: new Intl.DateTimeFormat('default', { month: 'short', day: 'numeric' }),
-  fullDate: new Intl.DateTimeFormat('default', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-};
+import { useState, useEffect, useCallback, useRef } from 'react';
+import * as Plotly from 'plotly.js-basic-dist-min'
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -19,47 +9,6 @@ const SELECT_OPTIONS = [
   { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
   { value: Number.MAX_VALUE, label: 'All Data' }
 ];
-
-const ACTIONS = {
-  SET_TIME_RANGE: 'SET_TIME_RANGE',
-  SET_CUSTOM_RANGE: 'SET_CUSTOM_RANGE',
-  SET_DATA: 'SET_DATA'
-};
-
-const createInitialState = () => ({
-  timeRange: 24 * 60 * 60 * 1000,
-  customRange: null,
-  customLabel: null,
-  data: []
-});
-
-function reducer(state, action) {
-  switch (action.type) {
-    case ACTIONS.SET_TIME_RANGE:
-      return {
-        ...state,
-        timeRange: action.payload,
-        customRange: null,
-        customLabel: null,
-        data: state.data
-      };
-    case ACTIONS.SET_CUSTOM_RANGE:
-      return {
-        ...state,
-        timeRange: 'custom',
-        customRange: action.payload.range,
-        customLabel: action.payload.label,
-        data: state.data
-      };
-    case ACTIONS.SET_DATA:
-      return {
-        ...state,
-        data: action.payload
-      };
-    default:
-      return state;
-  }
-}
 
 const processErrorData = (points) => {
   const errorMap = new Map();
@@ -87,59 +36,18 @@ const processErrorData = (points) => {
   }));
 };
 
-const useTheme = () => {
-  return useMemo(() => {
-    console.log('Theme recalculated');
-    const isDark = document.documentElement.classList.contains('dark');
-    return {
-      mode: isDark ? "dark" : "light",
-      background: isDark ? '#171717' : '#ffffff'
-    };
-  }, []);
+const getTheme = () => {
+  const isDark = document.documentElement.classList.contains('dark');
+  return {
+    mode: isDark ? "dark" : "light",
+    paper_bgcolor: isDark ? '#171717' : '#ffffff',
+    plot_bgcolor: isDark ? '#262626' : '#fafafa',
+    font_color: isDark ? '#ffffff' : '#000000',
+    grid_color: isDark ? '#404040' : '#e5e5e5'
+  };
 };
 
-const useFetchData = (endpoint, timeRange, customRange) => {
-  const lastFetchRef = useRef(null);
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
-
-  return useCallback(async (dispatch) => {
-    console.log('Fetching data');
-    const fetchId = Date.now();
-    lastFetchRef.current = fetchId;
-
-    try {
-      const endDate = Date.now();
-      const startDate = customRange?.min ?? 
-        (timeRange === Number.MAX_VALUE ? new Date(2020, 0).getTime() : endDate - timeRange);
-
-      const response = await fetch(
-        `https://delay.cloudflare.chaika.me/${endpoint}?` +
-        `StartDateTime=${new Date(startDate).toISOString()}&` +
-        `EndDateTime=${new Date(Math.min(endDate, Date.now())).toISOString()}&` +
-        `Metrics=AvgRunLength`
-      );
-
-      const { data: responseData } = await response.json();
-      
-      if (lastFetchRef.current === fetchId && isMountedRef.current) {
-        console.log('Processing error data');
-        const processedData = processErrorData(responseData.points);
-        dispatch({ type: ACTIONS.SET_DATA, payload: processedData });
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  }, [endpoint, timeRange, customRange]);
-};
-
-const TimeRangeSelector = memo(({ value, onChange, customLabel }) => {
-  console.log('TimeRangeSelector render');
+const TimeRangeSelector = ({ value, onChange, customLabel }) => {
   return (
     <select 
       value={value} 
@@ -156,200 +64,216 @@ const TimeRangeSelector = memo(({ value, onChange, customLabel }) => {
       )}
     </select>
   );
-});
-
-TimeRangeSelector.displayName = 'TimeRangeSelector';
-
-const createChartOptions = (themeState, label, chartId, onZoom) => {
-  const legendFormatter = (seriesName, opts) => {
-    const total = opts.w.globals.series[opts.seriesIndex].reduce((a, b) => a + b, 0);
-    const [, errorCode = ''] = seriesName.match(/\[(.*?)\]/) || [];
-    const errorMessage = seriesName.split(']:')[1]?.trim().split('.')[0] || seriesName;
-    return `[${errorCode}] ${errorMessage.substring(0, 50)}${errorMessage.length > 50 ? '...' : ''} (${total})`;
-  };
-
-  const tooltipCustom = ({ series, dataPointIndex, w }) => {
-    const timestamp = new Date(w.globals.seriesX[0][dataPointIndex]);
-    const dateStr = FORMATTERS.fullDate.format(timestamp);
-
-    const activeErrors = series
-      .map((s, index) => ({
-        name: w.globals.seriesNames[index],
-        value: s[dataPointIndex]
-      }))
-      .filter(error => error.value > 0);
-
-    if (!activeErrors.length) return '';
-
-    return `
-      <div class="p-2">
-        <div class="font-bold mb-2">${dateStr}</div>
-        ${activeErrors.map(error => {
-          const [, errorCode = ''] = error.name.match(/\[(.*?)\]/) || [];
-          const errorMessage = error.name.split(']:')[1]?.trim() || error.name;
-          return `
-            <div class="mb-1">
-              <span class="font-semibold">[${errorCode}]:</span> 
-              ${errorMessage}
-              <span class="ml-1 font-semibold">(${error.value})</span>
-            </div>`;
-        }).join('')}
-      </div>`;
-  };
-
-  return {
-    theme: { mode: themeState.mode },
-    title: {
-      text: `${label} - Error Occurrences`,
-      align: 'center'
-    },
-    chart: {
-      id: chartId,
-      type: 'bar',
-      stacked: true,
-      height: 500,
-      background: themeState.background,
-      zoom: {
-        enabled: true,
-        type: 'x',
-        autoScaleYaxis: true
-      },
-      events: { zoomed: onZoom },
-      animations: { enabled: false }
-    },
-    xaxis: {
-      type: 'datetime',
-      labels: {
-        datetimeUTC: false,
-        formatter: value => FORMATTERS.date.format(new Date(value))
-      }
-    },
-    yaxis: {
-      title: { text: 'Error Count' }
-    },
-    tooltip: {
-      shared: true,
-      intersect: false,
-      x: { format: 'MMM dd, yyyy' },
-      custom: tooltipCustom
-    },
-    legend: {
-      show: true,
-      position: 'bottom',
-      horizontalAlign: 'left',
-      height: 150,
-      formatter: legendFormatter,
-      itemMargin: {
-        horizontal: 15,
-        vertical: 5
-      }
-    },
-    noData: {
-      text: 'No data available',
-      align: 'center',
-      verticalAlign: 'middle'
-    }
-  };
 };
 
-const ChartComponent = memo(({ data, options, height }) => {
-  console.log('Chart render');
-  return (
-    <Chart 
-      options={options}
-      series={data}
-      type="bar"
-      height={height}
-    />
-  );
-});
+const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) => {
+  const chartRef = useRef(null);
+  const [theme, setTheme] = useState(getTheme);
 
-ChartComponent.displayName = 'ChartComponent';
+  const updateChart = useCallback(() => {
+    if (!chartRef.current || !data.length) return;
 
-const ErrorGraph = memo(({ endpoint, label, fullscreen = false }) => {
-  console.log('ErrorGraph render');
-  
-  const [state, dispatch] = useReducer(reducer, null, createInitialState);
-  const themeState = useTheme();
-  const chartId = useMemo(() => crypto.randomUUID(), []);
-  const fetchData = useFetchData(endpoint, state.timeRange, state.customRange);
+    const endDate = Date.now();
+    const startDate = customRange?.min ?? 
+      (timeRange === Number.MAX_VALUE ? new Date(2023, 8).getTime() : endDate - timeRange);
 
-  const handleTimeRangeChange = useCallback((event) => {
-    console.log('Time range changed');
-    dispatch({
-      type: ACTIONS.SET_TIME_RANGE,
-      payload: Number(event.target.value)
+
+    const plotlyData = data.map((series, index) => {
+      const [, errorCode = ''] = series.name.match(/\[(.*?)\]/) || [];
+      const errorMessage = series.name.split(']:')[1]?.trim().split('.')[0] || series.name;
+      const total = series.data.reduce((sum, point) => sum + point.y, 0);
+      const displayName = `[${errorCode}] ${errorMessage.substring(0, 50)}${errorMessage.length > 50 ? '...' : ''} (${total})`;
+
+      return {
+        x: series.data.map(d => new Date(d.x)),
+        y: series.data.map(d => d.y),
+        type: 'bar',
+        name: displayName,
+        hovertemplate: `<b>%{fullData.name}</b><br>` +
+                       `Date: %{x|%b %d, %Y}<br>` +
+                       `Count: %{y}<br>` +
+                       `<extra></extra>`
+      };
     });
-  }, []);
 
-  const handleCustomRange = useCallback((range, label) => {
-    dispatch({
-      type: ACTIONS.SET_CUSTOM_RANGE,
-      payload: { range, label }
+    const layout = {
+      title: {
+        text: `${label} - Error Occurrences`,
+        x: 0.5,
+        font: { color: theme.font_color, size: 16 }
+      },
+      xaxis: {
+        title: 'Date',
+        type: 'date',
+        range: [new Date(startDate), new Date(endDate)],
+        color: theme.font_color,
+        gridcolor: theme.grid_color
+      },
+      yaxis: {
+        title: 'Error Count',
+        color: theme.font_color,
+        gridcolor: theme.grid_color,
+        fixedrange: true
+      },
+      barmode: 'stack',
+      paper_bgcolor: theme.paper_bgcolor,
+      plot_bgcolor: theme.plot_bgcolor,
+      font: { color: theme.font_color },
+      height: height,
+      legend: {
+        orientation: 'h',
+        y: -0.2,
+        font: { color: theme.font_color, size: 12 }
+      },
+      margin: { l: 60, r: 40, t: 60, b: 120 }
+    };
+
+    const config = {
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['pan2d', 'select2d', 'lasso2d', 'autoScale2d'],
+      displaylogo: false,
+      responsive: true
+    };
+
+    Plotly.newPlot(chartRef.current, plotlyData, layout, config).then(() => {
+      const handleRelayout = (eventData) => {
+        if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
+          const minDate = new Date(eventData['xaxis.range[0]']);
+          const maxDate = new Date(eventData['xaxis.range[1]']);
+          const timeDiff = maxDate.getTime() - minDate.getTime();
+
+          if (timeDiff >= 5 * 60 * 1000) {
+            onZoom({
+              min: minDate.getTime(),
+              max: maxDate.getTime()
+            });
+          }
+        }
+      };
+
+      chartRef.current.on('plotly_relayout', handleRelayout);
     });
-  }, []);
+  }, [data, timeRange, customRange, label, height, theme]);
 
-  const handleZoomed = useCallback((chartContext, { xaxis }) => {
-    console.log('Zoom handled');
-    const minDate = new Date(xaxis.min);
-    const maxDate = new Date(xaxis.max);
-    const timeDiff = maxDate.getTime() - minDate.getTime();
-
-    if (timeDiff < 5 * 60 * 1000) return;
-
-    handleCustomRange(
-      { min: xaxis.min, max: xaxis.max },
-      `${FORMATTERS.monthDay.format(minDate)} -> ${FORMATTERS.monthDay.format(maxDate)}`
-    );
-  }, [handleCustomRange]);
-
-  const chartOptions = useMemo(() => 
-    createChartOptions(themeState, label, chartId, handleZoomed),
-    [themeState, label, chartId, handleZoomed]
-  );
-
+  // Cleanup event listeners
   useEffect(() => {
-    fetchData(dispatch);
-  }, [fetchData]);
-
-  useEffect(() => {
-    console.log('Setting up theme change listener');
-    const handleThemeChange = () => {
-      console.log('Theme changed');
-      const chart = window.ApexCharts?.getChartByID(chartId);
-      if (chart) {
-        chart.updateOptions({
-          theme: { mode: document.documentElement.classList.contains('dark') ? "dark" : "light" },
-          chart: { background: document.documentElement.classList.contains('dark') ? '#171717' : '#ffffff' }
-        });
+    return () => {
+      if (chartRef.current && chartRef.current.removeAllListeners) {
+        chartRef.current.removeAllListeners('plotly_relayout');
       }
+    };
+  }, []);
+
+  // Update chart when dependencies change
+  useEffect(() => {
+    updateChart();
+  }, [updateChart]);
+
+  // Handle theme changes
+  useEffect(() => {
+    const handleThemeChange = () => {
+      setTheme(getTheme());
     };
 
     window.addEventListener('themeChange', handleThemeChange);
-    return () => window.removeEventListener('themeChange', handleThemeChange);
-  }, [chartId]);
+
+    return () => {
+      window.removeEventListener('themeChange', handleThemeChange);
+    };
+  }, []);
 
   return (
     <div>
+      {data.length === 0 ? (
+        <div className="flex items-center justify-center h-96 text-gray-500">
+          No error data available in selected time frame
+        </div>
+      ) : (
+        <div ref={chartRef} style={{ width: '100%', height: `${height}px` }} />
+      )}
+    </div>
+  );
+};
+
+const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen = false }) => {
+  const [timeRange, setTimeRange] = useState(24 * 60 * 60 * 1000);
+  const [customRange, setCustomRange] = useState(null);
+  const [customLabel, setCustomLabel] = useState(null);
+  const [data, setData] = useState([]);
+  const lastFetchRef = useRef(null);
+
+  const fetchData = useCallback(async () => {
+    const fetchId = Date.now();
+    lastFetchRef.current = fetchId;
+
+    try {
+      const endDateFetch = Date.now();
+      const startDateFetch = customRange?.min ?? 
+        (timeRange === Number.MAX_VALUE ? new Date(2023, 8).getTime() : endDateFetch - timeRange);
+
+      const response = await fetch(
+        `https://delay.cloudflare.chaika.me/${endpoint}?` +
+        `StartDateTime=${new Date(startDateFetch).toISOString()}&` +
+        `EndDateTime=${new Date(Math.min(endDateFetch, Date.now())).toISOString()}&` +
+        `Metrics=AvgRunLength`
+      );
+
+      const { data: responseData } = await response.json();
+
+      // Only update if this is still the latest fetch
+      if (lastFetchRef.current === fetchId) {
+        const processedData = processErrorData(responseData.points);
+        setData(processedData);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  }, [endpoint, timeRange, customRange]);
+
+  const handleTimeRangeChange = (event) => {
+    const value = Number(event.target.value);
+    setTimeRange(value);
+    setCustomRange(null);
+    setCustomLabel(null);
+  };
+
+  const handleZoomed = (range) => {
+    const minDate = new Date(range.min);
+    const maxDate = new Date(range.max);
+    const monthDay = new Intl.DateTimeFormat('default', { month: 'short', day: 'numeric' });
+    
+    setTimeRange('custom');
+    setCustomRange({ min: range.min, max: range.max });
+    setCustomLabel(`${monthDay.format(minDate)} -> ${monthDay.format(maxDate)}`);
+  };
+
+  // Fetch data when dependencies change
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return (
+    <div className="w-full p-4">
       <div className="mb-4">
         <TimeRangeSelector 
-          value={state.timeRange}
+          value={timeRange}
           onChange={handleTimeRangeChange}
-          customLabel={state.customLabel}
+          customLabel={customLabel}
         />
       </div>
 
       <div className="w-full">
-        <ChartComponent 
-          data={state.data}
-          options={chartOptions}
+        <PlotlyChart 
+          data={data}
+          timeRange={timeRange}
+          customRange={customRange}
+          label={label}
           height={fullscreen ? 800 : 700}
+          onZoom={handleZoomed}
         />
       </div>
     </div>
   );
-});
-
-ErrorGraph.displayName = 'ErrorGraph';
+};
 
 export default ErrorGraph;

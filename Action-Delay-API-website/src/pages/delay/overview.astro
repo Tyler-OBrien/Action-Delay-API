@@ -20,9 +20,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         title="Cloudflare Delay Jobs"
         tagline="See Cloudflare Delay Monitoring Jobs"
         align="start"
-      />
+      >
+            <a href="/delay">Delay Jobs</a>
+      </Hero>
 			<SmartGraph endpoint=`/v2/jobs/analytics/type/CloudflareDelay` label=`Overall Cloudflare Delay API Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
-			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/CloudflareDelay` label=`Overall Cloudflare Delay Errors` options={["AvgApiResponseLatency" ]} client:only="preact"/> 
+			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/CloudflareDelay` label=`Overall Cloudflare Delay API Errors` options={["AvgApiResponseLatency" ]} client:only="preact"/> 
     </main>
   </div>
 </BaseLayout>

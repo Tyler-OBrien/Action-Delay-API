@@ -16,7 +16,7 @@ async function start() {
     console.log(connection);
     connStatus.innerText = "Connected: Live Updates";
     connStatus.classList = ["websocket-connected"];
-    await connection.invoke("SubscribeToAllJobs");
+    await connection.invoke("SubscribeToType", "CloudflareDelay");
   } catch (err) {
     console.log(err);
     connStatus.innerText = "Reconnecting: Not Live";

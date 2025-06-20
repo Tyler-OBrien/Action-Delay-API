@@ -28,16 +28,18 @@ const stats: QuickStats[] = await getAnalyticsTask;
 ---
 
 <BaseLayout
-	title="Cloudflare Delay Monitoring"
-	description="See Cloudflare Delay Monitoring Jobs"
+	title="Cloudflare AI Monitoring"
+	description="See Cloudflare AI Monitoring Jobs"
 >
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-8">
 			<Hero
-				title="Cloudflare Delay Jobs"
-				tagline="See Cloudflare Delay Monitoring Jobs"
+				title="Cloudflare AI Jobs"
+				tagline="See Cloudflare AI Monitoring Jobs"
 				align="start"
-			/>
+			>
+			      <a href="/ai/overview">Overview</a>
+			</Hero>
 			<Grid>
 				{
 					jobs.map((job: Job) => (

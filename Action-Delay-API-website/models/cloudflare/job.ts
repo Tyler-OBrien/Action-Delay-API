@@ -14,6 +14,6 @@ export interface Job {
     predictedDelayLengthMs: number;
     predictedRunTime:       Date;
     predictedRunStatus:     string;
-    description: string; 
+    jobDescription: string; 
     type: string;
 }

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import Chart from 'react-apexcharts';
+import  { useEffect, useState, useRef } from 'react';
+import Plotly from 'plotly.js-basic-dist-min'
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -29,22 +29,27 @@ const SELECT_DISPLAY_OPTIONS = [
 ];
 
 function formatTime(ms) {
+  if (ms < 1000) {
+    return ms.toFixed(0) + ' ms';
+  }
+  
   let seconds = ms / 1000;
   if (seconds < 60) {
-    return seconds.toFixed(2) + ' second(s)';
+    return seconds.toFixed(2) + ' s';
   }
   
   let minutes = seconds / 60;
   if (minutes < 60) {
-    return minutes.toFixed(2) + ' minute(s)';
+    return minutes.toFixed(2) + ' min';
   }
   
   let hours = minutes / 60;
-  return hours.toFixed(2) + ' hour(s)';
+  return hours.toFixed(2) + ' h';
 }
 
-const EnhancedTimeGraph = (props) => {
+const SmartGraph = (props) => {
   const { endpoint, label, options: propOptions, fullscreen, defaultOption } = props;
+  const plotRef = useRef(null);
   
   const options = propOptions 
     ? SELECT_DISPLAY_OPTIONS.filter(option => propOptions.includes(option.value))
@@ -59,7 +64,6 @@ const EnhancedTimeGraph = (props) => {
   const [timeRange, setTimeRange] = useState(24 * 60 * 60 * 1000);
   const [customTimeRange, setCustomTimeRange] = useState(null);
   const [customTimeRangeObj, setCustomTimeRangeObj] = useState(null);
-  const [oldZoomObj, setOldZoomObj] = useState({});
   const [displayOption, setDisplayOption] = useState(defaultOptionObj.value);
   const [displayOptionLabel, setDisplayOptionLabel] = useState(defaultOptionObj.label);
 
@@ -92,190 +96,211 @@ const EnhancedTimeGraph = (props) => {
       });
   }, [timeRange, displayOption, customTimeRangeObj, endpoint]);
 
-  const htmlElement = document.documentElement;
-  const hasDarkClass = htmlElement.classList.contains('dark');
-  const chartUuid = crypto.randomUUID();
+  useEffect(() => {
+    if (!plotRef.current) return;
 
-  const chartOptions = {
-    theme: {
-      mode: hasDarkClass ? "dark" : "light",
-    },
-    title: {
-      text: `${label} - ${displayOptionLabel}`,
-      align: 'center',
-      style: {
-        fontSize: '16px',
-        fontWeight: 600
-      }
-    },
-    chart: {
-      id: chartUuid,
-      type: 'line',
-      height: 500,
-      background: hasDarkClass ? '#171717' : '#ffffff',
-      zoom: {
-        enabled: true,
-        type: 'x',
-        autoScaleYaxis: true,
-        allowMouseWheelZoom: false
+    const htmlElement = document.documentElement;
+    const hasDarkClass = htmlElement.classList.contains('dark');
+    
+    const x = dataPoints.map(point => new Date(point.x));
+    const y = dataPoints.map(point => point.y);
+
+    let xRange = null;
+    if (customTimeRangeObj) {
+      xRange = [new Date(customTimeRangeObj.min), new Date(customTimeRangeObj.max)];
+    } else if (timeRange !== Number.MAX_VALUE) {
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - timeRange);
+      xRange = [startDate, endDate];
+    }
+
+    const data = [{
+      x: x,
+      y: y,
+      type: 'scatter',
+      mode: 'lines+markers',
+      name: displayOptionLabel,
+      line: {
+        shape: 'spline',
+        width: 2,
+        color: hasDarkClass ? '#3b82f6' : '#1d4ed8'
       },
-      animations: {
-        enabled: true,
-        easing: 'linear',
-        dynamicAnimation: {
-          speed: 450
+      marker: {
+        size: 4,
+        color: hasDarkClass ? '#3b82f6' : '#1d4ed8'
+      },
+      connectgaps: true
+    }];
+
+    const layout = {
+      title: {
+        text: `${label} - ${displayOptionLabel}`,
+        font: {
+          size: 16,
+          color: hasDarkClass ? '#e5e5e5' : '#333'
         }
       },
-      foreColor: hasDarkClass ? '#e5e5e5' : '#333',
-      redrawOnParentResize: true,
-      redrawOnWindowResize: true,
-      events: {
-        zoomed: function(chartContext, { xaxis }) {
-          const minDate = new Date(xaxis.min);
-          const maxDate = new Date(xaxis.max);
+      xaxis: {
+        title: 'Time',
+        type: 'date',
+        range: xRange,
+        gridcolor: hasDarkClass ? '#333' : '#e5e5e5',
+        tickfont: {
+          size: 12,
+          color: hasDarkClass ? '#e5e5e5' : '#333'
+        },
+        titlefont: {
+          size: 13,
+          color: hasDarkClass ? '#e5e5e5' : '#333'
+        },
+      },
+      yaxis: {
+        title: 'Duration',
+        tickmode: 'array',
+        gridcolor: hasDarkClass ? '#333' : '#e5e5e5',
+        tickfont: {
+          size: 12,
+          color: hasDarkClass ? '#e5e5e5' : '#333'
+        },
+        titlefont: {
+          size: 13,
+          color: hasDarkClass ? '#e5e5e5' : '#333'
+        },
+        fixedrange: true
+      },
+      plot_bgcolor: hasDarkClass ? '#171717' : '#ffffff',
+      paper_bgcolor: hasDarkClass ? '#171717' : '#ffffff',
+      font: {
+        color: hasDarkClass ? '#e5e5e5' : '#333'
+      },
+      margin: {
+        l: 80,
+        r: 50,
+        t: 80,
+        b: 80
+      },
+      hovermode: 'x unified',
+      legend: {
+        x: 0,
+        y: -0.2,
+        orientation: 'h',
+        font: {
+          size: 13,
+          color: hasDarkClass ? '#e5e5e5' : '#333'
+        }
+      }
+    };
+
+    const config = {
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['pan2d', 'select2d', 'lasso2d', 'autoScale2d', 'resetScale2d', 'zoom2d'],
+      displaylogo: false
+    };
+
+    // Custom hover template with time formatting
+    data[0].hovertemplate = '<b>%{fullData.name}</b><br>' +
+                           'Time: %{x}<br>' +
+                           'Duration: %{customdata}<br>' +
+                           '<extra></extra>';
+    data[0].customdata = y.map(val => formatTime(val));
+
+    // Custom y-axis tick formatting with appropriate units
+    if (y.length > 0) {
+      const minY = Math.min(...y);
+      const maxY = Math.max(...y);
+      const range = maxY - minY;
+      const numTicks = 8;
+      
+      // Determine appropriate unit based on data range
+      let unit = 'ms';
+      let divisor = 1;
+      if (maxY >= 3600000) { // >= 1 hour
+        unit = 'h';
+        divisor = 3600000;
+      } else if (maxY >= 60000) { // >= 1 minute
+        unit = 'min';
+        divisor = 60000;
+      } else if (maxY >= 1000) { // >= 1 second
+        unit = 's';
+        divisor = 1000;
+      }
+      
+      layout.yaxis.tickvals = [];
+      layout.yaxis.ticktext = [];
+      for (let i = 0; i <= numTicks; i++) {
+        const val = minY + (range * i / numTicks);
+        layout.yaxis.tickvals.push(val);
+        const displayVal = (val / divisor).toFixed(divisor === 1 ? 0 : 2);
+        layout.yaxis.ticktext.push(`${displayVal} ${unit}`);
+      }
+    }
+
+    Plotly.newPlot(plotRef.current, data, layout, config).then(() => {
+      plotRef.current.on('plotly_relayout', (eventData) => {
+        if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
+          const minDate = new Date(eventData['xaxis.range[0]']);
+          const maxDate = new Date(eventData['xaxis.range[1]']);
           const timeDiff = Math.abs(maxDate.getTime() - minDate.getTime());
           const timeDiffInSecond = Math.ceil(timeDiff / 1000);
 
           if (timeDiffInSecond < 5 * 60) {
-            chartContext.updateOptions({
-              xaxis: {
-                min: oldZoomObj.min,
-                max: oldZoomObj.max
-              }
-            }, true, false, false);
             return;
           }
 
-          setOldZoomObj({ min: xaxis.min, max: xaxis.max });
-          setCustomTimeRangeObj({ min: xaxis.min, max: xaxis.max});
-          const customTimeString = `${minDate.toLocaleString("default", {month: 'short'})} ${minDate.getDate()} ${minDate.toLocaleTimeString('default', { hour: "2-digit", minute: "2-digit"})} → ${maxDate.toLocaleString("default", {month: 'short'})} ${maxDate.getDate()} ${maxDate.toLocaleTimeString('default', { hour: "2-digit", minute: "2-digit"})}`;
+          setCustomTimeRangeObj({ min: minDate.getTime(), max: maxDate.getTime()});
+          
+          const customTimeString = `${minDate.toLocaleString("default", {month: 'short'})} ${minDate.getDate()} ${minDate.toLocaleTimeString('default', { 
+            hour: "2-digit", 
+            minute: "2-digit",
+            hour12: navigator.language === 'en-US' || Intl.DateTimeFormat().resolvedOptions().hour12
+          })} → ${maxDate.toLocaleString("default", {month: 'short'})} ${maxDate.getDate()} ${maxDate.toLocaleTimeString('default', { 
+            hour: "2-digit", 
+            minute: "2-digit",
+            hour12: navigator.language === 'en-US' || Intl.DateTimeFormat().resolvedOptions().hour12
+          })}`;
+          
           setTimeRange("custom");
           setCustomTimeRange(customTimeString);
-        },
-      },
-    },
-    stroke: {
-      curve: 'smooth',
-      width: 2,
-      lineCap: 'round',
-      colors: undefined,
-      dashArray: 0,
-      connectNulls: true
-    },
-    markers: {
-      size: 0,
-      strokeWidth: 2,
-      strokeOpacity: 1,
-      strokeColors: undefined,
-      fillOpacity: 1,
-      shape: "circle",
-      radius: 2,
-      hover: {
-        size: 5,
-        sizeOffset: 3
-      }
-    },
-    xaxis: {
-      type: 'datetime',
-      labels: {
-        datetimeUTC: false,
-        style: {
-          fontSize: '12px'
         }
-      },
-      tooltip: {
-        enabled: false
-      }
-    },
-    yaxis: {
-      labels: {
-        formatter: formatTime,
-        style: {
-          fontSize: '12px'
-        }
-      },
-      title: {
-        text: 'Duration',
-        style: {
-          fontSize: '13px'
-        }
-      }
-    },
-    tooltip: {
-      shared: true,
-      intersect: false,
-      x: {
-        format: 'MMM dd, HH:mm:ss'
-      },
-      y: {
-        formatter: formatTime
-      },
-      style: {
-        fontSize: '12px'
-      }
-    },
-    grid: {
-      borderColor: hasDarkClass ? '#333' : '#e5e5e5',
-      xaxis: {
-        lines: {
-          show: true
-        }
-      }
-    },
-    legend: {
-      show: true,
-      position: 'bottom',
-      horizontalAlign: 'left',
-      fontSize: '13px',
-      markers: {
-        width: 12,
-        height: 12,
-        radius: 6
-      },
-      itemMargin: {
-        horizontal: 10,
-        vertical: 5
-      }
-    },
-    noData: {
-      text: isLoading ? 'Loading...' : 'No data available',
-      align: 'center',
-      verticalAlign: 'middle',
-      style: {
-        fontSize: '14px'
-      }
-    }
-  };
+      });
+    });
+
+  }, [dataPoints, displayOptionLabel, label, timeRange, customTimeRangeObj]);
 
   useEffect(() => {
     function handleThemeChange() {
+      if (!plotRef.current) return;
+      
       const htmlElement = document.documentElement;
       const hasDarkClass = htmlElement.classList.contains('dark');
-      const chart = ApexCharts.getChartByID(chartUuid);
       
-      if (chart) {
-        chart.updateOptions({
-          theme: {
-            mode: hasDarkClass ? "dark": "light",
-          },
-          chart: {
-            background: hasDarkClass ? '#171717' : '#ffffff',
-          },
-          grid: {
-            borderColor: hasDarkClass ? '#333' : '#e5e5e5',
-          }
-        }); 
-      }
+      const update = {
+        'plot_bgcolor': hasDarkClass ? '#171717' : '#ffffff',
+        'paper_bgcolor': hasDarkClass ? '#171717' : '#ffffff',
+        'font.color': hasDarkClass ? '#e5e5e5' : '#333',
+        'xaxis.gridcolor': hasDarkClass ? '#333' : '#e5e5e5',
+        'yaxis.gridcolor': hasDarkClass ? '#333' : '#e5e5e5',
+        'xaxis.tickfont.color': hasDarkClass ? '#e5e5e5' : '#333',
+        'yaxis.tickfont.color': hasDarkClass ? '#e5e5e5' : '#333',
+        'xaxis.titlefont.color': hasDarkClass ? '#e5e5e5' : '#333',
+        'yaxis.titlefont.color': hasDarkClass ? '#e5e5e5' : '#333',
+        'title.font.color': hasDarkClass ? '#e5e5e5' : '#333',
+        'legend.font.color': hasDarkClass ? '#e5e5e5' : '#333'
+      };
+      
+      const traceUpdate = {
+        'line.color': hasDarkClass ? '#3b82f6' : '#1d4ed8',
+        'marker.color': hasDarkClass ? '#3b82f6' : '#1d4ed8'
+      };
+      
+      Plotly.restyle(plotRef.current, traceUpdate, 0);
+      Plotly.relayout(plotRef.current, update);
     }
 
     window.addEventListener('themeChange', handleThemeChange);
     return () => window.removeEventListener('themeChange', handleThemeChange);
-  }, [chartUuid]);
-
-  const series = [{
-    name: displayOptionLabel,
-    data: isLoading ? [] : dataPoints
-  }];
+  }, []);
 
   return (
     <div className="w-full">
@@ -322,19 +347,26 @@ const EnhancedTimeGraph = (props) => {
         </a>
       </div>
 
-      <Chart 
-        options={chartOptions} 
-        series={series} 
-        type="line" 
-        height={fullscreen ? 700 : 500} 
+      <div 
+        ref={plotRef}
+        style={{ 
+          height: fullscreen ? '700px' : '450px',
+          width: '100%'
+        }}
       />
+      
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75">
+          <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+        </div>
+      )}
     </div>
   );
 };
 
 async function fetchData(endpoint, start, end, displayOption) {
   const datetimeNow = new Date(Date.now());
-  const startParam = start ? new Date(start).toISOString() : new Date(2020, 0).toISOString();
+  const startParam = start ? new Date(start).toISOString() : new Date(2023, 8).toISOString();
   let endParam = end ? new Date(end).toISOString() : datetimeNow.toISOString();
   
   if (new Date(end) > datetimeNow) {
@@ -359,4 +391,4 @@ async function fetchData(endpoint, start, end, displayOption) {
   });
 }
 
-export default EnhancedTimeGraph;
+export default SmartGraph;

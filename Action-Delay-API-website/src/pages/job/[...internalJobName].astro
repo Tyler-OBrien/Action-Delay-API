@@ -9,7 +9,6 @@ import Pill from '../../components/Pill.astro';
 import type { Job } from '../../../models/cloudflare/job';
 import SmartGraph from '../../components/graph/SmartGraph.js';
 import ErrorGraph from '../../components/graph/ErrorGraph';
-import OriginalSmartGraph from '../../components/graph/OriginalSmartGraph';
 
 
 
@@ -162,13 +161,14 @@ if (job.internalJobName === "cron") {
 
 ---
 
-<BaseLayout title={job?.jobName ?? ""} description ={job?.description ?? ""}>
+<BaseLayout title={job?.jobName ?? ""} description ={job?.jobDescription ?? ""}>
 	<div class="stack gap-20">
 		<div class="stack gap-15">
 			<header>
 				<div class="wrapper stack gap-2">
 					<a class="back-link" href="/delay/"><Icon icon="arrow-left" />All Jobs</a>
 					<Hero title={job?.jobName} align="start">
+						<p>{job?.jobDescription}</p>
 						<a id="websocket-conn-status">Disconnected</a>
 						<div class="details">
 							<div class="w-full p-12">

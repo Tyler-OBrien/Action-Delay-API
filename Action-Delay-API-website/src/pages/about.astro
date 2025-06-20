@@ -27,11 +27,11 @@ import Hero from '../components/Hero.astro';
 					<p>
 						For various delay jobs, such as updating a DNS Record, or updating a Worker, we perform the update via the Cloudflare API and then rapidly check via 40 locations when the change is visible on edge. When at least half see the change, we mark the job complete.
 						<br><br>
-						Workers AI Performance is also measured from a more limited subset of locations, mostly focused on performance comparsion and errors.
+						Workers AI Performance is also measured from a more limited subset of locations, mostly focused on performance comparison and errors.
 						<br><br>
 						Lastly, there is various performance jobs comparing different cloud platforms and services.
 						<br><br>
-						Please note that none of these are designed to be perfect benchmarks. Delay Jobs focus on showing issues with update propogation and relative delay if you had done the same action at the same time, how long it'd take for you to see the update on edge.
+						Please note that none of these are designed to be perfect benchmarks. Delay Jobs focus on showing issues with update propagation and relative delay if you had done the same action at the same time, how long it'd take for you to see the update on edge.
 						<br><br>
 						For performance jobs, a greater care is taken in accuracy but is still hard to guarantee perfect routing in all cases. Most of these locations were handpicked for low latency to Cloudflare (only a few ms max) and all are in data centers.
 						<br><br>

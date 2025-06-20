@@ -12,13 +12,12 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.4",
-    "@astrojs/cloudflare": "^12.4.0",
-    "@astrojs/preact": "^4.0.8",
+    "@astrojs/cloudflare": "^12.5.4",
+    "@astrojs/preact": "^4.1.0",
     "@astrojs/tailwind": "^6.0.2",
-    "apexcharts": "^4.3.0",
-    "astro": "^5.6.1",
+    "astro": "^5.9.0",
+    "plotly.js-basic-dist-min": "^3.0.1",
     "preact": "^10.25.4",
-    "react-apexcharts": "^1.7.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.5.3"
   },
@@ -27,6 +26,14 @@
     "react-dom": "npm:@preact/compat@latest"
   },
   "devDependencies": {
-    "vite-bundle-analyzer": "^0.10.5"
+    "vite-bundle-analyzer": "^0.10.5",
+    "wrangler": "^4.16.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

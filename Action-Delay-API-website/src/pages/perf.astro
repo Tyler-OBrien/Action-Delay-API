@@ -28,16 +28,17 @@ const reorderedList = jobs.sort()
 ---
 
 <BaseLayout
-	title="Cloudflare Delay Monitoring"
-	description="See Cloudflare Delay Monitoring Jobs"
+	title="Cloudflare Performance Monitoring"
+	description="See Cloudflare Performance Monitoring Jobs"
 >
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-8">
 			<Hero
-				title="Cloudflare Delay Jobs"
-				tagline="See Cloudflare Delay Monitoring Jobs"
+				title="Cloudflare Performance Jobs"
+				tagline="See Cloudflare Performance Monitoring Jobs"
 				align="start"
-			/>
+			>
+			</Hero>
 			<Grid>
 				{
 					reorderedList.map((job: Job) => (
