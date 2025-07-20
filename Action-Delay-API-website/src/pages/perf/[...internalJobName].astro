@@ -1,8 +1,5 @@
 ---
-import { type CollectionEntry, getCollection } from 'astro:content';
-
 import BaseLayout from '../../layouts/BaseLayout.astro';
-
 import Hero from '../../components/Hero.astro';
 import Icon from '../../components/Icon.astro';
 import Pill from '../../components/Pill.astro';
@@ -165,6 +162,7 @@ if (job.internalJobName === "cron") {
 				<div class="wrapper stack gap-2">
 					<a class="back-link" href="/delay/"><Icon icon="arrow-left" />All Jobs</a>
 					<Hero title={job?.jobName} align="start">
+						<p>{job?.jobDescription}</p>
 						<div class="details">
 							<div class="w-full p-12">
 								<div class="container mx-auto max-w-3xl">
