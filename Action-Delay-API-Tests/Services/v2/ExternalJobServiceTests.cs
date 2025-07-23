@@ -561,7 +561,8 @@ public class ExternalJobServiceTests : IDisposable
 
         // Assert
         Assert.IsType<DateTime>(result);
-        Assert.Equal(DateTime.Parse(isoDateTime), result);
+        Assert.Equal(DateTime.Parse(isoDateTime, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal), result);
     }
 
     [Fact]
@@ -576,7 +577,8 @@ public class ExternalJobServiceTests : IDisposable
 
         // Assert
         Assert.IsType<DateTime>(result);
-        Assert.Equal(DateTime.Parse(isoDateTime), result);
+        Assert.Equal(DateTime.Parse(isoDateTime, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal), result);
     }
 
     [Fact]
@@ -591,7 +593,8 @@ public class ExternalJobServiceTests : IDisposable
 
         // Assert
         Assert.IsType<DateTime>(result);
-        Assert.Equal(DateTime.Parse(isoDateTime), result);
+        Assert.Equal(DateTime.Parse(isoDateTime, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AdjustToUniversal), result);
     }
 
     [Fact]

@@ -1,15 +1,18 @@
-﻿using System.Net;
-using Action_Delay_API.Extensions;
-using Action_Delay_API.Models.API.Responses.DTOs;
-using Action_Delay_API.Models.API.Responses;
-using Microsoft.AspNetCore.Mvc;
-using Swashbuckle.AspNetCore.Annotations;
-using Swashbuckle.AspNetCore.Filters;
-using Action_Delay_API.Models.Services.v2;
+﻿using Action_Delay_API.Extensions;
 using Action_Delay_API.Models.API.Requests.DTOs.v2.Analytics;
+using Action_Delay_API.Models.API.Responses;
+using Action_Delay_API.Models.API.Responses.DTOs;
 using Action_Delay_API.Models.API.Responses.DTOs.v2.Analytics;
+using Action_Delay_API.Models.Services.v2;
 using Action_Delay_API_Core.Models.Services.ClickHouse;
 using FluentResults;
+using HarfBuzzSharp;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Hybrid;
+using Swashbuckle.AspNetCore.Annotations;
+using Swashbuckle.AspNetCore.Filters;
+using System.Net;
+using System.Xml.Linq;
 
 namespace Action_Delay_API.Controllers.v2;
 
@@ -20,13 +23,14 @@ public class AnalyticsController : CustomBaseController
 {
 
     private readonly IAnalyticsService _analyticsService;
-
+    private HybridCache _cache;
     private readonly ILogger _logger;
 
 
-    public AnalyticsController(IAnalyticsService analyticsService,
+    public AnalyticsController(IAnalyticsService analyticsService, HybridCache cache,
         ILogger<AnalyticsController> logger)
     {
+        _cache = cache;
         _analyticsService = analyticsService;
         _logger = logger;
     }
@@ -252,5 +256,46 @@ public class AnalyticsController : CustomBaseController
             return tryGetRequestOptions.MapToResult();
 
         return (await _analyticsService.GetJobAnalyticsLocationRegion(jobNames.Split(","), regionName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+
+    /// <summary>
+    /// Get Overall Analytics
+    /// </summary>
+    /// <param name="jobName"></param>
+    /// <param name="queryParams"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    [HttpGet("OverallAnalytics")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<OverallAnalyticsResponseDTO>),
+        Description = "On success, return overall analytics")]
+    //[SwaggerResponseExample(200, typeof(JobDataResponseExample))]
+    public async Task<IActionResult> GetOverallAnalytics( CancellationToken token)
+    {
+        var entryOptions = new HybridCacheEntryOptions
+        {
+            Expiration = TimeSpan.FromMinutes(5),
+            LocalCacheExpiration = TimeSpan.FromMinutes(5),
+        };
+        var response = await _cache.GetOrCreateAsync(
+            $"GetOverallAnalytics", 
+            async cancel =>
+            {
+                try
+                {
+                    return await _analyticsService.GetOverallAnalytics(cancel);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error resolving Overall Analytics");
+                    throw;
+                }
+            },
+            options: entryOptions,
+            cancellationToken: token
+        );
+
+
+        return new OkObjectResult(response);
     }
 }

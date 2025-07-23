@@ -29,6 +29,9 @@ namespace Action_Delay_API.Models.Services.v2
         Task<Result<DataResponse<ErrorJobAnalyticsDTO>>> GetErrorAnalyticsForJobType(string jobType,
             DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100);
 
+        Task<DataResponse<OverallAnalyticsResponseDTO>> GetOverallAnalytics(CancellationToken token);
+
+
 
     }
 }

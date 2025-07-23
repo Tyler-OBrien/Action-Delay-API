@@ -7,5 +7,9 @@ namespace Action_Delay_API_Core.Broker.ColoData
     {
         Task<Result<ColoApiData>> GetColoData(CancellationToken token);
         Task<Result<MetalAPIData[]>> GetMetalData(CancellationToken token);
+
+        Task<Result<DateTime>> GetCloudflareLastDataDate(CancellationToken token);
+        Task<Result<DateTime>> GetBunnyLastDataDate(CancellationToken token);
+
     }
 }

@@ -53,9 +53,11 @@ public class Program
 
             var service =  builtHost.Services.GetRequiredService<NATSHubService>();
 
-            service.Run(CancellationToken.None).ConfigureAwait(false);
+            using var cts = new CancellationTokenSource();
+            service.Run(cts.Token).ConfigureAwait(false);
             
             await builtHost.RunAsync();
+            await cts.CancelAsync();
             return 0;
         }
         // Note: This will change in .net 7 https://github.com/dotnet/runtime/issues/60600#issuecomment-1068323222
@@ -78,6 +80,7 @@ public class Program
 
         IConfiguration configuration = builder.Configuration.GetSection("Base");
         var apiConfiguration = configuration.Get<APIConfig>();
+        builder.Services.AddHybridCache();
         builder.Services.Configure<APIConfig>(configuration);
 
         var newLocalConfig = new LocalConfig()

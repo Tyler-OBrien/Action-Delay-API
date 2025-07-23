@@ -6,6 +6,7 @@ using Action_Delay_API.Models.API.Responses.DTOs.v2.Analytics;
 using Action_Delay_API.Models.Services.v2;
 using FluentResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -15,6 +16,7 @@ namespace Action_Delay_API_Tests.Controllers.v2
     {
         private readonly Mock<IAnalyticsService> _mockAnalyticsService;
         private readonly Mock<ILogger<AnalyticsController>> _mockLogger;
+        private readonly Mock<HybridCache> _mockHybridCache;
         private readonly AnalyticsController _controller;
         private readonly CancellationToken _cancellationToken;
 
@@ -22,7 +24,8 @@ namespace Action_Delay_API_Tests.Controllers.v2
         {
             _mockAnalyticsService = new Mock<IAnalyticsService>();
             _mockLogger = new Mock<ILogger<AnalyticsController>>();
-            _controller = new AnalyticsController(_mockAnalyticsService.Object, _mockLogger.Object);
+            _mockHybridCache = new Mock<HybridCache>();
+            _controller = new AnalyticsController(_mockAnalyticsService.Object, _mockHybridCache.Object, _mockLogger.Object);
             _cancellationToken = CancellationToken.None;
         }
 

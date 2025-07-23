@@ -551,4 +551,22 @@ public class AnalyticsService : IAnalyticsService
 
         return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, tryGetJobInternalName, allUniqueErrors.ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
     }
+
+    public async Task<DataResponse<OverallAnalyticsResponseDTO>> GetOverallAnalytics(CancellationToken token)
+    {
+        
+        var getAnalyticsTask =  _clickhouseService.GetOverallAnalytics(token);
+        var uniqueLocations = await _genericServersContext.LocationData.Where(loc => loc.Enabled).CountAsync(token);
+        var uniqueJobs = await _genericServersContext.JobData.Where(job => job.JobType != "AI").CountAsync(token);
+        var getAnalytics = await getAnalyticsTask;
+        var resp = new OverallAnalyticsResponseDTO()
+        {
+            NormalJobPerLocationRunsLast24H = getAnalytics.NormalJobPerLocationRuns,
+            PerfJobPerLocationRunsLast24H = getAnalytics.PerfJobPerLocationRuns,
+            UniqueJobs = uniqueJobs,
+            UniqueLocations = uniqueLocations,
+            CacheDate = DateTime.UtcNow,
+        };
+        return new DataResponse<OverallAnalyticsResponseDTO>(resp);
+    }
 }

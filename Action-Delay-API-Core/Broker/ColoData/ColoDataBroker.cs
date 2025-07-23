@@ -113,5 +113,93 @@ namespace Action_Delay_API_Core.Broker.ColoData
 
             }
         }
+
+        public async Task<Result<DateTime>> GetCloudflareLastDataDate(CancellationToken token)
+        {
+            HttpResponseMessage httpResponse = null;
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://metal.cloudflare.chaika.me/lasthttppush");
+                request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+                httpResponse = await _httpClient.SendAsync(request, token);
+                var rawString = await httpResponse.Content.ReadAsStringAsync(token);
+
+
+                if (string.IsNullOrWhiteSpace(rawString))
+                {
+                    _logger.LogCritical(
+                        $"Could not get response metal last http push date from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
+                    return Result.Fail(new CustomAPIError($"Could not get response metal last http push date from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null, httpResponse.GetColoId()));
+                }
+
+
+                if (DateTime.TryParse(rawString, out var parsedLastHttpEventDate) == false)
+                {
+                    _logger.LogCritical("metal api: Failed to parse datetime, Response: {rawString}",
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
+                    return Result.Fail(new CustomAPIError(
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null, httpResponse.GetColoId()));
+                }
+
+
+                return parsedLastHttpEventDate;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogCritical(ex, $"Get metal last http push date Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
+                return Result.Fail(new CustomAPIError($"Get metal last http push date Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", null));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, $"Get metal last http push date Unexpected Error: API Returned: {httpResponse?.StatusCode}");
+                return Result.Fail(new CustomAPIError($"Get metal last http push date Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", null));
+
+            }
+        }
+
+        public async Task<Result<DateTime>> GetBunnyLastDataDate(CancellationToken token)
+        {
+            HttpResponseMessage httpResponse = null;
+            try
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://bunny-vector-log-ingest.workers.chaika.me/lasthttppush");
+                request.VersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+                httpResponse = await _httpClient.SendAsync(request, token);
+                var rawString = await httpResponse.Content.ReadAsStringAsync(token);
+
+
+                if (string.IsNullOrWhiteSpace(rawString))
+                {
+                    _logger.LogCritical(
+                        $"Could not get response vector log ingest last http push date from API, API returned nothing, Status Code: {httpResponse.StatusCode}");
+                    return Result.Fail(new CustomAPIError($"Could not get response metal last http push date from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", null, httpResponse.GetColoId()));
+                }
+
+
+                if (DateTime.TryParse(rawString, out var parsedLastHttpEventDate) == false)
+                {
+                    _logger.LogCritical("metal api: Failed to parse datetime, Response: {rawString}",
+                        rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
+                    return Result.Fail(new CustomAPIError(
+                        $"Issue reading response, Status Code: {httpResponse.StatusCode}: {httpResponse.ReasonPhrase}, Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}",
+                        (int)httpResponse.StatusCode, $"Failure parsing response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}", "", null, httpResponse.GetColoId()));
+                }
+
+
+                return parsedLastHttpEventDate;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogCritical(ex, $"Get vector log ingest last http push date Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}");
+                return Result.Fail(new CustomAPIError($"Get metal last http push date Unexpected HTTP Error: API Returned: {httpResponse?.StatusCode} - {ex.Message}", (int)(httpResponse?.StatusCode ?? 0), $"API Error, reason: {ex.Message}", "", null));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, $"Get vector log ingest last http push date Unexpected Error: API Returned: {httpResponse?.StatusCode}");
+                return Result.Fail(new CustomAPIError($"Get metal last http push date Unexpected Error: API Returned: {httpResponse?.StatusCode}", (int)(httpResponse?.StatusCode ?? 0), $"Unknown API Error", "", null));
+
+            }
+        }
     }
 }
