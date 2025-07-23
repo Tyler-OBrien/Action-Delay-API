@@ -9,7 +9,9 @@ using Action_Delay_API_Core.Models.Services;
 using FluentResults;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Win32;
 using NATS.Client.Core;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -35,7 +37,6 @@ public class NATSHubService
 
     private readonly APIConfig _configuration;
     private readonly IHubContext<JobSignalRHub> _hubContext;
-    private NatsConnection _natsConnection;
 
 
     // These are backed by the same instance type under the hood, we could go unsafe and not have to create 2x the contexts, but blehhh
@@ -88,6 +89,7 @@ public class NATSHubService
 
     private readonly ILogger _logger;
     private readonly ICacheSingletonService _cacheSingletonService;
+    private readonly ILoggerFactory _loggerFactory;
 
     public NATSHubService(ILogger<NATSHubService> logger, IOptions<APIConfig> baseConfiguration, ILoggerFactory loggerFactory, IHubContext<JobSignalRHub> hubContext, ICacheSingletonService cacheSingletonService)
     {
@@ -95,6 +97,7 @@ public class NATSHubService
         _hubContext = hubContext;
         _configuration = baseConfiguration.Value;
         _logger = logger;
+        _loggerFactory = loggerFactory;
 
 
         try
@@ -113,11 +116,9 @@ public class NATSHubService
         }
 
 
-        var myRegistry = new MixedSerializerRegistry();
 
 
-        var options = NatsOpts.Default with { LoggerFactory = loggerFactory, Url = _configuration.NATSConnectionURL, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), InboxPrefix = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "_INBOX_ActionDelayAPI" : $"_INBOX_{_configuration.CoreName}", Name = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "Action-Delay-API" : _configuration.CoreName, SubPendingChannelCapacity = 10_000, SubscriptionCleanUpInterval = TimeSpan.FromMinutes(2), MaxReconnectRetry = -1 };
-        _natsConnection = new NatsConnection(options);
+      
     }
 
     public static JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions()
@@ -133,21 +134,47 @@ public class NATSHubService
     public async Task Run(CancellationToken stoppingToken)
     {
         await _cacheSingletonService.CacheJobNames(stoppingToken);
-        await _natsConnection.ConnectAsync();
 
-        await Task.Run(async () =>
+
+        List<Task> tasks = new List<Task>();
+
+        var myRegistry = new MixedSerializerRegistry();
+
+
+        foreach (var natsEvents in _configuration.NATSConnectionURLsForEvents)
         {
-            await foreach (var msg in _natsConnection
-                               .SubscribeAsync<NatsMemoryOwner<byte>>($"jobs.>",
-                                   cancellationToken: stoppingToken,
-                                   serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
+            var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = natsEvents, RequestTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), InboxPrefix = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "_INBOX_ActionDelayAPI" : $"_INBOX_{_configuration.CoreName}", Name = String.IsNullOrWhiteSpace(_configuration.CoreName) ? "Action-Delay-API" : _configuration.CoreName, SubPendingChannelCapacity = 10_000, SubscriptionCleanUpInterval = TimeSpan.FromMinutes(2), MaxReconnectRetry = -1 };
+            var natsConnection = new NatsConnection(options);
+
+
+            var task =  Task.Run(async () =>
             {
-                _ = HandleNatsMessage(msg, stoppingToken);
-            }
-        });
-
-        _logger.LogInformation($"NATS Enabled, Connection Status: {_natsConnection.ConnectionState}");
-
+                while (stoppingToken.IsCancellationRequested == false)
+                {
+                    try
+                    {
+                        await foreach (var msg in natsConnection
+                                           .SubscribeAsync<NatsMemoryOwner<byte>>($"jobs.>",
+                                               cancellationToken: stoppingToken,
+                                               serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
+                        {
+                            _ = HandleNatsMessage(msg, stoppingToken);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error with Jobs NATS Connection, retrying in 5 seconds");
+                        // reconnect throttle
+                        await Task.Delay(5000, stoppingToken);
+                    }
+                }
+            });
+            tasks.Add(task);
+        }
+        if (_configuration.NATSConnectionURLsForEvents.Any() == false) 
+            _logger.LogWarning($"Warning: No NATSConnectionURLsForEvents to use to connect for events");
+        await Task.WhenAll(tasks);
+        _logger.LogWarning($"Nats Hub Done, ending loop");
     }
 
     private async Task HandleNatsMessage(NatsMsg<NatsMemoryOwner<byte>> msg, CancellationToken stoppingToken)
@@ -218,7 +245,7 @@ public class NATSHubService
         }
     }
 
-
+    /*
 
     public async ValueTask DisposeAsync()
     {
@@ -259,4 +286,5 @@ public class NATSHubService
             _logger.LogError(ex, "Error disposing NATS");
         }
     }
+    */
 }
