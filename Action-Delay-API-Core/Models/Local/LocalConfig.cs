@@ -11,6 +11,7 @@ namespace Action_Delay_API_Core.Models.Local
         public string API_ENDPOINT { get; set; }
 
         public string NATSConnectionURL { get; set; }
+        public string? NATSConnectionURLClickhouse { get; set; }
 
         public bool UsingNATS { get; set; }
 
@@ -70,11 +71,26 @@ namespace Action_Delay_API_Core.Models.Local
 
         public CustomHostnamesDelayJob? CustomHostnamesDelayJob { get; set; }
         public CertificateRenewalDelayJob? CertRenewalDelayJob { get; set; }
+
+        public CloudflareLogpushDelayJob? CloudflareLogpushDelayJob { get; set; }
+        public BunnyLogForwarderDelayJob? BunnyLogForwarderDelayJob { get; set; }
         public PerfConfig? PerfConfig { get; set; }
+
 
 
     }
 
+    public class CloudflareLogpushDelayJob : BaseConfig
+    {
+
+        public string API_Key { get; set; }
+    }
+
+    public class BunnyLogForwarderDelayJob : BaseConfig
+    {
+
+        public string AccessKey { get; set; }
+    }
 
     public class PerfConfig : BaseConfig
     {

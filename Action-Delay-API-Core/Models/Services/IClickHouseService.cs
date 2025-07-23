@@ -38,5 +38,8 @@ namespace Action_Delay_API_Core.Models.Services
              JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength,
              CancellationToken token = default);
 
+         Task<OverallAnalytics> GetOverallAnalytics(CancellationToken token);
+
+
     }
 }
