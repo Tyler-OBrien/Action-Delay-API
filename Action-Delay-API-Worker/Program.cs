@@ -486,7 +486,7 @@ namespace Action_Delay_API_Worker
             Log.Logger.Error(e.Exception,
                 "[ERROR] Unobserved Error: {UnobservedTaskExceptionEventArgs} - {UnobservedTaskExceptionEventArgsException} - {senderObj}",
                 e, e.Exception, sender);
-            throw e.Exception;
+            e.SetObserved();
         }
     }
 }

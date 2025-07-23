@@ -6,7 +6,7 @@
 
         public string API_ENDPOINT { get; set; }
 
-        public string NATSConnectionURL { get; set; }
+        public List<string> NATSConnectionURLs { get; set; }
         public Dictionary<string, string> CUSTOM_REQUEST_HEADERS_FOR_API { get; set; }
 
         public string Location { get; set; }

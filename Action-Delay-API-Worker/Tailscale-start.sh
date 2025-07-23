@@ -2,7 +2,7 @@
 echo 'Starting'
 jq -n \
   --arg sentry_dsn "$SENTRY_DSN" \
-  --arg nats_url "$NATSConnectionURL" \
+  --argjson nats_url "$NATSConnectionURL" \
   --arg location "$LOCATION" \
   --arg http_request_secret "$HTTP_REQUEST_SECRET" \
   '{
@@ -14,7 +14,7 @@ jq -n \
     },
     "Base": {
       "SENTRY_DSN": $sentry_dsn,
-      "NATSConnectionURL": $nats_url,
+      "NATSConnectionURLs": $nats_url,
       "location": $location,
       "HttpRequestSecret": $http_request_secret
     }

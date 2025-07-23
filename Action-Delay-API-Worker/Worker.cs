@@ -98,9 +98,9 @@ namespace Action_Delay_API_Worker
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+            _logger.LogInformation("Worker running at: {time}, version {version}", DateTimeOffset.Now, Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown");
 
-            if (string.IsNullOrWhiteSpace(_localConfig.NATSConnectionURL))
+            if (_localConfig.NATSConnectionURLs == null || _localConfig.NATSConnectionURLs.Count == 0 || _localConfig.NATSConnectionURLs.All(string.IsNullOrWhiteSpace))
             {
                 _logger.LogInformation("NATS URL not setup or blank, aborting Queue Load");
                 return;
@@ -130,82 +130,135 @@ namespace Action_Delay_API_Worker
 
 
 
+
             var myRegistry = new NatsJsonContextSerializerRegistry(SerializableRequestJsonContext.Default);
 
+            List<Task> tasks = new List<Task>();
 
-            var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL, MaxReconnectRetry = -1, SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), RequestTimeout = TimeSpan.FromSeconds(60)};
-            await using var natsConnection = new NatsConnection(options);
 
-            await natsConnection.ConnectAsync();
-
-            var tryHttp = Task.Run(async () =>
+            foreach (var natsConnectionUrl in _localConfig.NATSConnectionURLs)
             {
-                await foreach (var httpRequest in natsConnection
-                                   .SubscribeAsync<NatsMemoryOwner<byte>>($"HTTP-{_localConfig.Location}",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
+
+                var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = natsConnectionUrl, MaxReconnectRetry = -1, SerializerRegistry = myRegistry, CommandTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), RequestTimeout = TimeSpan.FromSeconds(60) };
+                var natsConnection = new NatsConnection(options);
+
+                //await natsConnection.ConnectAsync();
+
+                var tryHttp = Task.Run(async () =>
                 {
-                    _ = ExecuteHttpRequest(httpRequest, stoppingToken);
-                }
-            }, stoppingToken);
 
-
-
-            var tryDNS = Task.Run(async () =>
-            {
-                await foreach (var dnsRequest in natsConnection
-                                   .SubscribeAsync<NatsMemoryOwner<byte>>($"DNS-{_localConfig.Location}",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
-                {
-                    _ = ExecuteDNSRequest(dnsRequest, stoppingToken);
-                }
-
-            }, stoppingToken);
-
-            var tryPing = Task.Run(async () =>
-            {
-                await foreach (var dnsRequest in natsConnection
-                                   .SubscribeAsync<NatsMemoryOwner<byte>>($"PING-{_localConfig.Location}",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
-                {
-                    _ = ExecutePingRequest(dnsRequest, stoppingToken);
-                }
-
-            }, stoppingToken);
-
-
-            /*
-            var tryJob = Task.Run(async () =>
-            {
-                await foreach (var jobRequest in natsConnection
-                                   .SubscribeAsync<byte[]>($"job.{_localConfig.Location}.*",
-                                       cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
-                {
-                    if (jobRequest.Subject.EndsWith("JobStart"))
+                    while (stoppingToken.IsCancellationRequested == false)
                     {
-                        _ = ExecuteStartJobRequest(jobRequest, stoppingToken);
+                        try
+                        {
+                            await foreach (var httpRequest in natsConnection
+                                               .SubscribeAsync<NatsMemoryOwner<byte>>($"HTTP-{_localConfig.Location}",
+                                                   cancellationToken: stoppingToken,
+                                                   serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
+                            {
+                                _ = ExecuteHttpRequest(httpRequest, stoppingToken);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error with HTTP NATS Connection, retrying in 5 seconds");
+                            // reconnect throttle
+                            await Task.Delay(5000, stoppingToken);
+                        }
                     }
-                    else if (jobRequest.Subject.EndsWith("JobStatus"))
+                }, stoppingToken);
+                tasks.Add(tryHttp);
+
+
+                var tryDNS = Task.Run(async () =>
+                {
+                    while (stoppingToken.IsCancellationRequested == false)
                     {
-                        _ = ExecuteStatusJobRequest(jobRequest, stoppingToken);
+                        try
+                        {
+                            await foreach (var dnsRequest in natsConnection
+                                               .SubscribeAsync<NatsMemoryOwner<byte>>($"DNS-{_localConfig.Location}",
+                                                   cancellationToken: stoppingToken,
+                                                   serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
+                            {
+                                _ = ExecuteDNSRequest(dnsRequest, stoppingToken);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error with DNS NATS Connection, retrying in 5 seconds");
+                            // reconnect throttle
+                            await Task.Delay(5000, stoppingToken);
+                        }
                     }
-                    else if (jobRequest.Subject.EndsWith("JobEnd"))
+
+                }, stoppingToken);
+                tasks.Add(tryDNS);
+
+
+                var tryPing = Task.Run(async () =>
+                {
+                    while (stoppingToken.IsCancellationRequested == false)
                     {
-                        _ = ExecuteEndJobRequest(jobRequest, stoppingToken);
+                        try
+                        {
+                            await foreach (var dnsRequest in natsConnection
+                                               .SubscribeAsync<NatsMemoryOwner<byte>>($"PING-{_localConfig.Location}",
+                                                   cancellationToken: stoppingToken,
+                                                   serializer: NatsRawSerializer<NatsMemoryOwner<byte>>.Default))
+                            {
+                                _ = ExecutePingRequest(dnsRequest, stoppingToken);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error with Ping NATS Connection, retrying in 5 seconds");
+                            // reconnect throttle
+                            await Task.Delay(5000, stoppingToken);
+                        }
                     }
-                }
 
-            }, stoppingToken);
-
-            var tryJobLoop = Task.Run(async () =>
-            {
-                await _jobService.StartJobLoop(stoppingToken);
-
-            }, stoppingToken);
-            */
+                }, stoppingToken);
+                tasks.Add(tryPing);
 
 
-            _logger.LogInformation($"NATS Enabled, Connection State: {natsConnection.ConnectionState}");
-            await Task.WhenAll(tryDNS, tryHttp, tryPing);
+
+                /*
+                var tryJob = Task.Run(async () =>
+                {
+                    await foreach (var jobRequest in natsConnection
+                                       .SubscribeAsync<byte[]>($"job.{_localConfig.Location}.*",
+                                           cancellationToken: stoppingToken, serializer: NatsRawSerializer<byte[]>.Default))
+                    {
+                        if (jobRequest.Subject.EndsWith("JobStart"))
+                        {
+                            _ = ExecuteStartJobRequest(jobRequest, stoppingToken);
+                        }
+                        else if (jobRequest.Subject.EndsWith("JobStatus"))
+                        {
+                            _ = ExecuteStatusJobRequest(jobRequest, stoppingToken);
+                        }
+                        else if (jobRequest.Subject.EndsWith("JobEnd"))
+                        {
+                            _ = ExecuteEndJobRequest(jobRequest, stoppingToken);
+                        }
+                    }
+
+                }, stoppingToken);
+
+                var tryJobLoop = Task.Run(async () =>
+                {
+                    await _jobService.StartJobLoop(stoppingToken);
+
+                }, stoppingToken);
+                */
+                _logger.LogInformation($"NATS Enabled, Connection State: {natsConnection.ConnectionState}");
+
+            }
+
+
+
+            await Task.WhenAll(tasks);
             _logger.LogInformation($"NATS Done..");
         }
 
