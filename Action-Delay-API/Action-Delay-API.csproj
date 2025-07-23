@@ -7,8 +7,8 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <RootNamespace>Action_Delay_API</RootNamespace>
 	  <SelfContained>true</SelfContained>
-	  <FileVersion>1.4.1</FileVersion>
-	  <Version>1.4.1</Version>
+	  <FileVersion>1.4.2</FileVersion>
+	  <Version>1.4.2</Version>
 	  <GenerateDocumentationFile>False</GenerateDocumentationFile>
   </PropertyGroup>
 
@@ -36,27 +36,28 @@
   </ItemGroup>
 
   <ItemGroup>
-	  <PackageReference Include="FluentResults" Version="3.16.0" />
-	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="9.0.5" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.5" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.5">
+	  <PackageReference Include="FluentResults" Version="4.0.0" />
+	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="9.0.7" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.7" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.7">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 	  </PackageReference>
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.5" />
-	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.2" />
-	  <PackageReference Include="NATS.Net" Version="2.6.1" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.7" />
+	  <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="9.7.0" />
+	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
+	  <PackageReference Include="NATS.Net" Version="2.6.4" />
 	  <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
-	  <PackageReference Include="Sentry" Version="5.8.0" />
-	  <PackageReference Include="Sentry.AspNetCore" Version="5.8.0" />
-	  <PackageReference Include="Sentry.Serilog" Version="5.8.0" />
+	  <PackageReference Include="Sentry" Version="5.12.0" />
+	  <PackageReference Include="Sentry.AspNetCore" Version="5.12.0" />
+	  <PackageReference Include="Sentry.Serilog" Version="5.12.0" />
 	  <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
 	  <PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
 	  <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
 	  <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-	  <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.1" />
-	  <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="8.1.1" />
-	  <PackageReference Include="Swashbuckle.AspNetCore.Filters" Version="8.0.3" />
+	  <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
+	  <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="9.0.3" />
+	  <PackageReference Include="Swashbuckle.AspNetCore.Filters" Version="9.0.0" />
 	  <PackageReference Include="System.Private.Uri" Version="4.3.2" />
   </ItemGroup>
 
