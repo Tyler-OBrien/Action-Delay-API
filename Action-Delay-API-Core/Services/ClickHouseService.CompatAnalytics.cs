@@ -67,7 +67,7 @@ WHERE
 ORDER BY run_length DESC
 LIMIT 1;
 ";
-            var result = await command.ExecuteReaderAsync(token);
+            await using var result = await command.ExecuteReaderAsync(token);
             List<QuickAnalyticsAPI> data = new List<QuickAnalyticsAPI>(3);
             while (await result.ReadAsync(token))
             {
@@ -170,7 +170,7 @@ FROM (
 WHERE rn = 1;
 ";
 
-            var result = await command.ExecuteReaderAsync(token);
+            await using var result = await command.ExecuteReaderAsync(token);
             List<QuickAnalyticsAPI> data = new List<QuickAnalyticsAPI>(3 * jobs.Length);
             while (await result.ReadAsync(token))
             {

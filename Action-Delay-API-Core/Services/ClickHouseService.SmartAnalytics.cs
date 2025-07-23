@@ -1,4 +1,6 @@
 ﻿using Action_Delay_API_Core.Models.API.CompatAPI;
+using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.Services.ClickHouse;
 using ClickHouse.Client.Utility;
 using System;
 using System.Collections.Generic;
@@ -8,7 +10,6 @@ using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using Action_Delay_API_Core.Models.Services.ClickHouse;
 using DataSet = Action_Delay_API_Core.Models.Services.ClickHouse.DataSet;
 
 namespace Action_Delay_API_Core.Services
@@ -103,7 +104,7 @@ namespace Action_Delay_API_Core.Services
             command.AddParameter("jobs", "Array(String)", jobs);
 
             command.CommandText = commandText;
-            var result = await command.ExecuteReaderAsync(token);
+            await using var result = await command.ExecuteReaderAsync(token);
             var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
             List<NormalJobAnalyticsPoint> data = new List<NormalJobAnalyticsPoint>(predictedPoints);
             while (await result.ReadAsync(token))
@@ -148,7 +149,7 @@ namespace Action_Delay_API_Core.Services
             command.AddParameter("jobs", "Array(String)", jobs);
 
             command.CommandText = commandText;
-            var result = await command.ExecuteReaderAsync(token);
+            await using var result = await command.ExecuteReaderAsync(token);
             var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
             List<ErrorJobAnalyticsPoint> data = new List<ErrorJobAnalyticsPoint>(predictedPoints);
             while (await result.ReadAsync(token))
@@ -211,7 +212,7 @@ namespace Action_Delay_API_Core.Services
 
             command.CommandText = commandText;
 
-            var result = await command.ExecuteReaderAsync(token);
+            await using var result = await command.ExecuteReaderAsync(token);
             var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
             List<NormalJobAnalyticsPoint> data = new List<NormalJobAnalyticsPoint>(predictedPoints);
             while (await result.ReadAsync(token))
@@ -296,6 +297,7 @@ namespace Action_Delay_API_Core.Services
                 newAnalyticsObj.MedianResponseLatency = Convert.ToUInt64(reader.GetValue("median_response_latency"));
             return newAnalyticsObj;
         }
-   
+
+
     }
 }
