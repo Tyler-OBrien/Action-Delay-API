@@ -38,6 +38,45 @@ ORDER BY (timestamp, source);
 
 
 
+CREATE TABLE cloudflare_colos
+(
+    `coloid` UInt32,
+    `activeMachineCount` Int32,
+    `timestamp` DateTime CODEC(Delta(4), ZSTD(1)),
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+PRIMARY KEY (timestamp, coloid)
+ORDER BY (timestamp, coloid);
+
+
+
+CREATE TABLE bunny_regions
+(
+    `code` LowCardinality(String),
+    `activeMachineCount` Int32,
+    `timestamp` DateTime CODEC(Delta(4), ZSTD(1)),
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+PRIMARY KEY (timestamp, code)
+ORDER BY (timestamp, code);
+
+
+CREATE TABLE websocket_monitoring
+(
+    `source` LowCardinality(String),
+    `timestamp` DateTime CODEC(Delta(4), ZSTD(1)),
+    `duration` UInt32,
+    `closecode` LowCardinality(String),
+    `closereason` String,
+    `avgping` Int32
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(timestamp)
+PRIMARY KEY (timestamp, source)
+ORDER BY (timestamp, source);
+
 
 
 
