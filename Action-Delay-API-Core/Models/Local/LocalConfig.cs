@@ -107,6 +107,8 @@ namespace Action_Delay_API_Core.Models.Local
     {
         public string Name { get; set; }
 
+        public string Description { get; set; }
+
         public string Endpoint { get; set; }
 
         public string PrewarmEndpoint { get; set; }
@@ -131,6 +133,8 @@ namespace Action_Delay_API_Core.Models.Local
     {
         public string Name { get; set; }
 
+        public string Description { get; set; }
+
         public string Endpoint { get; set; }
 
         public string PrewarmEndpoint { get; set; }
@@ -152,6 +156,8 @@ namespace Action_Delay_API_Core.Models.Local
     {
         public string Name { get; set; }
 
+        public string Description { get; set; }
+
         public string Endpoint { get; set; }
 
         public string BucketName { get; set; }
@@ -168,6 +174,8 @@ namespace Action_Delay_API_Core.Models.Local
         public bool? CheckUploadedContentHash { get; set; }
 
         public bool? KeepOldAndDumpToDiskOnMisMatch { get; set; }
+
+        public bool? DeleteWithVersionId { get; set; }
     }
 
     public class CertificateRenewalDelayJob : BaseConfig

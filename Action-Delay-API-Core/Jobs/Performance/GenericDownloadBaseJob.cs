@@ -87,6 +87,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
                             }
 
+                            var tryGetDownloadTasks =
+                                getDownloadTasks.FirstOrDefault(download => download.Name == run.JobName);
+                            if (tryGetDownloadTasks != null)
+                                tryGetJob.JobDescription = tryGetDownloadTasks.Description ?? "Upload Test";
+
                             tryGetJob.CurrentRunTime = run.RunTime;
                             tryGetJob.CurrentRunLengthMs =
                                 run.ResponseLatency; // for Perf jobs, Latency = Latency
@@ -470,29 +475,33 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 resolvedUrl.Path = "/";
                 prewarmUrl = resolvedUrl.ToString();
             }
+            else
+            {
+                prewarmUrl = prewarmUrl.ProcessEndpoint(location);
+            }
 
             var newRequest = new NATSHttpRequest()
-            {
-                Headers = new Dictionary<string, string>()
+                {
+                    Headers = new Dictionary<string, string>()
                 {
                     { "User-Agent", $"Action-Delay-API {Name} {Program.VERSION}"},
                     { "APIKEY", _config.PerfConfig.Secret}
                 },
-                URL = prewarmUrl,
-                TimeoutMs = 15_000,
-                EnableConnectionReuse = !jobConfig.NoConnectionKeepAlive,
-                ReturnBody = false,
-                ReturnBodyOnError = false,
-                CustomDNSServerOverride = overridenCustomNameServerResolved,
-                DNSResolveOverride = jobConfig.DNSResolveOverride,
-                RetriesCount = 0,
-                ResponseHeaders = new List<string>()
+                    URL = prewarmUrl,
+                    TimeoutMs = 15_000,
+                    EnableConnectionReuse = !jobConfig.NoConnectionKeepAlive,
+                    ReturnBody = false,
+                    ReturnBodyOnError = false,
+                    CustomDNSServerOverride = overridenCustomNameServerResolved,
+                    DNSResolveOverride = jobConfig.DNSResolveOverride,
+                    RetriesCount = 0,
+                    ResponseHeaders = new List<string>()
                 {
-                    "colo", 
+                    "colo",
                     "server",
                     "x-adp-dur"
                 }
-            };
+                };
             if (jobConfig.CustomHeaders != null)
             {
                 foreach (var jobConfigCustomHeader in jobConfig.CustomHeaders)

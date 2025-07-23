@@ -95,6 +95,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
                             }
 
+                            var tryGetDownloadTasks =
+                                getDownloadTasks.FirstOrDefault(download => download.Name == run.JobName);
+                            if (tryGetDownloadTasks != null)
+                                tryGetJob.JobDescription = tryGetDownloadTasks.Description ?? "Upload Test";
+
                             tryGetJob.CurrentRunTime = run.RunTime;
                             tryGetJob.CurrentRunLengthMs =
                                 run.ResponseLatency; // for Perf jobs, Latency = Latency
@@ -212,6 +217,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 .WithCredentials(s3Job.AccessKey, s3Job.SecretKey)
                 .WithSSL(true)
                 .WithRegion(String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region)
+                .WithTimeout(60_000)
                 .Build();
 
             // Start monitoring on each Location
@@ -617,24 +623,46 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         SentrySdk.CaptureException(ex);
                     }
 
+                    bool attachedVersionId = false;
                     try
                     {
                         if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue && job.KeepOldAndDumpToDiskOnMisMatch.Value)
                         {
 
                             var deleteArgs = new RemoveObjectArgs().WithBucket(job.BucketName).WithObject(objectName);
-                            var tryGetHeader = tryPut.Value.Headers.FirstOrDefault(headerKvp =>
-                                headerKvp.Key.Equals("x-amz-version-id", StringComparison.OrdinalIgnoreCase));
 
-                            if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false)
+                            if (job.DeleteWithVersionId is true)
                             {
-                                deleteArgs.WithVersionId(tryGetHeader.Value);
+                                var tryGetHeader = tryPut.Value.Headers.FirstOrDefault(headerKvp =>
+                                    headerKvp.Key.Equals("x-amz-version-id", StringComparison.OrdinalIgnoreCase));
+
+                                if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false)
+                                {
+                                    deleteArgs.WithVersionId(tryGetHeader.Value);
+                                    attachedVersionId = true;
+                                }
                             }
+
+
 
                             await client.RemoveObjectAsync(deleteArgs, CancellationToken.None);
 
                         }
 
+                    }
+                    catch (Minio.Exceptions.InternalClientException minioEx)
+                    {
+                        try
+                        {
+                            _logger.LogError(minioEx,
+                                $"Error deleting file: {minioEx.ServerResponse.Content}, {minioEx.ServerResponse.StatusCode}, {minioEx.ServerMessage}, attached version id {attachedVersionId}, status {minioEx.ServerResponse.Response.StatusCode.ToString("D")}, content: {await minioEx.ServerResponse.Response.Content.ReadAsStringAsync()}");
+                        }
+                        catch (Exception)
+                        {
+                            /* nom */
+                        }
+
+                        SentrySdk.CaptureException(minioEx);
                     }
                     catch (Exception ex)
                     {

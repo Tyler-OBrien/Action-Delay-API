@@ -92,6 +92,10 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 tryGetJob.LastRunLengthMs = tryGetJob.CurrentRunLengthMs;
                                 tryGetJob.LastRunTime = tryGetJob.CurrentRunTime;
                             }
+                            var tryGetDownloadTasks =
+                                getDownloadTasks.FirstOrDefault(download => download.Name == run.JobName);
+                            if (tryGetDownloadTasks != null)
+                                tryGetJob.JobDescription = tryGetDownloadTasks.Description ?? "Upload Test";
 
                             tryGetJob.CurrentRunTime = run.RunTime;
                             tryGetJob.CurrentRunLengthMs =
