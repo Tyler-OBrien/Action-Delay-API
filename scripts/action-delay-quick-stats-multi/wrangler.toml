@@ -2,6 +2,7 @@ name = "action-delay-quick-stats-multi"
 main = "src/index.ts"
 compatibility_date = "2024-02-14"
 workers_dev = false
+account_id = 'b9e510810e1e12fcd40826d266a1fb12'
 
 routes = [
 	{ pattern = "all.cloudflare.chaika.me", custom_domain = true }

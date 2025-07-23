@@ -222,10 +222,11 @@ a:active {
 <div class="header-container">
 <h1 class="main-header"> <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Action Delay Tracker</a></h1>
 <p class="sub-header-text">
+    Tracking the delay of various Cloudflare Actions/Updates.<br>
     We do each action once a minute using the CF API. For example, 
     updating a DNS Record, or updating a Worker. <br> Then from 40 <a href="https://delay.cloudflare.chaika.me/v2/locations">locations</a>
-    we make requests until we see the change. <br> When 
-    half of those locations see the change, we consider the change propagated 
+    we make requests until we see the change on edge. <br> When 
+    75% of those locations see the change, we consider the change propagated 
     and the job complete.  <br>
     This is not designed to be a benchmark. Results may be faster then shown. This is aimed to show/detect issues/delay. <br>
     <a href="https://delay.cloudflare.chaika.me/swagger">API Docs</a>,  <a href="https://github.com/Tyler-OBrien/Action-Delay-API">Source</a>, <a href="https://status.tylerobrien.dev/status/action-delay-api">WIP Status Page</a>, <a href="https://delay.chaika.me/delay/">New WIP Website - Now with Live Updates & Dark Theme!</a>
