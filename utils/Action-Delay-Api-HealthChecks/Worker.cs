@@ -59,8 +59,13 @@ namespace Action_Delay_Api_HealthChecks
 
             var newDownLocations = failedResponses.Select(r => r.LocationName).ToHashSet();
 
+            if (stoppingToken.IsCancellationRequested)
+                return;
+
             if (ShouldSendNotification(newDownLocations))
             {
+                if (stoppingToken.IsCancellationRequested)
+                    return;
                 await SendSlackNotification(failedResponses, newDownLocations);
                 _lastNotificationTime = DateTime.UtcNow;
             }
@@ -200,7 +205,8 @@ namespace Action_Delay_Api_HealthChecks
                 Method = MethodType.GET,
                 ReturnBody = false,
                 RetriesCount = 1,
-                ReturnBodyOnError = true
+                ReturnBodyOnError = true,
+                NetType = NetType.Either,
             };
 
             request.SetDefaultsFromLocation(location);
