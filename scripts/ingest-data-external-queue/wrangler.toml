@@ -1,0 +1,28 @@
+name = "action-delay-api-queue-ingest"
+main = "src/index.ts"
+compatibility_date = "2025-05-29"
+
+[observability]
+enabled = true
+head_sampling_rate = 1 # optional. default = 1.
+
+
+[[queues.producers]]
+  queue = "ACTION-DELAY-API-DATA-INGEST"
+  binding = "QUEUE"
+
+
+  [[queues.consumers]]
+  queue = "action-delay-api-data-ingest"
+  max_batch_size = 100
+  max_batch_timeout = 10
+  max_retries = 100
+  dead_letter_queue = "action-delay-api-data-ingest-dlq"
+
+
+  [[queues.consumers]]
+  queue = "action-delay-api-data-ingest-dlq"
+  max_batch_size = 1 # with the idea being to handle them 1 by 1 in case of errors..
+  max_batch_timeout = 30
+  max_retries = 100
+  max_concurrency = 1
