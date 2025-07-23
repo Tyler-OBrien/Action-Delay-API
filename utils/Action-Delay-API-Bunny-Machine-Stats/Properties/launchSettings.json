@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Action-Delay-API-Bunny-Machine-Stats": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}

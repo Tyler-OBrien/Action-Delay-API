@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36121.58 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Action-Delay-API-Bunny-Machine-Stats", "Action-Delay-API-Bunny-Machine-Stats.csproj", "{94A24B41-34C6-4A43-8701-9BC8A50AE262}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{94A24B41-34C6-4A43-8701-9BC8A50AE262}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94A24B41-34C6-4A43-8701-9BC8A50AE262}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94A24B41-34C6-4A43-8701-9BC8A50AE262}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94A24B41-34C6-4A43-8701-9BC8A50AE262}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3C00109A-121A-4923-A247-99C4F52241E1}
+	EndGlobalSection
+EndGlobal
