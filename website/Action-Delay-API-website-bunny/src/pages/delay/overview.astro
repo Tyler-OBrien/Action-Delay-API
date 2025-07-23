@@ -1,0 +1,30 @@
+---
+import type { Job } from "../../../models/cloudflare/job";
+import ErrorGraph from "../../components/graph/ErrorGraph";
+import SmartGraph from "../../components/graph/SmartGraph";
+import Grid from "../../components/Grid.astro";
+import Hero from "../../components/Hero.astro";
+import JobDisplay from "../../components/JobDisplay.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+
+---
+
+<BaseLayout
+  title="Bunny Delay Monitoring"
+  description="See Bunny Delay Monitoring Jobs"
+>
+  <div class="stack gap-20">
+    <main class="wrapper stack gap-8">
+      <Hero
+        title="Bunny Delay Jobs"
+        tagline="See Bunny Delay Monitoring Jobs"
+        align="start"
+      >
+            <a href="/delay">Delay Jobs</a>
+      </Hero>
+			<SmartGraph endpoint=`/v2/jobs/analytics/type/BunnyDelay` label=`Overall Bunny Delay API Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/BunnyDelay` label=`Overall Bunny Delay API Errors` options={["AvgApiResponseLatency" ]} client:only="preact"/> 
+    </main>
+  </div>
+</BaseLayout>

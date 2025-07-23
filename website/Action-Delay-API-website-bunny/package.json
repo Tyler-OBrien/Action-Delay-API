@@ -1,0 +1,43 @@
+{
+  "name": "",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "pagespreview": "wrangler pages dev ./dist"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/preact": "^4.0.11",
+    "@astrojs/tailwind": "^6.0.2",
+    "@deno/astro-adapter": "^0.3.1",
+    "astro": "^5.7.13",
+    "plotly.js-basic-dist-min": "^3.0.1",
+    "preact": "^10.25.4",
+    "shiki": "^3.6.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.5.3"
+  },
+  "overrides": {
+    "react": "npm:@preact/compat@latest",
+    "react-dom": "npm:@preact/compat@latest"
+  },
+  "devDependencies": {
+    "vite-bundle-analyzer": "^0.10.5",
+    "wrangler": "^4.16.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ],
+    "patchedDependencies": {
+      "@deno/astro-adapter": "patches/@deno__astro-adapter.patch"
+    }
+  }
+}

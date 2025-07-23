@@ -1,0 +1,118 @@
+diff --git a/src/server.ts b/src/server.ts
+index 6e0dc7927ab279cedcb50016c7495f6ce0976009..30fdf78411ecbd9c8b1c7fd38f53555e447e1465 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -5,26 +5,10 @@ import { setGetEnv } from "astro/env/setup";
+ import type { InternalOptions } from "./types";
+ setGetEnv((key) => Deno.env.get(key));
+ 
+-// @ts-expect-error
+-import { fromFileUrl, serveFile } from "@deno/astro-adapter/__deno_imports.ts";
+ 
+-let _server: Deno.Server | undefined = undefined;
+-let _startPromise: Promise<void> | undefined = undefined;
++let hooked: bool = false;
+ 
+-async function* getPrerenderedFiles(clientRoot: URL): AsyncGenerator<URL> {
+-  // @ts-expect-error
+-  for await (const ent of Deno.readDir(clientRoot)) {
+-    if (ent.isDirectory) {
+-      yield* getPrerenderedFiles(new URL(`./${ent.name}/`, clientRoot));
+-    } else if (ent.name.endsWith(".html")) {
+-      yield new URL(`./${ent.name}`, clientRoot);
+-    }
+-  }
+-}
+ 
+-function removeTrailingForwardSlash(path: string) {
+-  return path.endsWith("/") ? path.slice(0, path.length - 1) : path;
+-}
+ 
+ export function start(manifest: SSRManifest, options: InternalOptions) {
+   if (options.start === false) {
+@@ -52,7 +36,7 @@ export function start(manifest: SSRManifest, options: InternalOptions) {
+       span?.setAttribute("http.route", routeData.route);
+       span?.setAttribute("astro.prerendered", routeData.prerender);
+       span?.setAttribute("astro.type", routeData.type);
+-      const hostname = handlerInfo.remoteAddr?.hostname;
++      const hostname = request.headers.get('x-real-ip') || '0.0.0.0';
+       Reflect.set(request, Symbol.for("astro.clientAddress"), hostname);
+       const response = await app.render(request, { routeData });
+       if (app.setCookieHeaders) {
+@@ -63,32 +47,10 @@ export function start(manifest: SSRManifest, options: InternalOptions) {
+       return response;
+     }
+ 
+-    // If the request path wasn't found in astro,
+-    // try to fetch a static file instead
+-    const url = new URL(request.url);
+-    const localPath = new URL("./" + app.removeBase(url.pathname), clientRoot);
+-
+-    let fileResp = await serveFile(request, fromFileUrl(localPath));
+-
+-    // Attempt to serve `index.html` if 404
+-    if (fileResp.status == 404) {
+-      let fallback;
+-      for await (const file of getPrerenderedFiles(clientRoot)) {
+-        const pathname = file.pathname.replace(/\/(index)?\.html$/, "");
+-        if (removeTrailingForwardSlash(localPath.pathname).endsWith(pathname)) {
+-          fallback = file;
+-          break;
+-        }
+-      }
+-      if (fallback) {
+-        fileResp = await serveFile(request, fromFileUrl(fallback));
+-      }
+-    }
+-
++   
+     // If the static file can't be found
+-    if (fileResp.status == 404) {
+-      // Render the astro custom 404 page
+-      const response = await app.render(request);
++    // render custom 404
++         const response = await app.render(request);
+ 
+       if (app.setCookieHeaders) {
+         for (const setCookieHeader of app.setCookieHeaders(response)) {
+@@ -96,32 +58,24 @@ export function start(manifest: SSRManifest, options: InternalOptions) {
+         }
+       }
+       return response;
+-
+-      // If the static file is found
+-    } else {
+-      return fileResp;
+-    }
+   };
+ 
+-  const port = options.port ?? 8085;
+-  const hostname = options.hostname ?? "0.0.0.0";
+-  _server = Deno.serve({ port, hostname }, handler);
+-  _startPromise = _server.finished;
+-  console.error(`Server running on port ${port}`);
++  //const port = options.port ?? 8085;
++  //const hostname = options.hostname ?? "0.0.0.0";
++  //_server = Deno.serve({ port, hostname }, handler);
++  Bunny.v1.serve(handler);
++  hooked = true;
++  //_startPromise = _server.finished;
+ }
+ 
+ export function createExports(manifest: SSRManifest, options: InternalOptions) {
+   const app = new App(manifest);
+   return {
+     async stop() {
+-      if (_server) {
+-        _server.shutdown();
+-        _server = undefined;
+-      }
+-      await Promise.resolve(_startPromise);
++      
+     },
+     running() {
+-      return _server !== undefined;
++      return hooked;
+     },
+     async start() {
+       return start(manifest, options);

@@ -1,0 +1,274 @@
+---
+import type { Job } from "../../models/cloudflare/job";
+import type { Incident } from "../../models/types";
+import SmartGraphLazy from "../components/graph/SmartGraphLazy";
+import Hero from "../components/Hero.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+
+
+// Static config for groups and items
+const config = {
+  groups: [
+    {
+      name: 'Bunny DNS',
+      items: [
+        { name: 'Bunny DNS Update Delay', jobName: 'bunnydns' },
+      ]
+    },
+    {
+      name: 'Bunny Edge Rule Update Job',
+      items: [
+        { name: 'Bunny Edge Rule Update Delay', jobName: 'bunnyedgerule' },
+      ]
+    },
+      {
+      name: 'Bunny Storage',
+      items: [
+        { name: 'Bunny Storage Replication Delay', jobName: 'bunnystoragereplication' },
+      ]
+    },
+      {
+      name: 'Bunny Edge Scripting',
+      items: [
+        { name: 'Bunny Edge Scripting Update Delay', jobName: 'bunnyedgescript' },
+      ]
+    },
+    
+    {
+      name: 'Analytics',
+      items: [
+        { name: 'Zone Analytics Delay', jobName: 'bunnyanalytics' },
+        { name: 'Bunny Log Forwarder Delay', jobName: 'bunnylogforwarder' },
+
+      ]
+    }
+  ]
+};
+
+
+const getJobs = async () => {
+  return (
+    await (
+      await fetch(
+        "https://delay.cloudflare.chaika.me/v2/jobs/type/BunnyDelay"
+      )
+    ).json()
+  ).data;
+};
+var getJobsTask = getJobs();
+
+const getIncidentsData = async () => {
+  return (
+    await (
+      await fetch(
+      "https://delay.cloudflare.chaika.me/v2/incidents/type/BunnyDelay"
+      )
+    ).json()
+  ).data;
+};
+var getIncidentsTask = getIncidentsData();
+
+const jobs: Job[] = await getJobsTask;
+const incidents: Incident[] = await getIncidentsTask;
+/*
+incidents.push({
+  target: "worker",
+  thresholdValue: "80",
+  currentValue: "60",
+  startedAt: new Date().toDateString(),
+  active: true,
+})
+*/
+
+// Helper function to get status for a job
+function getItemStatus(jobName: string) {
+  const job = jobs.find(j => j.internalJobName === jobName);
+  if (!job) return { status: 'Unknown', color: 'bg-gray-500', time: null };
+  
+  const incident = incidents.find(inc => inc.target === jobName && inc.active);
+  
+  if (incident) {
+    return { 
+      status: 'Degraded', 
+      color: 'bg-yellow-500',
+      time: job.predictedRunTime,
+      length: job.predictedDelayLengthMs,
+      runStatus: job.predictedRunStatus,
+    };
+  }
+  
+  if (job.predictedRunStatus === 'API_Error') {
+    return { 
+      status: 'API Down', 
+      color: 'bg-red-500',
+      time: null,
+      length: job.predictedDelayLengthMs,
+      runStatus: job.predictedRunStatus
+    };
+  }
+  
+  if (job.type === 'delayed') {
+    return { 
+      status: 'Delayed', 
+      color: 'bg-orange-500',
+      time: job.predictedRunTime,
+      length: job.predictedDelayLengthMs,
+      runStatus: job.predictedRunStatus
+    };
+  }
+  
+  return { 
+    status: 'Normal', 
+    color: 'bg-green-500',
+    time: job.predictedRunTime,
+    length: job.predictedDelayLengthMs,
+    runStatus: job.predictedRunStatus
+  };
+}
+
+// Helper function to get group status
+function getGroupStatus(groupItems: any[]) {
+  const hasIssues = groupItems.some(item => {
+    const job = jobs.find(j => j.internalJobName === item.jobName);
+    if (!job) return false;
+    
+    const incident = incidents.find(inc => inc.target === item.jobName && inc.active);
+    if (incident) return true;
+    
+    if (job.predictedRunStatus === 'API_Error' || job.type === 'delayed') {
+      return true;
+    }
+    
+    return false;
+  });
+  
+  return hasIssues ? 
+    { status: 'Partially Degraded', color: 'bg-yellow-500' } : 
+    { status: 'Normal', color: 'bg-green-500' };
+}
+
+function runLengthDisplayFormat(jobName: string, ms: Number | undefined): string {
+
+  if (jobName == "cron") {
+    if (ms) ms -= 60_000;
+  }
+
+	if (ms == undefined) return "";
+
+let seconds = ms / 1000;
+if (seconds < 60) {
+return seconds.toFixed(2) + ' second(s)';
+}
+
+let minutes = seconds / 60;
+if (minutes < 60) {
+return minutes.toFixed(2) + ' minute(s)';
+}
+
+let hours = minutes / 60;
+return hours.toFixed(2) + ' hour(s)';
+}
+function formatTime(date: Date | null) {
+  if (!date) return '';
+  return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: "short"});
+}
+---
+<script define:vars={{ jobs, config, incidents }}>
+globalThis.jobData = jobs;
+globalThis.config = config;
+globalThis.incidents = incidents;
+
+</script>
+<BaseLayout
+  title="Bunny Delay Monitoring"
+  description="See Bunny Delay Monitoring Status"
+>
+  <div class="stack gap-20">
+    <main class="wrapper gap-8">
+      <Hero
+        title="Bunny Status"
+        tagline="See Bunny Delay Monitoring Status"
+        align="start"
+      />
+            <a id="websocket-conn-status">Connecting to Live Updates..</a>
+<div class="max-w-5xl mx-auto py-8 px-4">
+  <h1 class="text-3xl font-bold mb-8 text-center">System Status</h1>
+  
+  <div class="space-y-6">
+    {config.groups.map(group => {
+      const groupStatus = getGroupStatus(group.items);
+      
+      return (
+        <div class="bg-white dark:bg-[#222122c9] shadow rounded-lg overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b">
+            <h2 class="text-xl font-semibold">{group.name}</h2>
+            <div class="flex items-center">
+              <span class={`w-3 h-3 rounded-full mr-2 ${groupStatus.color}`} id={`grp-${group.name}-color`}></span>
+              <span class="text-sm font-medium" id={`grp-${group.name}-status`}>{groupStatus.status}</span> 
+            </div>
+          </div>
+          
+          <div>
+            {group.items.map(item => {
+              const status = getItemStatus(item.jobName);
+              
+              return (
+      <details class="border-b last:border-b-0" id={`details-${item.jobName}`}>
+                  <summary class="flex items-center justify-between px-6 py-3 cursor-pointer hover:bg-gray-50">
+<span class="font-medium">{item.name}</span>
+<div class="flex items-center">
+  <span class="text-sm text-gray-500 dark:text-gray-300 w-32" id={`item-${item.jobName}-runLength`}>
+    {runLengthDisplayFormat(item.jobName, status.length)}
+  </span>
+  {status.time && (
+    <span class="text-sm text-gray-500 dark:text-gray-300 w-24" id={`item-${item.jobName}-time`}>
+      {formatTime(status.time)}
+    </span>
+  )}
+  <div class="flex items-center ml-0">
+    <span class={`w-3 h-3 rounded-full mr-2 ${status.color}`} id={`item-${item.jobName}-color`}></span>
+    <span class="text-sm font-medium" id={`item-${item.jobName}-status`}>{status.status}</span>
+  </div>
+</div>
+                  </summary>
+                  <div class="bg-white dark:bg-[#222122c9] "> 
+                  <div  id={`item-${group.name}-incidents`}>
+                  {incidents.filter(inc => inc.target === item.jobName).map(incident => (
+                      <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded">
+                        <div class="flex justify-between">
+                          <span class="font-medium text-red-800">Active Incident</span>
+                          <span class="text-sm text-red-800">
+                            Started: {new Date(incident.startedAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <div class="mt-2 text-sm">
+                          <span class="font-medium">Current Value:</span> {runLengthDisplayFormat(item.jobName, incident.currentValue)}) / 
+                          <span class="font-medium">Threshold:</span> {runLengthDisplayFormat(item.jobName, incident.thresholdValue)}
+                        </div>
+                      </div>
+                    ))}
+                    </div>
+
+                  <div class="px-6 py-4 bg-gray-50 dark:bg-[#222122c9]">
+                    <div class="h-120 bg-gray-100 dark:bg-[#222122c9] rounded-lg flex items-center justify-center">
+                      <SmartGraphLazy detailsId={`details-${item.jobName}`} endpoint=`v2/jobs/${item.jobName}/analytics` label={item.name} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} client:only="preact"/>
+                    </div>
+                    
+           </div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+      <script src="/assets/js/8.0.7/signalr.min.js" is:inline> </script>
+      <script src="/assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
+      <script src="../scripts/signalr-status-code.js"> </script>
+    </main>
+  </div>
+</BaseLayout>

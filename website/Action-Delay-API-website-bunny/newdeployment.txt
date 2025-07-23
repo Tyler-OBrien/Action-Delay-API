@@ -1,0 +1,54 @@
+How to get Astro deployed on Bunny
+Disclaimer: This is hacky/experimental and will probably have issues with some setups
+1. Switch to Deno's ssr astro adapter
+2. run build (npx astro build)
+3. esbuild the server int one big file, like so (assuming running in base of project and outputting to dist):
+npx esbuild ./dist/server/entry.mjs --bundle --outfile=index.mjs --format=esm --platform=neutral --external:jsr:*
+
+Then, we have to manually pick apart/modify the index.mjs
+
+3. Look for `jsr` refs, specifically reading file and resolving path. Remove them, and comment out the section which uses them
+These are the two lines to remove for now:
+import { serveFile } from "jsr:@std/http@1.0/file-server";
+import { fromFileUrl } from "jsr:@std/path@1.0";
+
+Then look for the usage of "serveFile" under the start function, strip out the first 404 handler section, starting with fileResp = await serveFile, ending with if fallback serveFile
+You should be left with the next section being if 404 then app.render(...). Change the condition of that to just if (true), and the else `return fileResp` to `return null`, removing all references to fileResp.
+In the end, the section should be like:
+    const url = new URL(request.url);
+    if (true) {
+      const response = await app.render(request);
+      if (app.setCookieHeaders) {
+        for (const setCookieHeader of app.setCookieHeaders(response)) {
+          response.headers.append("Set-Cookie", setCookieHeader);
+        }
+      }
+      return response;
+    } else {
+      return null;
+    }
+
+4. Replace the launch code
+Below the section you just modified, look for Deno.serve, replace the section with this:
+  //const port = options.port ?? 8085;
+  //const hostname = options.hostname ?? "0.0.0.0";
+  //_server = Deno.serve({ port, hostname }, handler);
+  Bunny.v1.serve(handler);
+  //_startPromise = _server.finished;
+  console.error(`Bunny Serve Hooked!`);
+
+Replace the usage of Remoteaddr with a static:
+Look for handlerInfo.remoteAddr?.hostname usages, replace with request.headers.get('x-real-ip') || '0.0.0.0'
+In the current version of Astro, there's only one, and it's under the handler in the start method, called hostname2.
+
+
+Now you have the "correct" server side code in theory. Make a new standalone script and just copy paste the entire file contents into the code editor. It worked well enough for my smaller sized Astro project w/ 12k lines. At some point you might have to use the API directly.
+
+Then, upload all client assets to storage zone. Navigate to `dist/client/` and upload them all. The dashboard Upload Folder utility works well enough.
+
+Make a pull zone off the storage zone. 
+Then, the last bit is to make an Edge Rule used to run the script and not hit storage.
+You can make a rule that specifically match none and then specify all the folders of your assets and the root ones, if none are hit to match it.
+Or you can just use `https://{hostname}/*.*`, match none (so don't match anything with an extension, will break if you have a dynamic page with an extension you want to use)  to fall back to running the edge script. Make sure to bypass cache too in the rule if your content is dynamic.
+
+SSR Page w/ dynamic content example: https://delay.bunny.chaika.me/delay/

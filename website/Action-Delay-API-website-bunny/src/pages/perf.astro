@@ -1,0 +1,53 @@
+---
+import { getCollection } from 'astro:content';
+
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+import JobDisplay from '../components/JobDisplay.astro';
+import Hero from '../components/Hero.astro';
+import Grid from '../components/Grid.astro';
+import type { QuickStats } from '../../models/cloudflare/quickstat';
+import type { Job } from '../../models/cloudflare/job';
+
+const getJobs = async () => {
+	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/Perf")).json()).data
+}
+var getJobsTask = getJobs()
+
+const getAnalytics = async () => {
+	return (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/Perf")).json());
+}
+var getAnalyticsTask = getAnalytics()
+
+const jobs: Job[] = await getJobsTask;
+const stats: QuickStats[] = await getAnalyticsTask;
+
+
+const reorderedList = jobs.sort()
+
+---
+
+<BaseLayout
+	title="Bunny Performance Monitoring"
+	description="See Bunny Performance Monitoring Jobs"
+>
+	<div class="stack gap-20">
+		<main class="wrapper stack gap-8">
+			<Hero
+				title="Bunny Performance Jobs"
+				tagline="See Bunny Performance Monitoring Jobs"
+				align="start"
+			>
+			</Hero>
+			<Grid>
+				{
+					reorderedList.filter(job => job.internalJobName.startsWith("bunny")).map((job: Job) => (
+						<li>
+							<JobDisplay  type="perf"  job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
+							</li>
+					))
+				}
+			</Grid>
+		</main>
+	</div>
+</BaseLayout>

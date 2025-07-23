@@ -1,0 +1,12 @@
+---
+import SmartGraph from '../../components/graph/SmartGraph.js';
+
+
+console.log(Astro.params)
+
+---
+<div>
+  <!-- @ts-ignore -->
+<SmartGraph endpoint={Astro.url.searchParams.get("endpoint")} label={Astro.url.searchParams.get("label")} options={Astro.url.searchParams.get("options")} fullscreen="true" client:only="preact"/>
+
+</div>

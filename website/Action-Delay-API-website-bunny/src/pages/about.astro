@@ -1,0 +1,128 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+import Hero from '../components/Hero.astro';
+---
+
+<BaseLayout title="About | Action Delay API" description="About Action Delay API">
+	<div class="stack gap-20">
+		<main class="wrapper about">
+			<Hero
+				title="About"
+				tagline="More about Action-Delay-API."
+			>
+			</Hero>
+
+			<section>
+				<h2 class="section-title">Overview</h2>
+				<div class="content">
+					<p>
+						This project monitors delay of various Bunny updates/operations, and has also expanded into generic performance monitoring, using 40+ remote <a href="https://api.bunny.chaika.me/v2/locations">locations</a>. 
+					</p>
+				</div>
+			</section>
+			<section>
+				<h2 class="section-title">Job Types</h2>
+				<div class="content">
+					<p>
+						For various delay jobs, such as updating a DNS Record, or updating an Edge Rule, we perform the update via the Bunny API and then rapidly check via 40 locations when the change is visible on edge. When at least half see the change, we mark the job complete.
+						<br><br>
+						Additionally, There is various performance jobs comparing different cloud platforms and services.
+						<br><br>
+						Please note that none of these are designed to be perfect benchmarks. Delay Jobs focus on showing issues with update propagation and relative delay if you had done the same action at the same time, how long it'd take for you to see the update on edge.
+						<br><br>
+						For performance jobs, a greater care is taken in accuracy but is still hard to guarantee perfect routing in all cases. Most of these locations were handpicked for low latency to global services (only a few ms max) and all are in data centers.
+						<br><br>
+					</p>
+			
+				</div>
+			</section>
+			<section>
+				<h2 class="section-title">Stats</h2>
+				<div class="content">
+					<p>
+						9 Million+ DNS and HTTP Requests from all nodes per day to perform jobs, with over 400k unique per location delay job results daily.
+						<br><br>
+						All results stored in ClickHouse with no sampling, and status live updated, leveraging Postgres as well.
+					</p>
+				</div>
+			</section>
+
+			
+
+			<!-- 
+			<section>
+				<h2 class="section-title">Education</h2>
+				<div class="content">
+					<p>Corporis voluptates tenetur laudantium.</p>
+				</div>
+			</section>
+			<section>
+				<h2 class="section-title">Skills</h2>
+				<div class="content">
+					<p>officia unde omnis</p>
+				</div>
+			</section>
+			-->
+		</main>
+
+	</div>
+</BaseLayout>
+
+<style>
+	.about {
+		display: flex;
+		flex-direction: column;
+		gap: 3.5rem;
+	}
+
+	img {
+		margin-top: 1.5rem;
+		border-radius: 1.5rem;
+		box-shadow: var(--shadow-md);
+	}
+
+	section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		color: var(--gray-200);
+	}
+
+	.section-title {
+		grid-column-start: 1;
+		font-size: var(--text-xl);
+		color: var(--gray-0);
+	}
+
+	.content {
+		grid-column: 2 / 4;
+	}
+
+	.content :global(a) {
+		text-decoration: 1px solid underline transparent;
+		text-underline-offset: 0.25em;
+		transition: text-decoration-color var(--theme-transition);
+	}
+
+	.content :global(a:hover),
+	.content :global(a:focus) {
+		text-decoration-color: currentColor;
+	}
+
+	@media (min-width: 50em) {
+		.about {
+			display: grid;
+			grid-template-columns: 1fr 60% 1fr;
+		}
+
+		.about > :global(:first-child) {
+			grid-column-start: 2;
+		}
+
+		section {
+			display: contents;
+			font-size: var(--text-lg);
+		}
+	}
+</style>

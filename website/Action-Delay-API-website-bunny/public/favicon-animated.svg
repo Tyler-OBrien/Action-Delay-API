@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background -->
+  
+  <!-- Central node (origin of update) -->
+  <circle cx="32" cy="32" r="8" fill="#06B6D4" />
+  
+  <!-- Propagation waves (animated) -->
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#06B6D4" stroke-width="2" opacity="0.8">
+    <animate attributeName="r" from="10" to="28" dur="3s" repeatCount="indefinite" />
+    <animate attributeName="opacity" from="0.8" to="0" dur="3s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Secondary propagation wave (delayed start) -->
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#06B6D4" stroke-width="2" opacity="0.8">
+    <animate attributeName="r" from="10" to="28" dur="3s" begin="1s" repeatCount="indefinite" />
+    <animate attributeName="opacity" from="0.8" to="0" dur="3s" begin="1s" repeatCount="indefinite" />
+  </circle>
+  
+  <!-- Check points (locations being monitored) -->
+  <circle cx="20" cy="15" r="3" fill="#FBBF24">
+    <animate attributeName="fill" values="#FBBF24;#22C55E;#22C55E" keyTimes="0;0.7;1" dur="2.5s" repeatCount="indefinite" />
+  </circle>
+  
+  <circle cx="50" cy="18" r="3" fill="#FBBF24">
+    <animate attributeName="fill" values="#FBBF24;#22C55E;#22C55E" keyTimes="0;0.8;1" dur="3s" repeatCount="indefinite" />
+  </circle>
+  
+  <circle cx="52" cy="40" r="3" fill="#FBBF24">
+    <animate attributeName="fill" values="#FBBF24;#22C55E;#22C55E" keyTimes="0;0.6;1" dur="2s" repeatCount="indefinite" />
+  </circle>
+  
+  <circle cx="30" cy="52" r="3" fill="#FBBF24">
+    <animate attributeName="fill" values="#FBBF24;#22C55E;#22C55E" keyTimes="0;0.9;1" dur="3.5s" repeatCount="indefinite" />
+  </circle>
+  
+  <circle cx="12" cy="40" r="3" fill="#FBBF24">
+    <animate attributeName="fill" values="#FBBF24;#F43F5E;#F43F5E" keyTimes="0;0.7;1" dur="3s" repeatCount="indefinite" />
+  </circle>
+</svg>

@@ -1,0 +1,20 @@
+How to get Astro deployed on Bunny
+Disclaimer: This is hacky/experimental and will probably have issues with some setups
+1. Switch to Deno's astro adapter
+2. run build (npx astro build)
+3. esbuild the server int one big file, like so:
+npx esbuild ./dist/server/entry.mjs --bundle --outfile=index.mjs --format=esm --platform=neutral --external:jsr:*
+3. Look for `jsr` refs, specifically reading file and resolving path. Remove them, and comment out the section which uses them
+4. Replace the launch code
+  const port = options.port ?? 8085;
+  const hostname = options.hostname ?? "0.0.0.0";
+  //_server = Deno.serve({ port, hostname }, handler);
+  Bunny.v1.serve(handler);
+  //_startPromise = _server.finished;
+  console.error(`Bunny Serve Hooked!`);
+
+Replace the usage of Remoteaddr with astatic
+      const hostname2 = "127.0.0.1";
+
+Then, upload all client assets to storage zone
+We're utilizing a single edge rule, `https://delay.bunny.chaika.me/*.*`, MATCH NONE, so anything without an extension goes to the Edge Script (via run Edge Script)
