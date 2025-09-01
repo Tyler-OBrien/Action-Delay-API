@@ -29,6 +29,9 @@ const SELECT_DISPLAY_OPTIONS = [
 ];
 
 function formatTime(ms) {
+   if (typeof ms !== 'number' || !isFinite(ms)) {
+    return ms;
+  }
   if (ms < 1000) {
     return ms.toFixed(0) + ' ms';
   }
