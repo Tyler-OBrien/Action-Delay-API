@@ -120,6 +120,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
       plot_bgcolor: theme.plot_bgcolor,
       font: { color: theme.font_color },
       height: height,
+      showlegend: true,
       legend: {
         orientation: 'h',
         y: -0.2,
