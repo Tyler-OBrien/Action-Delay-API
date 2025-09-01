@@ -37,18 +37,17 @@ namespace Action_Delay_API_Worker
             TaskScheduler.UnobservedTaskException += TaskSchedulerOnUnobservedTaskException;
 
 
-            var lookupClientOptionsAny = new LookupClientOptions(CloudflareV6, ControlDV4);
+            var lookupClientOptionsAny = new LookupClientOptions(CloudflareV4, ControlDV4, CloudflareV6, ControlDV6);
             lookupClientOptionsAny.UseCache = true;
             lookupClientOptionsAny.UseRandomNameServer = false;
             StaticLookupClientAny = new LookupClient(lookupClientOptionsAny);
-            var lookupClientOptionsV4 = new LookupClientOptions(CloudflareV4, ControlDV6);
+            var lookupClientOptionsV4 = new LookupClientOptions(CloudflareV4, ControlDV4);
             lookupClientOptionsAny.UseCache = true;
             lookupClientOptionsAny.UseRandomNameServer = false;
             StaticLookupClientV4 = new LookupClient(lookupClientOptionsV4);
 
 
 
-            StaticLookupClientAny = new LookupClient();
             
             try
             {
