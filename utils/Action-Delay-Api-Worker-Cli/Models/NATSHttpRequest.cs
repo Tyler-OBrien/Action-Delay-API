@@ -65,6 +65,20 @@ namespace Action_Delay_Api_Worker_Cli.Models
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? CustomDNSServerOverride { get; set; }
 
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? NoResponseHeaders { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? ResponseHeaders { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? AlwaysAllResponseHeadersOnNonSuccessStatusCode { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? DisableAutomaticResponseDecompression { get; set; }
+
+
         public void SetDefaultsFromLocation(Location location)
         {
             NetType = location.NetType ?? Models.NetType.Either;

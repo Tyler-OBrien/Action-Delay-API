@@ -136,6 +136,7 @@ namespace Action_Delay_Api_Worker_Cli
 
             var shortResponse = extraFlags.Contains("--short", StringComparison.OrdinalIgnoreCase);
             var shortv2Response = extraFlags.Contains("--shortv2", StringComparison.OrdinalIgnoreCase);
+            var noDecompression = extraFlags.Contains("--noDecompression", StringComparison.OrdinalIgnoreCase);
 
 
             var onlyShowDifferentPopRouting = extraFlags.Contains("--onlyShowDifferentPopRouting", StringComparison.OrdinalIgnoreCase);
@@ -154,6 +155,12 @@ namespace Action_Delay_Api_Worker_Cli
             {
                 newServerQuery.ReturnBody = false;
                 newServerQuery.ReturnBodyOnError = false;
+            }
+
+            if (noDecompression)
+            {
+                newServerQuery.DisableAutomaticResponseDecompression = true;
+                Console.WriteLine($"Disabled Automatic Compression on Queries");
             }
 
             Console.WriteLine($"Running Request: {url} {method ?? MethodType.GET}, NetType: {netType ?? NetType.Either}");
