@@ -1,0 +1,29 @@
+---
+import type { Job } from "../../models/cloudflare/job";
+import ErrorGraph from "../components/graph/ErrorGraph";
+import CloudflareRouting from "../components/graph/CloudflareRouting";
+import Grid from "../components/Grid.astro";
+import Hero from "../components/Hero.astro";
+import JobDisplay from "../components/JobDisplay.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+
+---
+
+<BaseLayout
+  title="Cloudflare Routing Monitoring"
+  description="See Cloudflare Routing, using Workers running on each plan returning static content."
+>
+  <div class="stack gap-20">
+    <main class="wrapper stack gap-8">
+      <Hero
+        title="Cloudflare Routing"
+        tagline="See Cloudflare Routing, using Workers running on each plan returning static content."
+        align="start"
+      >
+            <a href="/delay"></a>
+      </Hero>
+   <CloudflareRouting client:only="preact"/>
+    </main>
+  </div>
+</BaseLayout>
