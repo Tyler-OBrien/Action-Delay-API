@@ -144,6 +144,17 @@ namespace Action_Delay_Api_HealthChecks
             for (int i = 0; i < 3; i++)
             {
                 bool shouldErrorLastRun = i > 1;
+
+                if (i == 1)
+                {
+                    await Task.Delay(200);
+                }
+
+                if (shouldErrorLastRun)
+                {
+                    await Task.Delay(10_000); // some delay
+                }
+
                 try
                 {
                     var request = CreateHealthCheckRequest(location);
