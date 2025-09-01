@@ -19,6 +19,7 @@ namespace Action_Delay_Api_HealthChecks
         public List<Location> Locations { get; set; }
 
         public string HttpRequestSecret { get; set; }
+        public string LocationName { get; set; }
     }
 
     public class Location

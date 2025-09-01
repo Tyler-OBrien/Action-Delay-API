@@ -97,7 +97,7 @@ namespace Action_Delay_Api_HealthChecks
             HashSet<string> newDownLocations)
         {
             var message = BuildNotificationMessage(failedResponses, newDownLocations);
-            await _slackWebhookBroker.SendWebhook(_localConfig.SLACK_WEBHOOK_URL, message);
+            await _slackWebhookBroker.SendWebhook(_localConfig.SLACK_WEBHOOK_URL , message, _localConfig.LocationName);
         }
 
         private string BuildNotificationMessage(
@@ -133,7 +133,6 @@ namespace Action_Delay_Api_HealthChecks
                 sb.AppendLine("\nCurrently down locations:");
                 sb.AppendLine(string.Join(", ", newDownLocations));
             }
-
             return sb.ToString().TrimEnd();
         }
 

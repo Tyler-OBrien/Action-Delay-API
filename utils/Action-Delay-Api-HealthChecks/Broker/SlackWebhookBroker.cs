@@ -23,11 +23,12 @@ namespace Action_Delay_Api_HealthChecks.Broker
             _httpClient.Timeout = TimeSpan.FromSeconds(60);
         }
 
-        public async Task<Result<bool>> SendWebhook(string webhookUrl, string message)
+        public async Task<Result<bool>> SendWebhook(string webhookUrl, string message, string username)
         {
             var tryPost = await _httpClient.PostAsJsonAsync(webhookUrl, new
             {
-                text = message
+                text = message,
+                username
             });
             if (tryPost.IsSuccessStatusCode == false)
             {
