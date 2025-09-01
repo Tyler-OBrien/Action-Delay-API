@@ -175,6 +175,58 @@ namespace Action_Delay_API_Core.Services
         }
 
 
+        public async Task<RegionJobAnalytics> GetCountJobLocationAnalyticsByRegion(string[] jobs, string[] locations,
+            DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100,
+            JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength,
+            CancellationToken token = default)
+        {
+            var output = PickRightDataSet(startTime, endTime, maxPoints);
+            string dataSetName =  config.NormalDataSet; // this only supports normal ds because nothing else has info at this level, which means we need careful time restrictions, probably.
+
+
+
+           // var columns = ReturnOptionsColumns(agg, config, option);
+
+            string commandText =
+                    @$"SELECT  count() AS event_count, c.FriendlyRegionName AS region, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) AS time_period
+FROM ""default"".""{dataSetName}""
+INNER JOIN colo_data_from_pg AS c ON location_id = toString(c.ColoId)
+WHERE run_time > {{startDateTime:DateTime}}
+  AND run_time < {{endDateTime:DateTime}}
+  AND job_name IN {{jobs:Array(String)}}
+  AND location_name IN {{locations:Array(String)}}
+GROUP BY time_period, region
+ORDER BY time_period ";
+
+
+            await using var connection = CreateConnection();
+
+            await using var command = connection.CreateCommand();
+            command.AddParameter("startDateTime", "DateTime", startTime);
+            command.AddParameter("endDateTime", "DateTime", endTime);
+            command.AddParameter("jobs", "Array(String)", jobs);
+            command.AddParameter("locations", "Array(String)", locations);
+
+
+
+
+            command.CommandText = commandText;
+
+            await using var result = await command.ExecuteReaderAsync(token);
+            var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
+            List<RegionJobAnalyticsPoint> data = new List<RegionJobAnalyticsPoint>(predictedPoints);
+            while (await result.ReadAsync(token))
+            {
+                data.Add(RegionJobAnalyticsFromReader(result));
+            }
+
+            return new RegionJobAnalytics()
+            {
+                Points = data,
+                GroupByMinutesInterval = output.Interval,
+            };
+        }
+
         public async Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string[] jobs, string[] locations, DateTime startTime, DateTime endTime,JobAnalyticsConfiguration config, int maxPoints = 100, JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
@@ -263,6 +315,18 @@ namespace Action_Delay_API_Core.Services
                 columns.Add(agg ? $"medianMerge({colNameMedianResponseLatencyValue}) as median_response_latency" : $"median({colNameMedianResponseLatencyValue}) as median_response_latency");
             return columns;
         }
+
+        private RegionJobAnalyticsPoint RegionJobAnalyticsFromReader(DbDataReader reader)
+        {
+            var newAnalyticsObj = new RegionJobAnalyticsPoint();
+            newAnalyticsObj.TimePeriod = reader.GetDateTime("time_period");
+            newAnalyticsObj.FriendlyRegionName = reader.GetString("region");
+            newAnalyticsObj.EventCount = Convert.ToUInt64(reader.GetValue("event_count"));
+
+            return newAnalyticsObj;
+
+        }
+
 
         private NormalJobAnalyticsPoint NormalJobAnalyticsFromReader(DbDataReader reader, JobAnalyticsRequestOptions option, bool locationName)
         {

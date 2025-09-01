@@ -28,7 +28,9 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
                     LastChange = DateTime.Parse("2024-02-12T03:46:32.353923Z"),
                     Enabled = true,
                     ColoLatitude = 40.6925010681,
-                    ColoLongitude = -74.1687011719
+                    ColoLongitude = -74.1687011719,
+                    Region = "enam",
+                    FriendlyRegionName = "NA",
                 }
             );
         }
@@ -57,7 +59,9 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
                         LastChange = DateTime.Parse("2024-02-12T03:46:32.353923Z"),
                         Enabled = true,
                         ColoLatitude = 40.6925010681,
-                        ColoLongitude = -74.1687011719
+                        ColoLongitude = -74.1687011719,
+                        Region = "enam",
+                        FriendlyRegionName = "NA",
                     },
                     new LocationDataResponse
                     {
@@ -76,7 +80,9 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
                         LastChange = DateTime.Parse("2024-02-12T03:46:30.047329Z"),
                         Enabled = true,
                         ColoLatitude = 52.3086013794,
-                        ColoLongitude = 4.7638897896
+                        ColoLongitude = 4.7638897896,
+                        Region = "WEU",
+                        FriendlyRegionName = "EU",
                     },
                     new LocationDataResponse
                     {
@@ -95,7 +101,9 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
                         LastChange = DateTime.Parse("2024-02-12T03:46:32.258317Z"),
                         Enabled = true,
                         ColoLatitude = 32.8968009949,
-                        ColoLongitude = -97.0380020142
+                        ColoLongitude = -97.0380020142,
+                        Region = "wnam",
+                        FriendlyRegionName = "NA",
                     },
                 }
             );
@@ -111,8 +119,13 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
         [JsonPropertyName("friendlyLocationName")]
         public string FriendlyLocationName { get; set; }
 
+        [JsonPropertyName("friendlyRegionName")]
+        public string FriendlyRegionName { get; set; }
+
         [JsonPropertyName("region")]
         public string Region { get; set; }
+
+    
 
         [JsonPropertyName("provider")]
         public string Provider { get; set; }
@@ -165,6 +178,7 @@ namespace Action_Delay_API.Models.API.Responses.DTOs
             locationDataResponse.LocationLongitude = data.LocationLongitude;
             locationDataResponse.ColoFriendlyLocationName = data.ColoFriendlyLocationName;
             locationDataResponse.Region = data.Region;
+            locationDataResponse.FriendlyRegionName = data.FriendlyRegionName;
             locationDataResponse.ColoId = data.ColoId;
             locationDataResponse.IATA = data.IATA;
             locationDataResponse.LastUpdate = data.LastUpdate;

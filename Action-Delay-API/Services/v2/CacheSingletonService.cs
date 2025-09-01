@@ -131,7 +131,7 @@ public class CacheSingletonService : ICacheSingletonService
     {
         Interlocked.Exchange(ref LOCATION_NAMES, new HashSet<string>(locationNames.Select(location => location.LocationName )));
         Interlocked.Exchange(ref REGION_TO_LOCATION,
-            locationNames.GroupBy(loc => loc.Region).ToDictionary(keyKvp => keyKvp.Key,
+            locationNames.GroupBy(loc => loc.FriendlyRegionName.ToLower()).ToDictionary(keyKvp => keyKvp.Key,
                 elementKvp => elementKvp.Select(data => data.LocationName).ToArray())); 
         LOCATION_NAMES_LAST_CACHE = DateTime.UtcNow;
     }

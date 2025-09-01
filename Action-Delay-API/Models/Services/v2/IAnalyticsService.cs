@@ -15,6 +15,11 @@ namespace Action_Delay_API.Models.Services.v2
             string locationName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options,
             CancellationToken token, int maxPoints = 100);
 
+
+        Task<Result<DataResponse<RegionJobLocationAnalyticsDTO>>> GetCountJobAnalyticsLocationRegionByRegion(
+            string[] jobNames, string regionName, DateTime startDateTime, DateTime endDateTime,
+            JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100);
+
         Task<Result<DataResponse<NormalJobLocationAnalyticsDTO>>> GetJobAnalyticsLocationRegion(string[] jobName,
             string regionName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options,
             CancellationToken token, int maxPoints = 100);

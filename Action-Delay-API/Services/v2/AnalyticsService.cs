@@ -398,6 +398,64 @@ public class AnalyticsService : IAnalyticsService
 
         return new DataResponse<NormalJobLocationAnalyticsDTO>(new NormalJobLocationAnalyticsDTO(getAnalytics, regionName, String.Join(",", newJobList)));
     }
+
+
+    public async Task<Result<DataResponse<RegionJobLocationAnalyticsDTO>>> GetCountJobAnalyticsLocationRegionByRegion(string[] jobNames, string regionName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
+    {
+        var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);
+        if (tryValidate.IsFailed)
+            return Result.Fail(tryValidate.Errors.First());
+
+        var tryGetLocs = await _cacheSingletonService.GetLocationsForRegion(regionName, token);
+
+        if (tryGetLocs.Any() == false)
+            return Result.Fail(new ErrorResponse(404,
+                "Could not find any locs for region", "no_locations_for_region"));
+
+        string? currentJobType = null;
+        List<string> newJobList = new List<string>();
+        foreach (var jobName in jobNames)
+        {
+            var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+            if (tryGetJobInternalName == null)
+                return Result.Fail(new ErrorResponse(404,
+                    "Could not find job", "job_not_found"));
+
+            newJobList.Add(tryGetJobInternalName);
+            var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
+
+
+            if (currentJobType != null)
+            {
+                if (currentJobType.Equals(getJobType, StringComparison.OrdinalIgnoreCase) == false)
+                {
+                    return Result.Fail(new ErrorResponse(404,
+                        "You have specified jobs of different types which is disallowed", "jobs_of_different_types"));
+                }
+            }
+            else
+            {
+                currentJobType = getJobType;
+            }
+        }
+
+
+
+
+
+
+        Task<RegionJobAnalytics> tryGetAnalytics = null;
+
+        if (currentJobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
+            tryGetAnalytics = _clickhouseService.GetCountJobLocationAnalyticsByRegion(newJobList.ToArray(), tryGetLocs, startDateTime, endDateTime, JobLocationAnalyticsPerfConfig, maxPoints, options, token);
+        else
+            return Result.Fail(new ErrorResponse(404,
+                "This endpoint only supports Perf type jobs.", "job_type_not_supported_for_endpoint"));
+
+        var getAnalytics = await tryGetAnalytics;
+
+        return new DataResponse<RegionJobLocationAnalyticsDTO>(new RegionJobLocationAnalyticsDTO(getAnalytics, regionName, String.Join(",", newJobList)));
+    }
     public async Task<Result<DataResponse<NormalJobLocationAnalyticsDTO>>> GetJobAnalyticsLocation(string jobName, string locationName, DateTime startDateTime, DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100)
     {
         var tryValidate = ValidateParams(startDateTime, endDateTime, options, maxPoints);

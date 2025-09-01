@@ -38,7 +38,12 @@ namespace Action_Delay_API_Core.Models.Services
              JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength,
              CancellationToken token = default);
 
-         Task<OverallAnalytics> GetOverallAnalytics(CancellationToken token);
+         Task<RegionJobAnalytics> GetCountJobLocationAnalyticsByRegion(string[] jobs, string[] locations,
+             DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100,
+             JobAnalyticsRequestOptions option = JobAnalyticsRequestOptions.AvgRunLength,
+             CancellationToken token = default);
+
+        Task<OverallAnalytics> GetOverallAnalytics(CancellationToken token);
 
 
     }

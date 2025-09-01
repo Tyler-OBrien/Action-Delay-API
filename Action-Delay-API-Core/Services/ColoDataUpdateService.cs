@@ -98,7 +98,11 @@ namespace Action_Delay_API_Core.Services
                    tryGetCurrentLocationData.ColoFriendlyLocationName = tryGetColoInfo.FriendlyName;
                    if (String.IsNullOrWhiteSpace(tryGetCurrentLocationData.Region))
                     tryGetCurrentLocationData.Region = tryGetColoInfo.CfRegionDo ?? "";
-                   tryGetCurrentLocationData.ColoLatitude = tryGetColoInfo.Latitude;
+                    // FriendlyRegionName
+                    if (String.IsNullOrWhiteSpace(tryGetCurrentLocationData.FriendlyRegionName))
+                        tryGetCurrentLocationData.FriendlyRegionName = tryGetColoInfo.FriendlyRegionName ?? "";
+
+                    tryGetCurrentLocationData.ColoLatitude = tryGetColoInfo.Latitude;
                    tryGetCurrentLocationData.ColoLongitude = tryGetColoInfo.Longitude;
                    tryGetCurrentLocationData.Enabled = !location.Disabled;
                    if (tryGetLatency is not null)

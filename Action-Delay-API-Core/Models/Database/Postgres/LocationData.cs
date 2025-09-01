@@ -16,6 +16,8 @@ public class LocationData : BaseEntityClass
     public string LocationName { get; set; }
 
     public string FriendlyLocationName { get; set; }
+    
+    public string FriendlyRegionName { get; set; }
 
     public string Region { get; set; }
 

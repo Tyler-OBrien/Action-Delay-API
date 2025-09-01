@@ -27,6 +27,7 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             this.Longitude = apiData.Long ?? 0;
             this.CfRegionDo = apiData.CfRegionDo;
             this.CfRegionLb = apiData.CfRegionLb;
+            DealWithFriendlyRegionName();
         }
 
         public void Update(Colo apiData)
@@ -39,6 +40,62 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
             this.Longitude = apiData.Long ?? 0;
             this.CfRegionDo = apiData.CfRegionDo;
             this.CfRegionLb = apiData.CfRegionLb;
+            DealWithFriendlyRegionName();
+        }
+
+        public void DealWithFriendlyRegionName()
+        {
+            if (String.IsNullOrWhiteSpace(CfRegionLb) == false)
+            {
+                switch (CfRegionLb.ToLower())
+                {
+                    // North America
+                    case "enam":  // Eastern North America
+                    case "wnam":  // Western North America
+                        this.FriendlyRegionName = "NA";
+                        break;
+
+                    // Europe
+                    case "weu":   // Western Europe
+                    case "eeu":   // Eastern Europe
+                        this.FriendlyRegionName = "EU";
+                        break;
+
+                    // Asia
+                    case "neas":  // Northeast Asia
+                    case "seas":  // Southeast Asia
+                    case "sas":   // Southern Asia
+                        this.FriendlyRegionName = "AS";
+                        break;
+
+                    // Middle East
+                    case "me":    // Middle East
+                        this.FriendlyRegionName = "ME";
+                        break;
+
+                    // Africa
+                    case "naf":   // Northern Africa
+                    case "saf":   // Southern Africa
+                        this.FriendlyRegionName = "AF";
+                        break;
+
+                    // South America
+                    case "nsam":  // Northern South America
+                    case "ssam":  // Southern South America
+                        this.FriendlyRegionName = "SA";
+                        break;
+
+                    // Oceania
+                    case "oc":    // Oceania
+                        this.FriendlyRegionName = "OC";
+                        break;
+
+                    // Default case
+                    default:
+                        this.FriendlyRegionName = CfRegionDo;
+                        break;
+                }
+            }
         }
         
         [Required]
@@ -49,6 +106,8 @@ namespace Action_Delay_API_Core.Models.Database.Postgres
         public string IATA { get; set; }
 
         public string FriendlyName { get; set; }
+
+        public string FriendlyRegionName { get; set; }
 
         public string Country { get; set; }
 

@@ -241,6 +241,29 @@ public class AnalyticsController : CustomBaseController
         return (await _analyticsService.GetJobAnalyticsLocationRegion(new []{ jobName }, regionName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
     }
 
+    // GetCountJobAnalyticsLocationRegionByRegion
+
+    [HttpGet("{jobName}/locations/region/{regionName}/requestRoutingRegionAnalytics")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<RegionJobLocationAnalyticsDTO>),
+
+        Description = "On success, return adaptively sampled job analytics with the requested metrics and location")]
+    //[SwaggerResponseExample(200, typeof(JobLocationDataResponseExample))]
+
+    public async Task<IActionResult> GetRequestRoutingRegionAnalytics(string jobName, string regionName, [FromQuery] AnalyticsQueryParamsLocations queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        if (Math.Abs((queryParams.EndDateTime!.Value - queryParams.StartDateTime!.Value).TotalDays) > 32)
+            return (Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
+                "Currently, this endpoint is limited to one month for performance reasons", "bad_query_param"))).MapErrorToResult();
+
+
+        return (await _analyticsService.GetCountJobAnalyticsLocationRegionByRegion(new[] { jobName }, regionName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
 
     [HttpGet("analytics/locations/region/{regionName}/{jobNames}")]
     [SwaggerResponse(200, Type = typeof(DataResponse<NormalJobLocationAnalyticsDTO>),
