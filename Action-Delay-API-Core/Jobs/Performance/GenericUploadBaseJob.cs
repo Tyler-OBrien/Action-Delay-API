@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Security.Cryptography;
-using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -12,8 +11,6 @@ using Microsoft.Extensions.Options;
 using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Responses;
-using Action_Delay_API_Core.Jobs.AI;
-using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 
@@ -510,12 +507,12 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     "colo",
                     "server",
                 },
-                RandomBytesBody = 10_000,
+                RandomBytesBody = job.Size ?? 10_000,
             };
             if (job is { CheckUploadedContentHash: true })
             {
                 seed = Guid.NewGuid().GetHashCode();
-                randomBytes = GenerateRandomBytes(10_000, seed);
+                randomBytes = GenerateRandomBytes(job.Size ?? 10_000, seed);
                 newRequest.RandomSeed = seed;
             }
 

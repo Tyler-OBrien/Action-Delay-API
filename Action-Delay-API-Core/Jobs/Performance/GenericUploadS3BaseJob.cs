@@ -1,33 +1,37 @@
-using Action_Delay_API_Core.Broker;
+using Action_Delay_API_Core.Extensions;
+using Action_Delay_API_Core.Helpers;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Local;
+using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.NATS.Requests;
+using Action_Delay_API_Core.Models.NATS.Responses;
 using Action_Delay_API_Core.Models.Services;
 using FluentResults;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Action_Delay_API_Core.Extensions;
-using Action_Delay_API_Core.Models.NATS.Responses;
-using Minio;
-using Minio.DataModel.Args;
-using Action_Delay_API_Core.Models.NATS;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
-using Microsoft.EntityFrameworkCore;
-using Minio.Handlers;
-using System.Xml.Linq;
 
 namespace Action_Delay_API_Core.Jobs.Performance
 {
     public class GenericUploadS3BaseJob : BaseJob
     {
+
+        private readonly IHttpClientFactory _clientFactory;
+
+
         public GenericUploadS3BaseJob(IOptions<LocalConfig> config,
             ILogger<GenericUploadS3BaseJob> logger, IClickHouseService clickhouseService,
-            ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService,
+            ActionDelayDatabaseContext context, IQueue queue, IHttpClientFactory clientFactory) : base(config, logger, clickhouseService,
             context, queue)
         {
+            _clientFactory = clientFactory;
+            _httpClient = _clientFactory.CreateClient("CustomClient");
+            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+
         }
 
 
@@ -44,6 +48,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public override bool Enabled => _config.PerfConfig != null &&
                                         (_config.PerfConfig.Enabled.HasValue == false || _config.PerfConfig is
                                             { Enabled: true });
+
+        public readonly HttpClient _httpClient;
 
         public override async Task BaseRun()
         {
@@ -212,13 +218,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             var locations = locationsToUse;
 
-            var newClient = new MinioClient()
-                .WithEndpoint(s3Job.Endpoint)
-                .WithCredentials(s3Job.AccessKey, s3Job.SecretKey)
-                .WithSSL(true)
-                .WithRegion(String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region)
-                .WithTimeout(60_000)
-                .Build();
+            var newClient = new S3PresignedUrlGenerator(s3Job.AccessKey, s3Job.SecretKey,
+                String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region, s3Job.Endpoint);
+
 
             // Start monitoring on each Location
             foreach (var location in locations)
@@ -226,23 +228,29 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
     
 
-                //https://github.com/minio/minio-dotnet/issues/861
-                // prevent async
-                BucketRegionCache.Instance.Remove(s3Job.BucketName);
-                BucketRegionCache.Instance.Add(s3Job.BucketName, s3Job.Region);
+   
 
                 string getUrl = string.Empty;
 
                 var seed = Guid.NewGuid().GetHashCode();
-                var randomBytes = GenerateRandomBytes(10_000, seed);
+                var randomBytes = GenerateRandomBytes(s3Job.Size ?? 10_000, seed);
 
                 string md5Hash = Convert.ToBase64String(MD5.HashData(randomBytes));
+                string? contentHash = null;
 
+                if (s3Job.UnsignedPayload == false)
+                {
+                    contentHash =  BitConverter.ToString(SHA256.HashData(randomBytes)).Replace("-", "").ToLowerInvariant();
+                }
 
                 Dictionary<string, string> headers = new Dictionary<string, string>()
                 {
                     {"Content-MD5", md5Hash},
                 };
+                if (s3Job.UnsignedPayload == false)
+                {
+                    headers["X-Amz-Content-Sha256"] = contentHash;
+                }
 
                 string objectName = $"action-delay-api-s3uploadtest/action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}";
 
@@ -250,28 +258,15 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 {
                     objectName = $"action-delay-api-s3uploadtest/action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}-{Guid.NewGuid().ToString("N")}";
                 }
-                PresignedPutObjectArgs putObjectArgs = new PresignedPutObjectArgs()
-                    .WithBucket(s3Job.BucketName)
-                    .WithObject(objectName)
-                    .WithHeaders(headers)
-                    .WithExpiry(900);
 
-
-
-
-
-                var putUrl = await newClient.PresignedPutObjectAsync(putObjectArgs);
+                var putUrl = newClient.GenerateUploadUrl(s3Job.BucketName, objectName, TimeSpan.FromSeconds(900), md5Hash, s3Job.UnsignedPayload is true ? null : contentHash);
 
                 if (s3Job is { CheckUploadedContentHash: true })
                 {
-                    PresignedGetObjectArgs getObjectArgs = new PresignedGetObjectArgs()
-                        .WithBucket(s3Job.BucketName)
-                        .WithObject(objectName)
-                        .WithExpiry(900);
-                    getUrl = await newClient.PresignedGetObjectAsync(getObjectArgs);
+                    getUrl =  newClient.GenerateDownloadUrl(s3Job.BucketName, objectName, TimeSpan.FromSeconds(900));
                 }
 
-                var task = BaseRunLocation(newClient, location, objectName, randomBytes, seed, md5Hash, putUrl, getUrl, s3Job, cancellationTokenSource.Token);
+                var task = BaseRunLocation(newClient, location, objectName, randomBytes, seed, md5Hash, contentHash, putUrl, getUrl, s3Job, cancellationTokenSource.Token);
                 runningLocations[location] = task;
             }
 
@@ -524,8 +519,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
 
 
-        public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(IMinioClient client, Location location,
-            string objectName, byte[] randomBytes, int seed,  string md5Hash, string putUrl, string getUrl, UploadS3Job job, CancellationToken token)
+        public virtual async Task<Result<SerializableHttpResponse>> BaseRunLocation(S3PresignedUrlGenerator client, Location location,
+            string objectName, byte[] randomBytes, int seed,  string md5Hash, string? sha256Hash, string putUrl, string getUrl, UploadS3Job job, CancellationToken token)
         {
             try
             {
@@ -551,8 +546,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         "server",
                     },
                     RandomSeed = seed,
-                    RandomBytesBody = 10_000,
+                    RandomBytesBody = job.Size ?? 10_000,
                 };
+
+                if (String.IsNullOrWhiteSpace(sha256Hash) == false)
+                {
+                    newRequest.Headers["X-Amz-Content-Sha256"] = sha256Hash;
+                }
 
 
                 newRequest.SetDefaultsFromLocation(location);
@@ -570,6 +570,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         newRequest.URL = getUrl;
                         newRequest.Method = MethodType.GET;
                         newRequest.Headers.Remove("Content-MD5");
+                        newRequest.Headers.Remove("X-Amz-Content-Sha25");
                         newRequest.ReturnBodySha256 = true;
                         newRequest.ReturnBodyOnError = false;
                         var tryGet = await _queue.HTTP(newRequest, location, token);
@@ -629,7 +630,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         if (job.KeepOldAndDumpToDiskOnMisMatch.HasValue && job.KeepOldAndDumpToDiskOnMisMatch.Value)
                         {
 
-                            var deleteArgs = new RemoveObjectArgs().WithBucket(job.BucketName).WithObject(objectName);
+                            string? versionId = null;
 
                             if (job.DeleteWithVersionId is true)
                             {
@@ -638,32 +639,47 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
                                 if (String.IsNullOrWhiteSpace(tryGetHeader.Value) == false)
                                 {
-                                    deleteArgs.WithVersionId(tryGetHeader.Value);
+                                    versionId = (tryGetHeader.Value);
                                     attachedVersionId = true;
                                 }
                             }
 
+                            var tryGetDownloadLink = client.CreateDeleteRequest(job.BucketName, objectName,
+                                attachedVersionId ? versionId : null);
 
+                            try
+                            {
+                                var deletionRequest = await _httpClient.SendAsync(tryGetDownloadLink, token);
+                                if (deletionRequest.IsSuccessStatusCode == false)
+                                {
+                                    var getResponseBody = await deletionRequest.Content.ReadAsStringAsync(token);
+                                    _logger.LogError(
+                                        $"Error deleting file: {deletionRequest.StatusCode}, {deletionRequest.ReasonPhrase}, attached version id {attachedVersionId}, status {deletionRequest.StatusCode.ToString("D")}, content: {getResponseBody}");
+                                }
+                            }
+                            catch (HttpRequestException ex)
+                            {
+                                string extraInfo =
+                                    $"Error deleting file: status {ex.StatusCode}, {ex.Message}, attached version id {attachedVersionId}, httpRequestError: {ex.HttpRequestError.ToString("G")}";
+                                _logger.LogError(
+                                    extraInfo);
+                                SentrySdk.CaptureException(ex, scope =>
+                                {
+                                    scope.SetExtra("ExtraInfo", extraInfo);
+                                } );
 
-                            await client.RemoveObjectAsync(deleteArgs, CancellationToken.None);
+                            }
+                            catch (Exception ex)
+                            {
+                              _logger.LogError(ex, "Issue with deleting file");
+
+                              SentrySdk.CaptureException(ex);
+                            }
 
                         }
 
                     }
-                    catch (Minio.Exceptions.InternalClientException minioEx)
-                    {
-                        try
-                        {
-                            _logger.LogError(minioEx,
-                                $"Error deleting file: {minioEx.ServerResponse.Content}, {minioEx.ServerResponse.StatusCode}, {minioEx.ServerMessage}, attached version id {attachedVersionId}, status {minioEx.ServerResponse.Response.StatusCode.ToString("D")}, content: {await minioEx.ServerResponse.Response.Content.ReadAsStringAsync()}");
-                        }
-                        catch (Exception)
-                        {
-                            /* nom */
-                        }
-
-                        SentrySdk.CaptureException(minioEx);
-                    }
+        
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error pulling back upload info");

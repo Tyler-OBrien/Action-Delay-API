@@ -139,6 +139,9 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string PrewarmEndpoint { get; set; }
 
+        public int? Size { get; set; }
+
+
 
         public Dictionary<string, string> CustomHeaders { get; set; }
 
@@ -159,6 +162,10 @@ namespace Action_Delay_API_Core.Models.Local
         public string Description { get; set; }
 
         public string Endpoint { get; set; }
+
+        public bool? UnsignedPayload { get; set; }
+
+        public int? Size { get; set; }
 
         public string BucketName { get; set; }
 
