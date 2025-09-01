@@ -193,6 +193,7 @@ namespace Action_Delay_API_Worker.Services;
                             using var listener = new HttpEventListener();
                             var response = await newClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                             var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token);
+                            var responseContentHeaders = response.Content?.Headers;
 
                             long dnsResolveLatency = -1;
                             if (request.Options.TryGetValue(new HttpRequestOptionsKey<long>("DNSResolveLatency"),
@@ -210,6 +211,7 @@ namespace Action_Delay_API_Worker.Services;
                             perfInfo =
                                 $"DNS: {dnsResolveLatency}ms, Connect: {timings.SocketConnect?.TotalMilliseconds ?? 0}ms, SSL: {timings.SslHandshake?.TotalMilliseconds ?? 0}ms, Request: {timings.Request?.TotalMilliseconds ?? 0}ms, Response Headers: {timings.ResponseHeaders?.TotalMilliseconds ?? 0}ms, Response Content: {responseContent.latencyMs}ms.";
                             couldGetBody = responseContent.couldRead;
+                            bool deCompressedResponse = false;
                             if (couldGetBody)
                             {
                                 if (incomingRequest.DisableAutomaticResponseDecompression.HasValue == false || incomingRequest.DisableAutomaticResponseDecompression == false)
@@ -219,6 +221,8 @@ namespace Action_Delay_API_Worker.Services;
                                         ResolveStreamContentAutomaticCompression(responseContent.memStream, response);
                                     response.Content = tryDecomp.content;
                                     borrowedCompToReturn = tryDecomp.borrowDecompressor;
+                                    if (String.IsNullOrWhiteSpace(tryDecomp.compressionResolved) == false)
+                                        deCompressedResponse = true;
                                 }
                                 else
                                 {
@@ -228,6 +232,43 @@ namespace Action_Delay_API_Worker.Services;
                             }
                             else
                                 response.Content = null;
+
+                            if (response.Content?.Headers != null && responseContentHeaders != null)
+                            {
+                                foreach (var responseContentHeaderKvp in responseContentHeaders)
+                                {
+                                    if (deCompressedResponse &&
+                                        responseContentHeaderKvp.Key.Equals("content-encoding",
+                                            StringComparison.OrdinalIgnoreCase)) // if we decompressed this at edge, special behavior
+                                    {
+                                        if (responseContentHeaders.ContentEncoding != null &&
+                                            responseContentHeaders.ContentEncoding.Count > 0)
+                                        {
+                                            response.Content.Headers.TryAddWithoutValidation(
+                                                responseContentHeaderKvp.Key,
+                                                responseContentHeaders.ContentEncoding.SkipLast(1));
+                                            response.Content.Headers.TryAddWithoutValidation(
+                                                "x-adp-original-content-encoding", responseContentHeaders.ContentEncoding.Last());
+                                        }
+                                    }
+
+                                    if (deCompressedResponse &&
+                                        responseContentHeaderKvp.Key.Equals("content-length",
+                                            StringComparison
+                                                .OrdinalIgnoreCase)) // if we decompressed this at edge, special behavior 
+                                    {
+                                        // right now, we're just going to hide this..
+                                        response.Content.Headers.TryAddWithoutValidation(
+                                            "x-adp-original-content-length", responseContentHeaderKvp.Value);
+                                    }
+                                    else
+                                    {
+                                        response.Content.Headers.TryAddWithoutValidation(responseContentHeaderKvp.Key,
+                                            responseContentHeaderKvp.Value);
+                                    }
+                                }
+
+                            }
 
                             return response;
                         }
@@ -254,7 +295,7 @@ namespace Action_Delay_API_Worker.Services;
                         WasSuccess = false,
                         StatusCode = HttpStatusCode.BadGateway,
                         ProxyFailure = true,
-                        Headers = ResolveHeaders(response.Headers, false, incomingRequest),
+                        Headers = ResolveHeaders(response.Headers, response.Content?.Headers, false, incomingRequest),
                         Body = string.Empty,
                         Info = $"The Response Body was too large",
                         ResponseTimeMs = Math.Round(responseTimeMs, 3),
@@ -290,7 +331,7 @@ namespace Action_Delay_API_Worker.Services;
                 {
                     WasSuccess = response.IsSuccessStatusCode,
                     StatusCode = response.StatusCode,
-                    Headers = ResolveHeaders(response.Headers, response.IsSuccessStatusCode, incomingRequest),
+                    Headers = ResolveHeaders(response.Headers, response.Content?.Headers, response.IsSuccessStatusCode, incomingRequest),
                     Body = output,
                     ResponseTimeMs = Math.Round(responseTimeMs, 3),
                     BodySha256 = hash,
@@ -376,7 +417,7 @@ namespace Action_Delay_API_Worker.Services;
         }
 
 
-      private  (StreamContent content, Decompressor? borrowDecompressor) ResolveStreamContentAutomaticCompression(MemoryStream content, HttpResponseMessage response)
+      private  (StreamContent content, Decompressor? borrowDecompressor, string? compressionResolved) ResolveStreamContentAutomaticCompression(MemoryStream content, HttpResponseMessage response)
         {
             ICollection<string> contentEncodings = response.Content.Headers.ContentEncoding;
             if (contentEncodings.Count > 0)
@@ -389,22 +430,22 @@ namespace Action_Delay_API_Worker.Services;
 
                 if (string.Equals(last, "gzip", StringComparison.OrdinalIgnoreCase))
                 {
-                    return (new StreamContent(new GZipStream(content, CompressionMode.Decompress)), null);
+                    return (new StreamContent(new GZipStream(content, CompressionMode.Decompress)), null, last);
                 }
                 else if (string.Equals(last, "zstd", StringComparison.OrdinalIgnoreCase))
                 {
                     var newComp = GetDecompressor();
 
-                    return (new StreamContent(new ZstdSharp.DecompressionStream(content, newComp)), newComp);
+                    return (new StreamContent(new ZstdSharp.DecompressionStream(content, newComp)), newComp, last);
                 }
                 else if (string.Equals(last, "br", StringComparison.OrdinalIgnoreCase))
                 {
-                    return (new StreamContent(new BrotliStream(content, CompressionMode.Decompress)), null);
+                    return (new StreamContent(new BrotliStream(content, CompressionMode.Decompress)), null, last);
 
                 }
             }
 
-            return (new StreamContent(content), null);
+            return (new StreamContent(content), null, null);
         }
 
     public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
@@ -414,29 +455,40 @@ namespace Action_Delay_API_Worker.Services;
             newRandom.NextBytes(randomBytes);
             return randomBytes;
         }
-    public Dictionary<string, string> ResolveHeaders(HttpResponseHeaders headers, bool isSuccessCode,
+    public Dictionary<string, string> ResolveHeaders(HttpResponseHeaders responseHeaders, HttpContentHeaders? contentHeaders, bool isSuccessCode,
             SerializableHttpRequest req)
+    {
+        Dictionary<string, string> fullHeadersList = new Dictionary<string, string>(responseHeaders.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value)));
+
+        if (contentHeaders != null)
         {
-            // if none set, return all
+            foreach (var headerKvp in contentHeaders)
+            {
+                fullHeadersList[headerKvp.Key] = String.Join(",", headerKvp.Value);
+            }
+        }
+
+
+        // if none set, return all
             if (req.NoResponseHeaders.HasValue == false && req.ResponseHeaders == null &&
                 req.AlwaysAllResponseHeadersOnNonSuccessStatusCode.HasValue == false)
             {
-                return headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+                return fullHeadersList;
             }
 
             // if return non-success and non-success
             if (req.AlwaysAllResponseHeadersOnNonSuccessStatusCode.HasValue &&
                 req.AlwaysAllResponseHeadersOnNonSuccessStatusCode.Value && isSuccessCode == false)
             {
-                return headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+                return fullHeadersList;
             }
             // if some set, return just what was ordered
             if (req.ResponseHeaders != null && req.ResponseHeaders.Any())
             {
                 HashSet<string> allowedHeaders =
                     new HashSet<string>(req.ResponseHeaders.ToList(), StringComparer.OrdinalIgnoreCase);
-                return headers.Where(header => allowedHeaders.Contains(header.Key))
-                    .ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+                return fullHeadersList.Where(header => allowedHeaders.Contains(header.Key))
+                    .ToDictionary(x => x.Key, pair => pair.Value);
             }
             // if set to not get any
             if (req.NoResponseHeaders.HasValue && req.NoResponseHeaders.Value)
@@ -445,7 +497,7 @@ namespace Action_Delay_API_Worker.Services;
             }
 
             // otherwise fallback to giving all
-            return headers.ToDictionary(x => x.Key, pair => String.Join(",", pair.Value));
+            return fullHeadersList;
         }
 
 

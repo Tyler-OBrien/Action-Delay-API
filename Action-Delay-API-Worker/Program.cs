@@ -183,6 +183,7 @@ namespace Action_Delay_API_Worker
                  newHttpRequest.ReturnBodyOnError = HeaderToValueBool(request, "Action-Delay-Proxy-ReturnBodyOnError");
                  newHttpRequest.DNSResolveOverride = HeaderToValue(request, "Action-Delay-Proxy-DNS-Override");
                  newHttpRequest.CustomDNSServerOverride = HeaderToValue(request, "Action-Delay-Proxy-CustomDNSServerOverride");
+                 newHttpRequest.DisableAutomaticResponseDecompression = HeaderToValueBool(request, "Action-Delay-Proxy-DisableAutomaticResponseDecompression");
                  request.EnableBuffering();
                  newHttpRequest.Body = await ReadAllBytes(request.Body);
                  request.Body.Position = 0;
