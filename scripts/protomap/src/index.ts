@@ -2,6 +2,9 @@ import HTML from "./index.html";
 import LEAFLETMINCSS from "./leaflet.min.css";
 import PROTOMAPSJS from "./protomaps-leaflet.js"
 import LEAFLETMINJS from "./leaflet.min.js"
+import DurableObjects from "./DurableObjects.json";
+
+globalThis.durableObjects = JSON.stringify(DurableObjects);
 
 export interface Env {
 }
@@ -14,10 +17,11 @@ export default {
 		
 		if (newUrl.pathname == "/")
 		{
-		return new Response(HTML, { status: 200, headers: { "content-type": "text/html"}});
+		return new Response(HTML.replaceAll("{{PLSINJECTUSRCOLOCLOUDFLAREOK}}", req.cf?.colo).replaceAll("{{PLSINJECTUSRLAT}}", req.cf?.latitude ?? 0).replaceAll("{{PLSINJECTUSRLONG}}", req.cf?.longitude ?? 0).replaceAll("{{INJECTDURABLEOBJECTSDATA}}", globalThis.durableObjects), { status: 200, headers: { "content-type": "text/html"}});
 		}
 		if (newUrl.pathname  == "/map.pmtiles") {
-			return await fetch("https://map.cloudflare.chaika.me/newmap.pmtiles", req)
+
+			return fetch("https://map.cloudflare.chaika.me/newmap.pmtiles", req)
 		}
 		if (newUrl.pathname  == "/leaflet.min.css") {
 			return new Response(LEAFLETMINCSS, { headers: { "content-type": "text/css"}})

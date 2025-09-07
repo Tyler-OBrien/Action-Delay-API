@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Cloudflare Colos Map</title>
+	<link rel="stylesheet" href="/leaflet.min.css" />
+	<style>
+		#map {
+			height: 100vh;
+			width: 80%;
+			float: left;
+		}
+
+		#info-panel {
+			height: 100vh;
+			width: 20%;
+			float: right;
+			padding: 20px;
+			box-sizing: border-box;
+			overflow-y: auto;
+			background: #1a1a1a;
+			color: white;
+		}
+
+		.info-card {
+			background: #2a2a2a;
+			border-radius: 8px;
+			padding: 15px;
+			margin-bottom: 15px;
+			box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+		}
+
+		.info-title {
+			font-size: 1.2em;
+			font-weight: bold;
+			margin-bottom: 10px;
+		}
+
+		.info-item {
+			margin: 8px 0;
+		}
+
+		.info-label {
+			font-weight: bold;
+		}
+
+		.marker-label {
+			background: none;
+			border: none;
+			box-shadow: none;
+			font-weight: bold;
+			color: #fff;
+			text-shadow: 0 0 3px #000;
+			z-index: 3 !important;
+		}
+
+		.custom-marker {
+			z-index: 1 !important;
+		}
+
+		.custom-marker-do {
+			z-index: 2 !important;
+		}
+
+		.marker-label-do {
+			z-index: 1000 !important;
+			font-size: 14px;
+			font-weight: bold;
+		}
+
+		.search-box {
+			width: 90%;
+			padding: 8px;
+			margin-bottom: 10px;
+			border: 1px solid #ccc;
+			border-radius: 4px;
+		}
+
+		.search-results {
+			max-height: 200px;
+			overflow-y: auto;
+			margin-bottom: 15px;
+		}
+
+		.search-result-item {
+			padding: 8px;
+			cursor: pointer;
+			border-bottom: 1px solid #eee;
+		}
+
+		.search-result-item:hover {
+			background-color: #f5f5f5;
+		}
+
+		.stats-panel {
+			bottom: 20px;
+			background: #484848d1;
+			padding: 10px 15px;
+			border-radius: 6px;
+			color: white;
+			font-size: 14px;
+			z-index: 1000;
+			color: #ffffffe3;
+		}
+
+		.stats-item {
+			margin: 5px 0;
+		}
+	</style>
+</head>
+
+<body style="margin: 0">
+	<div id="map"></div>
+	<div id="info-panel">
+		<div class="info-card">
+			<input type="text" id="searchBox" class="search-box" placeholder="Search by IATA, ColoID or name..." />
+			<div id="searchResults" class="search-results"></div>
+		</div>
+		<div class="info-card">
+			<div id="server-info">Select a server location</div>
+		</div>
+		<div class="info-card">
+			<div id="colo-info">Select a server location</div>
+		</div>
+		<div class="stats-panel">
+			<div class="stats-item">Total Locations: <span id="totalPoPs">0</span></div>
+			<div class="stats-item">Total Colos: <span id="totalColos">0</span></div>
+			<div class="stats-item">Last Updated: <span id="lastUpdated">-</span></div>
+			<div class="stats-item">PoPs marked in pink support Durable Objects.</div>
+			<div class="stats-item">Data is based off unique colos/PoPs we've seen in the last 14 days from requests.
+			</div>
+		</div>
+	</div>
+
+	<script src="/leaflet.min.js"></script>
+	<script src="/protomaps-leaflet.js"></script>
+	<script>
+		(function () {
+			var originalInitTile = L.GridLayer.prototype._initTile
+			L.GridLayer.include({
+				_initTile: function (tile) {
+					originalInitTile.call(this, tile);
+					var tileSize = this.getTileSize();
+					tile.style.width = tileSize.x + 1 + 'px';
+					tile.style.height = tileSize.y + 1 + 'px';
+				}
+			});
+		})()
+
+		async function main() {
+			const map = L.map('map').setView([39.8283, -98.5795], 4);
+			let markers = new Map();
+			let labels = new Map();
+
+
+			var layer = protomapsL.leafletLayer({
+				url: '/map.pmtiles',
+				noWrap: true,
+				flavor: 'dark',
+				maxDataZoom: 8,
+				lang: 'en',
+				labels: true,
+				boundaries: true,
+			});
+
+			for (const element of layer.labelRules) {
+				if (element.dataLayer == 'places' && (element.minzoom || element.maxzoom)) {
+					element.filter = (i, f) => {
+						const kind = f.props.kind_detail;
+						return kind != 'town' && f.props.population_rank > 11;
+					};
+				}
+			}
+
+			layer.paintRules = layer.paintRules.filter(item => item.dataLayer != "landcover" && item.dataLayer != "landuse");
+			globalThis.layer = layer;
+
+			layer.addTo(map);
+
+
+			let alreadyHit = false;
+
+
+			var tryFetchColos = fetch("https://delay.cloudflare.chaika.me/v2/colos");
+			var getColos = await (await tryFetchColos).json();
+
+			let servers = [];
+			let durableObjectsData = JSON.parse(`{{INJECTDURABLEOBJECTSDATA}}`)
+			for (const colo of getColos.results) {
+				var tryGetExistingServerInfo = servers.find(server => server.IATA == colo.IATA);
+				if (!tryGetExistingServerInfo) {
+					tryGetExistingServerInfo = {
+						IATA: colo.IATA,
+						niceName: colo.niceName,
+						country: colo.country,
+						lat: colo.lat,
+						long: colo.long,
+						cfRegionLB: colo.cfRegionLB,
+						cfRegionDO: colo.cfRegionDO,
+						cfRegionR2: colo.cfRegionR2,
+						isDurableObjectHost: durableObjectsData[colo.IATA]
+					}
+					if (tryGetExistingServerInfo.lat && tryGetExistingServerInfo.long)
+						servers.push(tryGetExistingServerInfo)
+				}
+			}
+			lastUpdate = getColos.meta.LastDataUpdate;
+
+			function updateInfoPanel(server) {
+				var tryGetColos = getColos.results.filter(colo => colo.IATA == server.IATA);
+				document.getElementById('server-info').innerHTML = `
+						<div class="info-title">${server.niceName}</div>
+						<div class="info-item">
+							<span class="info-label">IATA:</span> ${server.IATA}
+						</div>
+
+						<div class="info-item">
+							<span class="info-label">Load Balancer Region:</span> ${server.cfRegionLB}
+						</div>
+						<div class="info-item">
+							<span class="info-label">Durable Object Region:</span> ${server.cfRegionR2}
+						</div>
+								<div class="info-item">
+							<span class="info-label">Colocation Count:</span> ${tryGetColos.length}
+						</div>
+						${server.isDurableObjectHost ? `
+						<div class="info-item">
+							<span class="info-label">This PoP hosts Durable Objects</span>
+						</div>
+						` : ''}`;
+
+				if (server.IATA == "{{PLSINJECTUSRCOLOCLOUDFLAREOK}}") {
+					document.getElementById('server-info').innerHTML += `
+							<div class="info-item">
+								<span class="info-label">You are currently connected to this PoP.</span>
+							</div>`;
+				}
+
+				let newColoHtml = `<div class="info-title">Colocations of ${server.niceName}</div>`
+				for (const element of tryGetColos) {
+					newColoHtml += `<div class="info-item">
+							<span class="info-label">ColoId ${element.ID}</span>
+						</div>`
+				}
+				document.getElementById('colo-info').innerHTML = newColoHtml;
+			}
+
+			function addServerToMap(server) {
+				try {
+					const isDOPoP = server.isDurableObjectHost;
+					const marker = L.marker([server.lat, server.long], {
+						icon: L.divIcon({
+							className: isDOPoP ? 'custom-marker-do' : 'custom-marker',
+							html: `<div style="background-color: ${isDOPoP ? '#ff4477' : '#4477ff'};
+								width: ${isDOPoP ? '14' : '10'}px;
+								height: ${isDOPoP ? '14' : '10'}px;
+								border-radius: 50%;
+								border: 2px solid white;"></div>`
+						})
+					}).addTo(map);
+
+					const label = L.marker([server.lat, server.long], {
+						icon: L.divIcon({
+							className: `marker-label ${isDOPoP ? 'marker-label-do' : ''}`,
+							html: server.IATA,
+							iconSize: [40, 20],
+							iconAnchor: [20, -10]
+						})
+					});
+
+					if (map.getZoom() < 4 && !isDOPoP) {
+						label.remove();
+					} else if (map.getZoom() >= 4) {
+						label.addTo(map);
+					}
+
+					markers.set(server.IATA, marker);
+					labels.set(server.IATA, label);
+
+					map.on('zoomend', function () {
+						if (map.getZoom() < 4 && !isDOPoP) {
+							label.remove();
+						} else if (map.getZoom() >= 4) {
+							label.addTo(map);
+						}
+					});
+
+					marker.on('click', () => {
+						updateInfoPanel(server);
+						map.setView([server.lat, server.long], 6);
+					});
+				}
+				catch (exception) {
+					console.error(exception);
+					console.log(`error trying to add ${JSON.stringify(server)} to map`)
+				}
+			}
+
+			function setupSearch() {
+				const searchBox = document.getElementById('searchBox');
+				const resultsDiv = document.getElementById('searchResults');
+
+				searchBox.addEventListener('input', (e) => {
+					const query = e.target.value.toLowerCase();
+					if (!query) {
+						resultsDiv.innerHTML = '';
+						return;
+					}
+
+					const anyColoIDMatches = getColos.results.find(colo => colo.ID == query);
+
+					let matches = servers.filter(server =>
+						server.IATA.toLowerCase() == (query) ||
+						server.niceName.toLowerCase() == (query) ||
+						(anyColoIDMatches && server.IATA == anyColoIDMatches.IATA)
+					);
+
+					if (matches.length < 5) {
+						const remainingServers = servers.filter(server =>
+							!matches.find(existingMatch => existingMatch.IATA == server.IATA)
+						);
+
+						matches = matches.concat(remainingServers.filter(server =>
+							server.IATA.toLowerCase().includes(query) ||
+							server.niceName.toLowerCase().includes(query)
+						));
+					}
+
+					resultsDiv.innerHTML = matches.slice(0, 5).map(server => `
+							<div class="search-result-item" onclick="window.focusServer('${server.IATA}')">
+								${server.IATA} - ${server.niceName} ${server.isDurableObjectHost ? '(DO PoP)' : ''}
+							</div>
+						`).join('');
+				});
+			}
+
+			window.focusServer = (IATA) => {
+				const server = servers.find(s => s.IATA === IATA);
+				if (server) {
+					map.setView([server.lat, server.long], 6);
+					updateInfoPanel(server);
+					const resultsDiv = document.getElementById('searchResults');
+					const searchBox = document.getElementById('searchBox');
+					resultsDiv.innerHTML = '';
+					searchBox.value = "";
+				}
+			};
+
+			let userCoordLat = {{ PLSINJECTUSRLAT }
+		}, userCoordLong = {{ PLSINJECTUSRLONG }};
+
+		servers.forEach(addServerToMap);
+
+		map.on('zoomend', () => {
+			servers.forEach(server => {
+				const label = labels.get(server.IATA);
+				if (map.getZoom() < 4 && !server.isDurableObjectHost) {
+					label.remove();
+				} else if (map.getZoom() >= 4) {
+					label.addTo(map);
+				}
+			});
+		});
+
+		setupSearch();
+
+		var tryGetUserColo = servers.find(colo => colo.IATA == "{{PLSINJECTUSRCOLOCLOUDFLAREOK}}");
+		if (tryGetUserColo) {
+			updateInfoPanel(tryGetUserColo);
+		}
+
+		// Update stats
+		document.getElementById('totalColos').textContent = getColos.results.length;
+		document.getElementById('totalPoPs').textContent = servers.length;
+		document.getElementById('lastUpdated').textContent = lastUpdate ? new Date(lastUpdate).toLocaleString() + "" : '-';
+			}
+		main()
+	</script>
+</body>
+
+</html>
