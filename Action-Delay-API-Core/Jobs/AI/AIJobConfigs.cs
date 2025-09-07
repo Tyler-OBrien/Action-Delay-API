@@ -322,6 +322,30 @@ namespace Action_Delay_API_Core.Jobs.AI
                         }
                     }
                 });
+
+                if ((model.Name.Equals("@cf/openai/gpt-oss-120b", StringComparison.OrdinalIgnoreCase) ||
+                    model.Id.Equals("f9f2250b-1048-4a52-9910-d0bf976616a1", StringComparison.OrdinalIgnoreCase)) 
+                    ||
+                    (model.Name.Equals("@cf/openai/gpt-oss-20b", StringComparison.OrdinalIgnoreCase) ||
+                        model.Id.Equals("188a4e1e-253e-46d0-9616-0bf8c149763f", StringComparison.OrdinalIgnoreCase)))
+                {
+                    newConfig.OutputType = "json";
+                    newConfig.ContentStr = System.Text.Json.JsonSerializer.Serialize(new ResponseAPIPrompt()
+                    {
+                        input = new Message[]
+                        {
+                            new Message()
+                            {
+                                Role = "user",
+                                Content = question
+                            }
+                        },
+                        modelName = model.Name,
+                    });
+                    
+                }
+           
+
                 return newConfig;
             }
             // Text-to-Image / 3d6e1f35-341b-4915-a6c8-9a7142a9033a
@@ -414,6 +438,15 @@ namespace Action_Delay_API_Core.Jobs.AI
 
 
             return null;
+        }
+
+        public partial class ResponseAPIPrompt
+        {
+            [JsonPropertyName("input")]
+            public Message[] input { get; set; }
+
+            [JsonPropertyName("model")]
+            public string modelName { get; set; }
         }
 
         public partial class MessagePrompt
