@@ -252,11 +252,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     headers["X-Amz-Content-Sha256"] = contentHash;
                 }
 
-                string objectName = $"action-delay-api-s3uploadtest/action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}";
+                string objectName = $"action-delay-api-s3uploadtest/{s3Job.Name.Replace(" ", "-", StringComparison.OrdinalIgnoreCase)}-{location.NATSName ?? location.Name}-{s3Job.Size ?? 10_000}";
 
                 if (s3Job.KeepOldAndDumpToDiskOnMisMatch.HasValue && s3Job.KeepOldAndDumpToDiskOnMisMatch.Value)
                 {
-                    objectName = $"action-delay-api-s3uploadtest/action-delay-api-s3uploadtest-{location.NATSName ?? location.Name}-{Guid.NewGuid().ToString("N")}";
+                    objectName = $"action-delay-api-s3uploadtest/{s3Job.Name.Replace(" ", "-", StringComparison.OrdinalIgnoreCase)}-{location.NATSName ?? location.Name}-{s3Job.Size ?? 10_000}-{Guid.NewGuid().ToString("N")}";
                 }
 
                 var putUrl = newClient.GenerateUploadUrl(s3Job.BucketName, objectName, TimeSpan.FromSeconds(900), md5Hash, s3Job.UnsignedPayload is true ? null : contentHash);
