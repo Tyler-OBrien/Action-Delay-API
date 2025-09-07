@@ -1,0 +1,21 @@
+{
+	"name": "hello-world",
+	"description": "A first step in developing with Cloudflare Workers",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"start": "wrangler dev",
+		"deploy": "wrangler deploy"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20241230.0",
+		"typescript": "^5.2.2",
+		"wrangler": "^3.99.0"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"esbuild",
+			"workerd"
+		]
+	}
+}

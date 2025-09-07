@@ -13,8 +13,8 @@ export interface Env {
 }
 
 export default {
-	async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		console.log("boop")
-		return new Response('Hello World!');
+	async fetch(request, env) {
+		console.log(`invoke!!!`)
+	  return env.ASSETS.fetch(request);
 	},
-};
+  };

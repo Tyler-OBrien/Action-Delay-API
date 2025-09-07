@@ -1,4 +1,4 @@
-drop table config;
+drop table if EXISTS config;
 CREATE TABLE config (id INTEGER PRIMARY KEY, data JSON);
 
 WITH RECURSIVE nums AS (SELECT 1 n UNION ALL SELECT n+1 FROM nums LIMIT 2000)

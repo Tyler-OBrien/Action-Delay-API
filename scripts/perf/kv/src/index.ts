@@ -62,6 +62,10 @@ const handler = {
 				return await getKeyResponse(env.KV, 'cached/5mb', 31536001, env.AE);
 			} else if (url.pathname === '/cached/10kb') {
 				return await getKeyResponse(env.KV, 'cached/10Kb-new', 31536001, env.AE);
+			} else if (url.pathname === '/cached/100b') {
+				return await getKeyResponse(env.KV, 'cached/100b', 31536001, env.AE);
+			} else if (url.pathname === '/cached/1mb') {
+				return await getKeyResponse(env.KV, 'cached/1mb', 31536001, env.AE);
 			}
 		}
 		if (url.pathname.startsWith('/uncached/')) {
@@ -71,6 +75,10 @@ const handler = {
 				return await getKeyResponse(env.KV, 'uncached/5mb', 60, env.AE);
 			} else if (url.pathname === '/uncached/10kb') {
 				return await getKeyResponse(env.KV, 'uncached/10Kb', 60, env.AE);
+			} else if (url.pathname === '/uncached/100b') {
+				return await getKeyResponse(env.KV, 'uncached/100b', 60, env.AE);
+			} else if (url.pathname === '/uncached/1mb') {
+				return await getKeyResponse(env.KV, 'uncached/1mb', 60, env.AE);
 			}
 		}
 		return new Response('404, Bad Robot.', { status: 404 });

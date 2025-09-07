@@ -1,12 +1,12 @@
-name = "action-delay-api-worker-assets"
+name = "action-delay-api-worker-assets-isolated-test"
 main = "src/index.ts"
-compatibility_date = "2024-09-15"
+compatibility_date = "2025-04-01"
 
 
-[experimental_assets]
+[assets]
 directory = "./public"
-html_handling = "none" 
-not_found_handling = "none"
+binding= "ASSETS"
+not_found_handling = "404-page"
 
 
 

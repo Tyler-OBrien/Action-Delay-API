@@ -1,0 +1,17 @@
+name = "action-delay-api-worker-assets-binding"
+main = "src/index.ts"
+compatibility_date = "2025-04-15"
+
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+html_handling = "none" 
+not_found_handling = "none"
+run_worker_first = true
+
+
+
+[observability]
+enabled = true
+head_sampling_rate = 1

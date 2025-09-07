@@ -1,0 +1,17 @@
+name = "action-delay-api-perf-replication-test"
+main = "src/index.ts"
+compatibility_date = "2025-03-16"
+
+# wrangler.toml (wrangler v3.88.0^)
+[observability.logs]
+enabled = true
+
+
+
+
+
+[[d1_databases]]
+binding = "DB"
+database_name = "action-delay-api-replication-test"
+database_id = "1fbd6ce6-65fb-4af1-8d6d-09a36621f02e"
+
