@@ -1,0 +1,16 @@
+name = "action-delay-websocket-testing"
+main = "index.ts"
+compatibility_date = "2025-07-03"
+
+
+[observability]
+enabled = true
+
+
+[[durable_objects.bindings]]
+name = "WEBSOCKET_HIBERNATION_SERVER"
+class_name = "WebSocketHibernationServer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["WebSocketHibernationServer"]
