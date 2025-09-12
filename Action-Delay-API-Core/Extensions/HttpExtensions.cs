@@ -1,3 +1,4 @@
+using System.Net;
 using Action_Delay_API_Core.Models.CloudflareAPI;
 using System.Text.Json;
 using FluentResults;
@@ -75,7 +76,20 @@ namespace Action_Delay_API_Core.Extensions
                     {
                         logger.LogCritical($"Error with {assetName}: {error}");
                     }
+
                     span?.Finish(SpanStatus.InternalError);
+
+                    if (httpResponse.StatusCode == HttpStatusCode.TooManyRequests)
+                    {
+                        // hacky match on rate limiting header names because as of 9/9, even though it says it uses the standard x-ratelimit ones, it's using custom "ratelimit" ones
+                    return Result.Fail(new CustomAPIError(
+                            $"RateLimiting with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}, rate limiting headers:  {String.Join(" | ", httpResponse.Headers.Where(header => header.Key.Contains("ratelimit", StringComparison.OrdinalIgnoreCase) || header.Key.Equals("retry-after", StringComparison.OrdinalIgnoreCase)).Select(kvp => $"{kvp.Key}={String.Join(",", kvp.Value)}"))}",
+                            (int)httpResponse.StatusCode,
+                            $"RateLimiting: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}",
+                            response.Errors?.FirstOrDefault(error => error.Code != null)?.Code.ToString() ?? "",
+                            listener.GetTime(), httpResponse.GetColoId()));
+                    }
+
                     return Result.Fail(new CustomAPIError(
                         $"Error with {assetName}: {String.Join(" | ", response.Errors.Select(error => $"{error.Code} - {error.Message}"))}, status code: {httpResponse.StatusCode}",
                         (int)httpResponse.StatusCode,
