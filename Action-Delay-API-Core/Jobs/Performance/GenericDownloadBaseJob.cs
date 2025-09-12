@@ -11,6 +11,7 @@ using Action_Delay_API_Core.Models.NATS.Requests;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json.Serialization;
 using Action_Delay_API.Extensions;
 using Microsoft.EntityFrameworkCore;
 
@@ -49,12 +50,43 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             var getDownloadTasks = _config.PerfConfig!.BasicDownloadJobList;
 
+            var jobDetails = new List<(DownloadJobGeneric downloadTask, int totalLocationRequests)>();
+            int totalLocationsAcrossAllJobs = 0;
+
             List<Task> runningJobs = new List<Task>();
             foreach (var downloadTask in getDownloadTasks)
             {
+                var allowedLocsHashset = new HashSet<string>(downloadTask.AllowedEdgeLocations ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                var locationsToUse = _config.Locations.Count(location => location.Disabled == false &&
+                                                                         (allowedLocsHashset.Any() == false || allowedLocsHashset.Contains(location.Name)));
+                var totalLocationRequests = locationsToUse * (downloadTask.CountOfRequests ?? 1);
 
-                runningJobs.Add(RunSpecificJob(downloadTask));
+
+                jobDetails.Add((downloadTask, totalLocationRequests));
+                totalLocationsAcrossAllJobs += totalLocationRequests;
+                //runningJobs.Add(RunSpecificJob(downloadTask));
             }
+
+            double delayPerLocationMs = totalLocationsAcrossAllJobs > 0 ? (15_000.0 / totalLocationsAcrossAllJobs) : 0;
+            int cumulativeLocations = 0;
+
+            foreach (var (downloadTask, totalLocationRequests) in jobDetails)
+            {
+                int delayMs = (int)(cumulativeLocations * delayPerLocationMs);
+
+                if (delayMs > 0)
+                {
+                    runningJobs.Add(Task.Delay(delayMs).ContinueWith(_ => RunSpecificJob(downloadTask)).Unwrap());
+                }
+                else
+                {
+                    runningJobs.Add(RunSpecificJob(downloadTask));
+                }
+
+                cumulativeLocations += totalLocationRequests;
+            }
+
+
             runningJobs.Add(Task.Delay(5000));
             await Task.WhenAll(runningJobs);
             try
@@ -226,21 +258,53 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 }
             }
 
-            var runningLocations = new Dictionary<Location, Task<Result<SerializableHttpResponse>>>();
+            var runningLocations = new Dictionary<(Location location, int num), Task<Result<SerializableHttpResponse>>>();
 
-            var finishedLocationStatus = new Dictionary<Location, PerformanceLocationReturn>();
+            var finishedLocationStatus = new List<PerformanceLocationReturn>();
 
             List<CustomAPIErrorPerf>? errors = new List<CustomAPIErrorPerf>();
 
             var locations = locationsToUse;
 
-            // Start monitoring on each Location
-            foreach (var location in locations)
-            {
-                var task = BaseRunLocation(location, downloadJobConfig, resolvedDnsNameserverIP, cancellationTokenSource.Token);
-                runningLocations[location] = task;
-            }
+            var requestCount = downloadJobConfig.CountOfRequests ?? 1;
 
+            var runCounts = locations.Count * requestCount;
+
+            // Start monitoring on each Location
+            if (requestCount == 1)
+            {
+                foreach (var location in locations)
+                {
+
+                    for (int i = 0; i < (downloadJobConfig.CountOfRequests ?? 1); i++)
+                    {
+                        var task = BaseRunLocation(location, downloadJobConfig, resolvedDnsNameserverIP,
+                            cancellationTokenSource.Token);
+                        runningLocations[(location, i)] = task;
+                    }
+                }
+            }
+            else
+            {
+                // Stagger multiple requests over 10 seconds in batches
+                var delayBetweenBatches = TimeSpan.FromSeconds(10.0 / requestCount);
+
+                for (int i = 0; i < requestCount; i++)
+                {
+                    foreach (var location in locations)
+                    {
+                        var task = BaseRunLocation(location, downloadJobConfig, resolvedDnsNameserverIP, cancellationTokenSource.Token);
+                        runningLocations[(location, i)] = task;
+                    }
+
+                    // Wait before starting next batch (except for the last batch)
+                    if (i < requestCount - 1)
+                    {
+                        await Task.Delay(delayBetweenBatches, cancellationTokenSource.Token);
+                    }
+                }
+            }
+            
             SentrySdk.AddBreadcrumb($"Started Locations for {name}");
 
             try
@@ -251,9 +315,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     try
                     {
                         // Get the task that finishes first
-
                         var completedTask = await Task.WhenAny(runningLocations.Values);
-                        var completedLocation = runningLocations.First(x => x.Value == completedTask).Key;
+                        var completedKvp = runningLocations.First(x => x.Value == completedTask).Key;
+                        var completedLocation = completedKvp.location;
                         Result<SerializableHttpResponse>? taskResult = null;
                         try
                         {
@@ -274,13 +338,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
 
                         // Remove the completed task from the running tasks
-                        runningLocations.Remove(completedLocation);
+                        runningLocations.Remove(completedKvp);
 
 
                         if (taskResult == null || (taskResult?.IsFailed ?? true) || taskResult.ValueOrDefault == null)
                         {
-                            finishedLocationStatus.Add(completedLocation,
-                                new PerformanceLocationReturn(false, 0, DateTime.UtcNow, null, null));
+                            finishedLocationStatus.Add(
+                                new PerformanceLocationReturn(completedLocation, false, 0, DateTime.UtcNow, null, null));
                             continue;
                         }
 
@@ -289,8 +353,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
                         if (tryGetValue.WasSuccess)
                         {
-                            finishedLocationStatus.Add(completedLocation,
-                                new PerformanceLocationReturn(tryGetValue.WasSuccess,
+                            finishedLocationStatus.Add(
+                                new PerformanceLocationReturn(completedLocation, tryGetValue.WasSuccess,
                                     (uint)(tryGetValue.ResponseTimeMs.HasValue == false ? 0 : tryGetValue.ResponseTimeMs.Value) ,
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
                                     GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
@@ -312,8 +376,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 errors.Add(newError);
                             }
 
-                            finishedLocationStatus.Add(completedLocation,
-                                new PerformanceLocationReturn(tryGetValue.WasSuccess,
+                            finishedLocationStatus.Add(
+                                new PerformanceLocationReturn(completedLocation, tryGetValue.WasSuccess,
                                     (uint)(tryGetValue?.ResponseTimeMs.HasValue == false ? 0 : tryGetValue!.ResponseTimeMs!.Value),
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
                                     GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
@@ -325,7 +389,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     catch (OperationCanceledException)
                     {
                         _logger.LogInformation(
-                            $"{name} had {runningLocations.Count} locations, namely: {string.Join(", ", runningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))} timed out.");
+                            $"{name} had {runCounts} runs, namely: {string.Join(", ", runningLocations.Select(loc => loc.Key.location.DisplayName ?? loc.Key.location.Name))} timed out.");
                         /* NOM NOM */
                     }
                 }
@@ -334,7 +398,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
             {
                 _logger.LogError(ex,
                     "Error handling location runs for job {name}, aborting... Locations not finished yet: {locations}",
-                    name, string.Join(", ", runningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name)));
+                    name, string.Join(", ", runningLocations.Select(loc => loc.Key.location.DisplayName ?? loc.Key.location.Name)));
                 SentrySdk.CaptureException(ex);
             }
 
@@ -346,31 +410,31 @@ namespace Action_Delay_API_Core.Jobs.Performance
             {
                 uint averageBindingLatencyOfSuccessful = 0;
                 uint averageOfSuccessFull = 0;
-                if (finishedLocationStatus.Any(kvp => kvp.Value.Success))
+                if (finishedLocationStatus.Any(kvp => kvp.Success))
                 {
-                    var tryGetSuccessful = finishedLocationStatus.Where(kvp => kvp.Value.Success)
-                        .Select(kvp => (double)kvp.Value.Duration).ToList();
+                    var tryGetSuccessful = finishedLocationStatus.Where(kvp => kvp.Success)
+                        .Select(kvp => (double)kvp.Duration).ToList();
                     if (tryGetSuccessful.Any()) averageOfSuccessFull = (uint)tryGetSuccessful.Median();
 
-                    var tryGetBindingLatenciesToUse = finishedLocationStatus.Where(kvp => kvp.Value.Success)
-                        .Where(kvp => kvp.Value.BindingDuration != null)
-                        .Select(kvp => (double)kvp.Value.BindingDuration!.Value).ToList();
+                    var tryGetBindingLatenciesToUse = finishedLocationStatus.Where(kvp => kvp.Success)
+                        .Where(kvp => kvp.BindingDuration != null)
+                        .Select(kvp => (double)kvp.BindingDuration!.Value).ToList();
                     if (tryGetBindingLatenciesToUse.Any())
                         averageBindingLatencyOfSuccessful = (uint)tryGetBindingLatenciesToUse
                             .Median();
 
                 }
 
-                var runStatus = (finishedLocationStatus.All(kvp => kvp.Value.Success) ||
-                                 (finishedLocationStatus.Count(kvp => kvp.Value.Success) >=
-                                  (locations.Count() / 2)))
+                var runStatus = (finishedLocationStatus.All(kvp => kvp.Success) ||
+                                 (finishedLocationStatus.Count(kvp => kvp.Success) >=
+                                  (runCounts / 2)))
                     ? "Success"
                     : "Failure";
 
                 if (finishedLocationStatus.Any() == false)
                     runStatus = "Failure";
 
-                _logger.LogInformation($"Finished {name}, runStatus: {runStatus}, average ms: {averageOfSuccessFull}, binding avg: {averageBindingLatencyOfSuccessful}, successful: {finishedLocationStatus.Count(kvp => kvp.Value.Success)}/{locations.Count}");
+                _logger.LogInformation($"Finished {name}, runStatus: {runStatus}, average ms: {averageOfSuccessFull}, binding avg: {averageBindingLatencyOfSuccessful}, successful: {finishedLocationStatus.Count(kvp => kvp.Success)}/{runCounts}");
                 FinishedRunInsertLater(
                     new ClickhouseJobRunPerf()
                     {
@@ -384,13 +448,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         locationDataKv => new ClickhouseJobLocationRunPerf()
                         {
                             JobName = name,
-                            RunStatus = locationDataKv.Value.Success ? "Success" : "Failure",
-                            LocationName = locationDataKv.Key.Name,
+                            RunStatus = locationDataKv.Success ? "Success" : "Failure",
+                            LocationName = locationDataKv.Location.Name,
                             RunLength = 0,
-                            RunTime = locationDataKv.Value.ResponseUtc,
-                            ResponseLatency = locationDataKv.Value.Duration,
-                            LocationId = locationDataKv.Value.LocationId ?? string.Empty,
-                            BindingResponseLatency = locationDataKv.Value.BindingDuration ?? 0,
+                            RunTime = locationDataKv.ResponseUtc,
+                            ResponseLatency = locationDataKv.Duration,
+                            LocationId = locationDataKv.LocationId ?? string.Empty,
+                            BindingResponseLatency = locationDataKv.BindingDuration ?? 0,
                         }).ToArray(),
                     errors?.Any() == false
                         ? Array.Empty<ClickhouseAPIErrorPerf>()
@@ -579,8 +643,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
     }
     public class PerformanceLocationReturn
     {
-        public PerformanceLocationReturn(bool success, uint duration, DateTime responseUtc, string? locationId, uint? bindingDuration)
+        public PerformanceLocationReturn(Location location, bool success, uint duration, DateTime responseUtc, string? locationId, uint? bindingDuration)
         {
+            Location = location;
             Success = success;
             Duration = duration;
             ResponseUtc = responseUtc;
@@ -598,6 +663,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public uint? BindingDuration { get; set; }
 
         public string? LocationId { get; set; }
+
+
+        [JsonIgnore]
+        public Location Location { get; set; }
+        
 
     }
 

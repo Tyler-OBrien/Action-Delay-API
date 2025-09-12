@@ -126,6 +126,8 @@ namespace Action_Delay_API_Core.Models.Local
         public bool DisablePrewarmup { get; set; }
         
         public bool NoConnectionKeepAlive { get; set; }
+
+        public int? CountOfRequests { get; set; }
     }
 
 
