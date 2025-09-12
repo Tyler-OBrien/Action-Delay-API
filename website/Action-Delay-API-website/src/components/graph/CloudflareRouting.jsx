@@ -73,6 +73,64 @@ const JobSelector = ({ value, onChange }) => {
   );
 };
 
+const ViewToggle = ({ showPercentage, onChange }) => {
+  return (
+    <div className="mb-6">
+      <label htmlFor="view-toggle" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        Display Mode:
+      </label>
+      <div className="flex items-center space-x-4">
+        <label className="flex items-center">
+          <input
+            type="radio"
+            name="viewMode"
+            value="percentage"
+            checked={showPercentage}
+            onChange={() => onChange(true)}
+            className="mr-2"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">Percentage</span>
+        </label>
+        <label className="flex items-center">
+          <input
+            type="radio"
+            name="viewMode"
+            value="count"
+            checked={!showPercentage}
+            onChange={() => onChange(false)}
+            className="mr-2"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">Request Count</span>
+        </label>
+      </div>
+    </div>
+  );
+};
+
+const FeatureBanner = ({  }) => {
+  return (
+    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+      <div className="flex items-start justify-between">
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              New Feature
+            </h3>
+            <div className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+              <p>Switch between seeing percentage routing or actual request count data. There is now 10x the requests used to sample routing from each region.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CloudflareRouting = ({ fullscreen = false }) => {
   const [selectedJob, setSelectedJob] = useState('cloudflare-worker-uncached-10kb-free-plan');
   const [timeRange, setTimeRange] = useState(24 * 60 * 60 * 1000);
@@ -80,6 +138,7 @@ const CloudflareRouting = ({ fullscreen = false }) => {
   const [customLabel, setCustomLabel] = useState(null);
   const [locationsByRegion, setLocationsByRegion] = useState({});
   const [loadingLocations, setLoadingLocations] = useState(true);
+  const [showPercentage, setShowPercentage] = useState(true);
 
   useEffect(() => {
     const fetchLocations = async () => {
@@ -141,6 +200,8 @@ const CloudflareRouting = ({ fullscreen = false }) => {
 
   return (
     <div className="w-full p-4">
+      <FeatureBanner />
+
       <div className="flex flex-wrap gap-4 mb-6">
         <JobSelector 
           value={selectedJob}
@@ -150,6 +211,10 @@ const CloudflareRouting = ({ fullscreen = false }) => {
           value={timeRange}
           onChange={handleTimeRangeChange}
           customLabel={customLabel}
+        />
+        <ViewToggle 
+          showPercentage={showPercentage}
+          onChange={setShowPercentage}
         />
       </div>
       
@@ -187,6 +252,7 @@ const CloudflareRouting = ({ fullscreen = false }) => {
                 customLabel={customLabel}
                 onTimeRangeChange={handleTimeRangeChange}
                 onZoom={handleZoom}
+                showPercentage={showPercentage}
               />
             </div>
           );

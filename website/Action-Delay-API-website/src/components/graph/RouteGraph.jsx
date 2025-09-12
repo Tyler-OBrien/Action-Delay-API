@@ -9,7 +9,7 @@ const SELECT_OPTIONS = [
   { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' }
 ];
 
-const processRouteData = (points, primaryRegion) => {
+const processRouteData = (points, primaryRegion, showPercentage = false) => {
   const regionMap = new Map();
   const regions = new Set();
 
@@ -58,15 +58,31 @@ const processRouteData = (points, primaryRegion) => {
   // Add other regions
   finalRegionOrder.push(...sortedOtherRegions);
 
-  return finalRegionOrder.map(region => ({
-    name: region,
-    data: Array.from(regionMap.entries())
-      .map(([timestamp, regions]) => ({
-        x: timestamp,
-        y: regions.get(region) || 0
-      }))
-      .sort((a, b) => a.x - b.x)
-  }));
+  return finalRegionOrder.map(region => {
+    const data = Array.from(regionMap.entries())
+      .map(([timestamp, regions]) => {
+        const regionCount = regions.get(region) || 0;
+        let value = regionCount;
+        
+        if (showPercentage && regionCount > 0) {
+          // Calculate total for this timestamp
+          const total = Array.from(regions.values()).reduce((sum, count) => sum + count, 0);
+          value = total > 0 ? (regionCount / total) * 100 : 0;
+        }
+        
+        return {
+          x: timestamp,
+          y: value,
+          rawCount: regionCount
+        };
+      })
+      .sort((a, b) => a.x - b.x);
+
+    return {
+      name: region,
+      data: data
+    };
+  });
 };
 
 const getTheme = () => {
@@ -99,7 +115,7 @@ const TimeRangeSelector = ({ value, onChange, customLabel }) => {
   );
 };
 
-const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regionName }) => {
+const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regionName, showPercentage }) => {
   const chartRef = useRef(null);
   const [theme, setTheme] = useState(getTheme);
 
@@ -123,8 +139,8 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
     };
 
     const plotlyData = data.map((series, index) => {
-      const total = series.data.reduce((sum, point) => sum + point.y, 0);
-      const displayName = `${series.name} (${total.toLocaleString()})`;
+      const totalRequests = series.data.reduce((sum, point) => sum + point.rawCount, 0);
+      const displayName = `${series.name} (${totalRequests.toLocaleString()})`;
 
       return {
         x: series.data.map(d => new Date(d.x)),
@@ -134,16 +150,31 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
         marker: {
           color: regionColors[series.name] || '#6B7280'
         },
-        hovertemplate: `<b>%{fullData.name}</b><br>` +
-                       `Date: %{x|%b %d, %Y %H:%M}<br>` +
-                       `Requests: %{y:,}<br>` +
-                       `<extra></extra>`
+        customdata: series.data.map(d => ({
+          rawCount: d.rawCount,
+          percentage: d.rawCount > 0 && showPercentage ? d.y : null
+        })),
+        hovertemplate: showPercentage 
+          ? `<b>%{fullData.name}</b><br>` +
+            `Date: %{x|%b %d, %Y %H:%M}<br>` +
+            `Percentage: %{y:.1f}%<br>` +
+            `Requests: %{customdata.rawCount:,}<br>` +
+            `<extra></extra>`
+          : `<b>%{fullData.name}</b><br>` +
+            `Date: %{x|%b %d, %Y %H:%M}<br>` +
+            `Requests: %{y:,}<br>` +
+            `<extra></extra>`
       };
     });
 
+    const yAxisTitle = showPercentage ? 'Percentage (%)' : 'Request Count';
+    const chartTitle = showPercentage 
+      ? `${label} - Request Percentage by Executing Region`
+      : `${label} - Request Count by Executing Region`;
+
     const layout = {
       title: {
-        text: `${label} - Request Count by Executing Region`,
+        text: chartTitle,
         x: 0.5,
         font: { color: theme.font_color, size: 16 }
       },
@@ -155,10 +186,14 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
         gridcolor: theme.grid_color
       },
       yaxis: {
-        title: 'Request Count',
+        title: yAxisTitle,
         color: theme.font_color,
         gridcolor: theme.grid_color,
-        fixedrange: true
+        fixedrange: true,
+        ...(showPercentage && {
+          range: [0, 100],
+          ticksuffix: '%'
+        })
       },
       barmode: 'stack',
       paper_bgcolor: theme.paper_bgcolor,
@@ -199,7 +234,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
 
       chartRef.current.on('plotly_relayout', handleRelayout);
     });
-  }, [data, timeRange, customRange, label, height, theme, regionName]);
+  }, [data, timeRange, customRange, label, height, theme, regionName, showPercentage]);
 
   // Cleanup event listeners
   useEffect(() => {
@@ -241,7 +276,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
   );
 };
 
-const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName, timeRange, customRange, customLabel, onTimeRangeChange, onZoom }) => {
+const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName, timeRange, customRange, customLabel, onTimeRangeChange, onZoom, showPercentage = false }) => {
   const [data, setData] = useState([]);
   const lastFetchRef = useRef(null);
 
@@ -267,7 +302,7 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
       if (lastFetchRef.current === fetchId) {
         // Handle different possible response structures
         const points = responseJson?.data?.points || responseJson?.points || [];
-        const processedData = processRouteData(points, regionName);
+        const processedData = processRouteData(points, regionName, showPercentage);
         setData(processedData);
       }
     } catch (error) {
@@ -278,7 +313,7 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
         setData([]);
       }
     }
-  }, [endpoint, timeRange, customRange]);
+  }, [endpoint, timeRange, customRange, showPercentage]);
 
   const handleTimeRangeChange = (event) => {
     const value = Number(event.target.value);
@@ -307,6 +342,7 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
           height={height}
           onZoom={handleZoomed}
           regionName={regionName}
+          showPercentage={showPercentage}
         />
       </div>
     </div>
