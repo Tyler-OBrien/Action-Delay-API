@@ -47,9 +47,9 @@ public class CacheSingletonServiceTests : IDisposable
 
         var locationData = new List<LocationData>
         {
-            new() { LocationName = "Location1", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test"},
-            new() { LocationName = "Location2", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test" },
-            new() { LocationName = "Location3", Region = "Region2", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test" }
+            new() { LocationName = "Location1", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test", FriendlyRegionName = "Region1",},
+            new() { LocationName = "Location2", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test", FriendlyRegionName = "Region1", },
+            new() { LocationName = "Location3", Region = "Region2", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test", FriendlyRegionName = "Region2",}
         };
 
         _dbContext.JobData.AddRange(jobsData);
@@ -235,7 +235,7 @@ public class CacheSingletonServiceTests : IDisposable
         CacheSingletonService.LOCATION_NAMES_LAST_CACHE = DateTime.UtcNow.AddSeconds(-31); // Force cache invalidation
 
         // Add new location to database
-        var newLocation = new LocationData { LocationName = "NewLocation", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test" };
+        var newLocation = new LocationData { LocationName = "NewLocation", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test",  FriendlyRegionName = "Region1", };
         _dbContext.LocationData.Add(newLocation);
         await _dbContext.SaveChangesAsync();
 
@@ -254,7 +254,7 @@ public class CacheSingletonServiceTests : IDisposable
         await _service.GetLocationNames(_cancellationToken); // Initial cache load
 
         // Add new location to database
-        var newLocation = new LocationData { LocationName = "NewLocation", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test" };
+        var newLocation = new LocationData { LocationName = "NewLocation", Region = "Region1", FriendlyLocationName = "Location1, City, Country", ColoFriendlyLocationName = "Location1, City, Country", IATA = "XYZ", PathToCF = "IXP", Provider = "test", FriendlyRegionName = "Region1", };
         _dbContext.LocationData.Add(newLocation);
         await _dbContext.SaveChangesAsync();
 

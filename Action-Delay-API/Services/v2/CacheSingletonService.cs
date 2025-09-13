@@ -35,8 +35,8 @@ public class CacheSingletonService : ICacheSingletonService
 
     public void CacheJobNames(List<JobData> jobs)
     {
-        Interlocked.Exchange(ref INTERNAL_JOB_NAME_TO_TYPE, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.InternalJobName, job => job.JobType));
-        Interlocked.Exchange(ref PUBLIC_TO_INTERNAL_NAMES, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.JobName, job => job.InternalJobName));
+        Interlocked.Exchange(ref INTERNAL_JOB_NAME_TO_TYPE, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.InternalJobName, job => job.JobType, StringComparer.OrdinalIgnoreCase));
+        Interlocked.Exchange(ref PUBLIC_TO_INTERNAL_NAMES, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.JobName, job => job.InternalJobName, StringComparer.OrdinalIgnoreCase));
         Interlocked.Exchange(ref RESOLVE_TYPE, jobs.DistinctBy(job => job.JobType).ToDictionary(job => job.JobType, job => job.JobType, StringComparer.OrdinalIgnoreCase));
 
         JOB_NAMES_LAST_CACHE = DateTime.UtcNow;
@@ -132,7 +132,7 @@ public class CacheSingletonService : ICacheSingletonService
         Interlocked.Exchange(ref LOCATION_NAMES, new HashSet<string>(locationNames.Select(location => location.LocationName )));
         Interlocked.Exchange(ref REGION_TO_LOCATION,
             locationNames.GroupBy(loc => loc.FriendlyRegionName.ToLower()).ToDictionary(keyKvp => keyKvp.Key,
-                elementKvp => elementKvp.Select(data => data.LocationName).ToArray())); 
+                elementKvp => elementKvp.Select(data => data.LocationName).ToArray(), StringComparer.OrdinalIgnoreCase)); 
         LOCATION_NAMES_LAST_CACHE = DateTime.UtcNow;
     }
 
