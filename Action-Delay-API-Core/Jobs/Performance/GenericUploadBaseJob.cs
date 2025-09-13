@@ -34,7 +34,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public override string JobType => "Perf";
 
         public override string JobDescription => "Generic Perf Job";
-        public override int TargetExecutionSecond => 30;
+        public override int TargetExecutionSecond => 50;
 
         public override bool Enabled => _config.PerfConfig != null &&
                                         (_config.PerfConfig.Enabled.HasValue == false || _config.PerfConfig is
@@ -157,7 +157,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
             }
 
             _logger.LogInformation($"Perf Run over");
-            await Task.Delay(TimeSpan.FromMinutes(1));
         }
 
 

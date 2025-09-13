@@ -118,6 +118,9 @@ namespace Action_Delay_API_Core.Models.Local
         public string[]? AllowedEdgeLocations { get; set; }
         public Dictionary<string, string>? EdgeLocationCustomDNSNameserverOverride { get; set; }
 
+        public Dictionary<string, NetType>? EdgeLocationForceNetType { get; set; }
+
+
         public string? CustomDNSNameserver { get; set; }
         public string? DNSResolveOverride { get; set; }
 

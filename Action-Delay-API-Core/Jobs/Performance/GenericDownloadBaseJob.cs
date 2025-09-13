@@ -34,7 +34,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public override string JobType => "Perf";
 
         public override string JobDescription => "Generic Perf Job";
-        public override int TargetExecutionSecond => 50;
+        public override int TargetExecutionSecond => 05;
         public override bool Enabled => _config.PerfConfig != null && (_config.PerfConfig.Enabled.HasValue == false || _config.PerfConfig is { Enabled: true });
 
         public override async Task BaseRun()
@@ -185,7 +185,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 _logger.LogError(ex, "Error inserting into Clickhouse");
             }
             _logger.LogInformation($"Perf Run over");
-            await Task.Delay(TimeSpan.FromMinutes(1.5));
         }
 
 
@@ -585,6 +584,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
             if (jobConfig.ForceNetType.HasValue)
                 newRequest.NetType = jobConfig.ForceNetType.Value;
+
+            if (jobConfig.EdgeLocationForceNetType != null)
+            {
+                if (jobConfig.EdgeLocationForceNetType.TryGetValue(location.Name, out var overridenNetType))
+                    newRequest.NetType = overridenNetType;
+            }
+
             return await _queue.HTTP(newRequest, location, token);
         }
 
@@ -632,6 +638,14 @@ namespace Action_Delay_API_Core.Jobs.Performance
             newRequest.SetDefaultsFromLocation(location);
             if (jobConfig.ForceNetType.HasValue)
                 newRequest.NetType = jobConfig.ForceNetType.Value;
+
+
+            if (jobConfig.EdgeLocationForceNetType != null)
+            {
+                if (jobConfig.EdgeLocationForceNetType.TryGetValue(location.Name, out var overridenNetType))
+                    newRequest.NetType = overridenNetType;
+            }
+
 
             return await _queue.HTTP(newRequest, location, token);
         }

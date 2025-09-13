@@ -43,7 +43,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public override string JobType => "Perf";
 
         public override string JobDescription => "Generic Perf Job";
-        public override int TargetExecutionSecond => 20;
+        public override int TargetExecutionSecond => 30;
 
         public override bool Enabled => _config.PerfConfig != null &&
                                         (_config.PerfConfig.Enabled.HasValue == false || _config.PerfConfig is
