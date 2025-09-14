@@ -181,13 +181,18 @@ namespace Action_Delay_API_Core.Services
             CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
-            string dataSetName =  config.NormalDataSet; // this only supports normal ds because nothing else has info at this level, which means we need careful time restrictions, probably.
 
+            string dataSetName = "";
+            if (output.Dataset == DataSet.Minutely)
+                dataSetName = config.NormalDataSet;
+            else if (output.Dataset == DataSet.Per30Minutes)
+                dataSetName = config.ThirtyMinDataSet;
+            else if (output.Dataset == DataSet.Per12Hours)
+                dataSetName = config.TwelthHourDataSet;
 
-
-           // var columns = ReturnOptionsColumns(agg, config, option);
-
-            string commandText =
+            string commandText = "";
+            if (output.Agg == false)
+                commandText =
                     @$"SELECT  count() AS event_count, c.FriendlyRegionName AS region, toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) AS time_period
 FROM ""default"".""{dataSetName}""
 INNER JOIN colo_data_from_pg AS c ON location_id = toString(c.ColoId)
@@ -196,7 +201,18 @@ WHERE run_time > {{startDateTime:DateTime}}
   AND job_name IN {{jobs:Array(String)}}
   AND location_name IN {{locations:Array(String)}}
 GROUP BY time_period, region
-ORDER BY time_period ";
+ORDER BY time_period";
+            else commandText =
+                @$"SELECT  countMerge(event_count) AS event_count, c.FriendlyRegionName AS region, toStartOfInterval(average_time, INTERVAL {output.Interval} MINUTES) AS time_period
+FROM ""default"".""{dataSetName}""
+INNER JOIN colo_data_from_pg AS c ON location_id = toString(c.ColoId)
+WHERE average_time > {{startDateTime:DateTime}}
+  AND average_time < {{endDateTime:DateTime}}
+  AND job_name IN {{jobs:Array(String)}}
+  AND location_name IN {{locations:Array(String)}}
+GROUP BY time_period, region
+ORDER BY time_period";
+
 
 
             await using var connection = CreateConnection();

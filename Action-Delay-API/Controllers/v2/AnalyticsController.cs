@@ -256,10 +256,11 @@ public class AnalyticsController : CustomBaseController
         if (tryGetRequestOptions.IsFailed)
             return tryGetRequestOptions.MapToResult();
 
+        /* Proper Materialized View usage now
         if (Math.Abs((queryParams.EndDateTime!.Value - queryParams.StartDateTime!.Value).TotalDays) > 32)
             return (Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
                 "Currently, this endpoint is limited to one month for performance reasons", "bad_query_param"))).MapErrorToResult();
-
+        */
 
         return (await _analyticsService.GetCountJobAnalyticsLocationRegionByRegion(new[] { jobName }, regionName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, tryGetRequestOptions.Value, token, queryParams.MaxPoints)).MapToResult();
     }

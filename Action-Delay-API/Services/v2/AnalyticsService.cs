@@ -337,6 +337,36 @@ public class AnalyticsService : IAnalyticsService
         }
     };
 
+    public static JobAnalyticsConfiguration JobLocationAnalyticsPerfRegionConfig = new JobAnalyticsConfiguration()
+    {
+        NormalDataSet = "job_runs_locations_perf",
+        ThirtyMinDataSet = "job_runs_locations_perf_regions_mv_30_mins",
+        TwelthHourDataSet = "job_runs_locations_perf_regions_mv_12_hours",
+        ColumnNames = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "response_latency" },
+        },
+        ColumnNamesAgg = new Dictionary<JobAnalyticsRequestOptions, string>()
+        {
+            { JobAnalyticsRequestOptions.MinRunLength, "min_run_length" },
+            { JobAnalyticsRequestOptions.MaxRunLength, "max_run_length" },
+            { JobAnalyticsRequestOptions.AvgRunLength, "avg_run_length" },
+            { JobAnalyticsRequestOptions.MedianRunLength, "quan_run_length" },
+            { JobAnalyticsRequestOptions.MinResponseLatency, "min_response_latency" },
+            { JobAnalyticsRequestOptions.MaxResponseLatency, "max_response_latency" },
+            { JobAnalyticsRequestOptions.AvgResponseLatency, "avg_response_latency" },
+            { JobAnalyticsRequestOptions.MedianResponseLatency, "quan_response_latency" },
+        }
+    };
+
+
 
 
 
@@ -447,7 +477,7 @@ public class AnalyticsService : IAnalyticsService
         Task<RegionJobAnalytics> tryGetAnalytics = null;
 
         if (currentJobType.Equals("Perf", StringComparison.OrdinalIgnoreCase))
-            tryGetAnalytics = _clickhouseService.GetCountJobLocationAnalyticsByRegion(newJobList.ToArray(), tryGetLocs, startDateTime, endDateTime, JobLocationAnalyticsPerfConfig, maxPoints, options, token);
+            tryGetAnalytics = _clickhouseService.GetCountJobLocationAnalyticsByRegion(newJobList.ToArray(), tryGetLocs, startDateTime, endDateTime, JobLocationAnalyticsPerfRegionConfig, maxPoints, options, token);
         else
             return Result.Fail(new ErrorResponse(404,
                 "This endpoint only supports Perf type jobs.", "job_type_not_supported_for_endpoint"));
