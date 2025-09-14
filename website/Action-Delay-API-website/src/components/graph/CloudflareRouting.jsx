@@ -6,7 +6,10 @@ const SELECT_OPTIONS = [
   { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
   { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
   { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' }
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
+  { value: 90 * 24 * 60 * 60 * 1000, label: 'Last 90 Days' },
+  { value: 365 * 24 * 60 * 60 * 1000, label: 'Last Year' },
+
 ];
 
 const JOB_OPTIONS = [
@@ -122,7 +125,8 @@ const FeatureBanner = ({  }) => {
               New Feature
             </h3>
             <div className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-              <p>Switch between seeing percentage routing or actual request count data. There is now 10x the requests used to sample routing from each region.</p>
+              <p>Switch between seeing percentage routing or actual request count data. There is now 10x the requests used to sample routing from each region (2025-09-11).</p>
+              <p>You can now see back to one full year of history. Please note some jobs started more recently.</p>
             </div>
           </div>
         </div>
@@ -242,6 +246,19 @@ const CloudflareRouting = ({ fullscreen = false }) => {
                   </div>
                 )}
               </div>
+               {region.code == "eu" ? 
+              <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  Some European ISPs (ex: DTAG) sometimes route Cloudflare free traffic to the US due to peering issues. We test from datacenters connecting to Cloudflare via peering/IXPs to avoid this. <br></br> This project measures Cloudflare's internal re-routing usually done for capacity reasons, not the complex routing decisions of Residential ISPs.
+                </p>
+
+              </div> : null}
+              {region.code == "as" && timeRange > (31 * 24 * 60 * 60 * 1000) && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ? (
+                <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+Indian ISPs often route Cloudflare free traffic to Europe due to poor peering. One probe was  affected until Sept 4, 2025 sending traffic to Europe, now switched. Project measures CF internal rerouting, not ISP routing complexity. Asia Pacific tends to be one of the most complex regions for routing from ISPs.</p>
+                    </div>
+                    ) : null}
               <RouteGraph 
                 endpoint={`v2/jobs/${selectedJob}/locations/region/${region.code}/requestRoutingRegionAnalytics`}
                 label={`${selectedJobLabel} - Requests From ${region.name}`}

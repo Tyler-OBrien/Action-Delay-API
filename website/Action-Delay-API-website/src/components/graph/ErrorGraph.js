@@ -126,7 +126,6 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
         y: -0.2,
         font: { color: theme.font_color, size: 12 }
       },
-      margin: { l: 60, r: 40, t: 60, b: 120 }
     };
 
     const config = {

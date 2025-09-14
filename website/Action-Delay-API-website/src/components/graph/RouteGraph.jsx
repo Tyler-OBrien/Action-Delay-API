@@ -8,7 +8,6 @@ const SELECT_OPTIONS = [
   { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
   { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' }
 ];
-
 const processRouteData = (points, primaryRegion, showPercentage = false) => {
   const regionMap = new Map();
   const regions = new Set();
@@ -26,6 +25,9 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
     const timeRegions = regionMap.get(timestamp);
     timeRegions.set(point.region, (timeRegions.get(point.region) || 0) + point.eventCount);
   });
+
+  // Get all unique timestamps and sort them
+  const allTimestamps = Array.from(regionMap.keys()).sort((a, b) => a - b);
 
   // Separate primary region from others
   const otherRegions = Array.from(regions).filter(region => region.toUpperCase() !== primaryRegion.toUpperCase());
@@ -58,25 +60,34 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
   // Add other regions
   finalRegionOrder.push(...sortedOtherRegions);
 
+  // Pre-calculate totals for each timestamp when showing percentages
+  const timestampTotals = new Map();
+  if (showPercentage) {
+    allTimestamps.forEach(timestamp => {
+      const regions = regionMap.get(timestamp);
+      const total = Array.from(regions.values()).reduce((sum, count) => sum + count, 0);
+      timestampTotals.set(timestamp, total);
+    });
+  }
+
   return finalRegionOrder.map(region => {
-    const data = Array.from(regionMap.entries())
-      .map(([timestamp, regions]) => {
-        const regionCount = regions.get(region) || 0;
-        let value = regionCount;
-        
-        if (showPercentage && regionCount > 0) {
-          // Calculate total for this timestamp
-          const total = Array.from(regions.values()).reduce((sum, count) => sum + count, 0);
-          value = total > 0 ? (regionCount / total) * 100 : 0;
-        }
-        
-        return {
-          x: timestamp,
-          y: value,
-          rawCount: regionCount
-        };
-      })
-      .sort((a, b) => a.x - b.x);
+    // Create data for ALL timestamps, not just ones where this region has data
+    const data = allTimestamps.map(timestamp => {
+      const regionCount = regionMap.get(timestamp)?.get(region) || 0;
+      let value = regionCount;
+      
+      if (showPercentage) {
+        // Always calculate percentage, even for 0 values
+        const total = timestampTotals.get(timestamp) || 0;
+        value = total > 0 ? (regionCount / total) * 100 : 100;
+      }
+      
+      return {
+        x: timestamp,
+        y: value,
+        rawCount: regionCount
+      };
+    });
 
     return {
       name: region,
@@ -84,6 +95,7 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
     };
   });
 };
+
 
 const getTheme = () => {
   const isDark = document.documentElement.classList.contains('dark');
@@ -206,7 +218,6 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
         y: -0.2,
         font: { color: theme.font_color, size: 12 }
       },
-      margin: { l: 60, r: 40, t: 60, b: 120 }
     };
 
     const config = {
