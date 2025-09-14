@@ -17,7 +17,7 @@ const JOB_OPTIONS = [
   { value: 'cloudflare-worker-uncached-10kb-pro-plan', label: 'Pro Plan' },
   { value: 'cloudflare-worker-uncached-10kb-business-plan', label: 'Business Plan' },
   { value: 'cloudflare-worker-uncached-10kb', label: 'Enterprise' },
-  { value: 'cloudflare-worker-uncached-10kb-argo', label: 'Argo' },
+  { value: 'cloudflare-worker-uncached-10kb-argo', label: 'Argo Addon' },
   { value: 'cloudflare-worker-uncached-10kb-spectrum', label: 'Enterprise Spectrum HTTP' }
 ];
 
@@ -125,8 +125,8 @@ const FeatureBanner = ({ }) => {
               New Feature
             </h3>
             <div className="mt-1 text-sm text-blue-700 dark:text-blue-300">
-              <p>Switch between seeing percentage routing or actual request count data. There is now 10x the requests used to sample routing from each region (2025-09-11).</p>
-              <p>You can now see back to one full year of history. Please note some jobs started more recently.</p>
+              <p>Switch between seeing percentage routing or request counts. There is now 10x the requests used to sample routing from each region (2025-09-11).</p>
+              <p>You can now see back to one full year of history. Please note monitoring for some plans started more recently.</p>
             </div>
           </div>
         </div>
@@ -256,14 +256,14 @@ const CloudflareRouting = ({ fullscreen = false }) => {
               {region.code == "as" && timeRange < (31 * 24 * 60 * 60 * 1000) && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ? (
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    Some Indian ISPs sometimes route Cloudflare free traffic to Europe due to peering issue. We test from datacenters connecting to Cloudflare via peering/IXPs to avoid this. <br></br> This project measures Cloudflare's internal re-routing usually done for capacity reasons, not the complex routing decisions of Residential ISPs.
+                    Some Indian ISPs sometimes route Cloudflare free traffic to Europe due to peering issues. We test from datacenters connecting to Cloudflare via peering/IXPs to avoid this. <br></br> This project measures Cloudflare's internal re-routing usually done for capacity reasons, not the complex routing decisions of Residential ISPs.
                     </p>
                 </div>
               ) : null}
               {region.code == "as" && timeRange >= (31 * 24 * 60 * 60 * 1000) && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ? (
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    Indian ISPs often route Cloudflare free traffic to Europe due to poor peering. One probe was  affected until Sept 4, 2025 sending traffic to Europe, now switched. Project measures CF internal rerouting, not ISP routing complexity. Asia Pacific tends to be one of the most complex regions for routing from ISPs.</p>
+                    Indian ISPs often route Cloudflare free traffic to Europe due to poor peering. One probe was affected until Sept 4, 2025 sending traffic to Europe, now switched. This Project measures CF internal rerouting, not ISP routing complexity. Asia Pacific tends to be one of the most complex regions for routing from ISPs.</p>
                 </div>
               ) : null}
               <RouteGraph

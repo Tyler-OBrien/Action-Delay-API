@@ -1,26 +1,8 @@
 ---
-import { getCollection } from 'astro:content';
-
-// Layout import — provides basic page elements: <head>, <nav>, <footer> etc.
 import BaseLayout from '../layouts/BaseLayout.astro';
-
-// Component Imports
-import CallToAction from '../components/CallToAction.astro';
 import Grid from '../components/Grid.astro';
-import Hero from '../components/Hero.astro';
-import Icon from '../components/Icon.astro';
-import Pill from '../components/Pill.astro';
-//import PortfolioPreview from '../components/PortfolioPreview.astro';
-
-// Page section components
-import Skills from '../components/Skills.astro';
 import MonitoringTypeCard from '../components/MonitoringTypeCard.astro';
 
-// Content Fetching: List four most recent work projects
-
-
-// Full Astro Component Syntax:
-// https://docs.astro.build/basics/astro-components/
 ---
 
 <BaseLayout>
@@ -30,7 +12,6 @@ import MonitoringTypeCard from '../components/MonitoringTypeCard.astro';
 
 			</header>
 
-			<!-- <Skills />  -->
 		</div>
 
 		<main class="wrapper stack gap-20 lg:gap-48">
@@ -43,42 +24,12 @@ import MonitoringTypeCard from '../components/MonitoringTypeCard.astro';
 				<div class="gallery">
 					<Grid>
 						<MonitoringTypeCard type="Status" path="status/" img="cloudflare-status.svg"/>
-						<MonitoringTypeCard type="Updates" path="delay/" img="cloudflare-delay-monitoring.svg"/>
+						<MonitoringTypeCard type="Jobs" path="delay/" img="cloudflare-delay-monitoring.svg"/>
 						<MonitoringTypeCard type="Routing" path="routing/" img="cloudflare-routing.svg"/>
 					</Grid>
 				</div>
-
-				<!--   more silly template stuff
-				<div class="cta">
-					<CallToAction href="/work/">
-						View All
-						<Icon icon="arrow-right" size="1.2em" />
-					</CallToAction>
-				</div> -->
 			</section>
-			<!--  silly template stuff
-			<section class="section with-background bg-variant">
-				<header class="section-header stack gap-2 lg:gap-4">
-					<h3>Mentions</h3>
-					<p>
-						I have been fortunate enough to receive praise for my work in several publications. Take
-						a look below to learn more.
-					</p>
-				</header>
 
-				<div class="gallery">
-					<Grid variant="small">
-						{
-							['Medium', 'BuzzFeed', 'The Next Web', 'awwwards.', 'TechCrunch'].map((brand) => (
-								<li class="mention-card">
-									<p>{brand}</p>
-								</li>
-							))
-						}
-					</Grid>
-				</div>
-			</section>
-			-->
 		</main>
 
 	</div>
