@@ -36,17 +36,15 @@ import MonitoringTypeCard from '../components/MonitoringTypeCard.astro';
 		<main class="wrapper stack gap-20 lg:gap-48">
 			<section class="section with-background with-cta">
 				<header class="section-header stack gap-2 lg:gap-4">
-					<h3>Monitoring</h3>
+					<h3>Overview</h3>
 					<p>Types of Monitoring below</p>
 				</header>
 
 				<div class="gallery">
 					<Grid>
-						
-						<MonitoringTypeCard type="Cloudflare Delay Monitoring" path="delay/"/>
-						<MonitoringTypeCard type="Workers AI Monitoring"  path="ai/" />
-						<MonitoringTypeCard type="Performance Monitoring"  path="perf/" />
-						
+						<MonitoringTypeCard type="Status" path="status/" img="cloudflare-status.svg"/>
+						<MonitoringTypeCard type="Updates" path="delay/" img="cloudflare-delay-monitoring.svg"/>
+						<MonitoringTypeCard type="Routing" path="routing/" img="cloudflare-routing.svg"/>
 					</Grid>
 				</div>
 

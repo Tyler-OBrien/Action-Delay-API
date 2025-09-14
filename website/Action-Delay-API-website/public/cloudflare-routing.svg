@@ -1,0 +1,79 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <!-- Define paths for animation -->
+                <defs>
+                    <path id="route1" d="M 36 68 Q 68 60 100 72 T 164 68" fill="none"></path>
+                    <path id="route2" d="M 164 68 Q 132 80 100 72 T 36 132" fill="none"></path>
+                    <path id="route3" d="M 36 132 Q 68 120 100 128 T 164 132" fill="none"></path>
+                    <path id="route4" d="M 164 132 Q 132 140 100 128 T 100 175" fill="none"></path>
+                    <path id="route5" d="M 100 25 Q 80 50 72 100 T 100 175" fill="none"></path>
+                    <path id="route6" d="M 36 68 Q 68 100 100 100 T 164 132" fill="none"></path>
+                </defs>
+                
+                <!-- Outer ring -->
+                <circle cx="100" cy="100" r="75" fill="none" stroke="#bee3f8" stroke-width="20"></circle>
+                
+                <!-- Inner ring -->
+                <circle cx="100" cy="100" r="50" fill="none" stroke="#7dd3fc" stroke-width="15"></circle>
+                
+                <!-- Center circle -->
+                <circle cx="100" cy="100" r="28" fill="#0891b2"></circle>
+                
+                <!-- Regional nodes -->
+                <circle cx="100" cy="25" r="10" fill="#10b981"></circle> <!-- NA -->
+                <circle cx="164" cy="68" r="10" fill="#3b82f6"></circle> <!-- EU -->
+                <circle cx="164" cy="132" r="10" fill="#8b5cf6"></circle> <!-- APAC -->
+                <circle cx="100" cy="175" r="10" fill="#f97316"></circle> <!-- SA -->
+                <circle cx="36" cy="132" r="10" fill="#06b6d4"></circle> <!-- AF -->
+                <circle cx="36" cy="68" r="10" fill="#10b981"></circle> <!-- CA -->
+                
+                <!-- Connection lines -->
+                <line x1="100" y1="72" x2="100" y2="35" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="125" y1="82" x2="156" y2="73" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="125" y1="118" x2="156" y2="127" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="100" y1="128" x2="100" y2="165" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="75" y1="118" x2="44" y2="127" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="75" y1="82" x2="44" y2="73" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                
+                <!-- Animated traffic dots -->
+                <circle r="3" fill="#fbbf24">
+                    <animateMotion dur="3s" repeatCount="indefinite">
+                        <mpath href="#route1"></mpath>
+                    </animateMotion>
+                </circle>
+                
+                <circle r="3" fill="#60a5fa">
+                    <animateMotion dur="3.5s" begin="0.5s" repeatCount="indefinite">
+                        <mpath href="#route2"></mpath>
+                    </animateMotion>
+                </circle>
+                
+                <circle r="3" fill="#a78bfa">
+                    <animateMotion dur="4s" begin="1s" repeatCount="indefinite">
+                        <mpath href="#route3"></mpath>
+                    </animateMotion>
+                </circle>
+                
+                <circle r="3" fill="#34d399">
+                    <animateMotion dur="3.2s" begin="1.5s" repeatCount="indefinite">
+                        <mpath href="#route4"></mpath>
+                    </animateMotion>
+                </circle>
+                
+                <circle r="3" fill="#f87171">
+                    <animateMotion dur="2.8s" begin="2s" repeatCount="indefinite">
+                        <mpath href="#route5"></mpath>
+                    </animateMotion>
+                </circle>
+                
+                <circle r="3" fill="#fde047">
+                    <animateMotion dur="3.6s" begin="2.5s" repeatCount="indefinite">
+                        <mpath href="#route6"></mpath>
+                    </animateMotion>
+                </circle>
+                
+                <!-- Pulse effect on center -->
+                <circle cx="100" cy="100" r="28" fill="none" stroke="#0ea5e9" stroke-width="2" opacity="0">
+                    <animate attributeName="r" values="28;35;28" dur="2s" repeatCount="indefinite"></animate>
+                    <animate attributeName="opacity" values="0.8;0;0.8" dur="2s" repeatCount="indefinite"></animate>
+                </circle>
+            </svg>

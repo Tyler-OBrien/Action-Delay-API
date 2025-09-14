@@ -3,15 +3,18 @@
 interface Props {
 	type: string;
 	path: string;
+	img: string | undefined;
 }
 
 const type = Astro.props.type;
 const path = Astro.props.path;
+const img = Astro.props.img;
 ---
 
 <a class="card" href={`/${path}`}>
 	<span class="title">{type ?? ""}</span>
-	<!-- <img src={data.img} alt={data.img_alt || ''} loading="lazy" decoding="async" />  -->
+
+	{img ? <img src={Astro.props.img} alt={type ?? ""} /> : null}
 </a>
 
 <style>
@@ -49,7 +52,7 @@ const path = Astro.props.path;
 		grid-area: 1 / 1 / 3 / 3;
 		width: 100%;
 		height: 100%;
-		object-fit: cover;
+		object-fit: fill;
 	}
 
 	@media (min-width: 50em) {

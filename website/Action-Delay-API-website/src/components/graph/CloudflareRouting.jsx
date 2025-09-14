@@ -27,9 +27,9 @@ const TimeRangeSelector = ({ value, onChange, customLabel }) => {
       <label htmlFor="time-range-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
         Time Range:
       </label>
-      <select 
+      <select
         id="time-range-select"
-        value={value} 
+        value={value}
         onChange={onChange}
         className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3 w-64 mr-4"
       >
@@ -60,9 +60,9 @@ const JobSelector = ({ value, onChange }) => {
       <label htmlFor="job-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
         Select Cloudflare Plan:
       </label>
-      <select 
+      <select
         id="job-select"
-        value={value} 
+        value={value}
         onChange={onChange}
         className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-3 w-64"
       >
@@ -110,7 +110,7 @@ const ViewToggle = ({ showPercentage, onChange }) => {
   );
 };
 
-const FeatureBanner = ({  }) => {
+const FeatureBanner = ({ }) => {
   return (
     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
       <div className="flex items-start justify-between">
@@ -149,7 +149,7 @@ const CloudflareRouting = ({ fullscreen = false }) => {
       try {
         const response = await fetch('https://delay.cloudflare.chaika.me/v2/locations');
         const data = await response.json();
-        
+
         // Group enabled locations by friendlyRegionName
         const grouped = {};
         data.data
@@ -161,12 +161,12 @@ const CloudflareRouting = ({ fullscreen = false }) => {
             }
             grouped[regionName].push(location.locationName);
           });
-        
+
         // Sort IATA codes for each region
         Object.keys(grouped).forEach(region => {
           grouped[region].sort();
         });
-        
+
         setLocationsByRegion(grouped);
       } catch (error) {
         // Silently ignore errors as requested
@@ -194,7 +194,7 @@ const CloudflareRouting = ({ fullscreen = false }) => {
     const minDate = new Date(range.min);
     const maxDate = new Date(range.max);
     const monthDay = new Intl.DateTimeFormat('default', { month: 'short', day: 'numeric' });
-    
+
     setTimeRange('custom');
     setCustomRange({ min: range.min, max: range.max });
     setCustomLabel(`${monthDay.format(minDate)} -> ${monthDay.format(maxDate)}`);
@@ -207,25 +207,25 @@ const CloudflareRouting = ({ fullscreen = false }) => {
       <FeatureBanner />
 
       <div className="flex flex-wrap gap-4 mb-6">
-        <JobSelector 
+        <JobSelector
           value={selectedJob}
           onChange={handleJobChange}
         />
-        <TimeRangeSelector 
+        <TimeRangeSelector
           value={timeRange}
           onChange={handleTimeRangeChange}
           customLabel={customLabel}
         />
-        <ViewToggle 
+        <ViewToggle
           showPercentage={showPercentage}
           onChange={setShowPercentage}
         />
       </div>
-      
+
       <div className="space-y-8">
         {REGIONS.map(region => {
           const iataList = locationsByRegion[region.friendlyName] || [];
-          
+
           return (
             <div key={region.code} className="bg-white dark:bg-slate-900 rounded-lg shadow-lg p-6">
               <div className="flex items-center justify-between mb-4">
@@ -246,20 +246,27 @@ const CloudflareRouting = ({ fullscreen = false }) => {
                   </div>
                 )}
               </div>
-               {region.code == "eu" ? 
-              <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Some European ISPs (ex: DTAG) sometimes route Cloudflare free traffic to the US due to peering issues. We test from datacenters connecting to Cloudflare via peering/IXPs to avoid this. <br></br> This project measures Cloudflare's internal re-routing usually done for capacity reasons, not the complex routing decisions of Residential ISPs.
-                </p>
-
-              </div> : null}
-              {region.code == "as" && timeRange > (31 * 24 * 60 * 60 * 1000) && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ? (
+              {region.code == "eu" && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ?
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-Indian ISPs often route Cloudflare free traffic to Europe due to poor peering. One probe was  affected until Sept 4, 2025 sending traffic to Europe, now switched. Project measures CF internal rerouting, not ISP routing complexity. Asia Pacific tends to be one of the most complex regions for routing from ISPs.</p>
-                    </div>
-                    ) : null}
-              <RouteGraph 
+                    Some European ISPs (ex: DTAG) sometimes route Cloudflare free traffic to the US due to peering issues. We test from datacenters connecting to Cloudflare via peering/IXPs to avoid this. <br></br> This project measures Cloudflare's internal re-routing usually done for capacity reasons, not the complex routing decisions of Residential ISPs.
+                  </p>
+
+                </div> : null}
+              {region.code == "as" && timeRange < (31 * 24 * 60 * 60 * 1000) && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ? (
+                <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    Some Indian ISPs sometimes route Cloudflare free traffic to Europe due to peering issue. We test from datacenters connecting to Cloudflare via peering/IXPs to avoid this. <br></br> This project measures Cloudflare's internal re-routing usually done for capacity reasons, not the complex routing decisions of Residential ISPs.
+                    </p>
+                </div>
+              ) : null}
+              {region.code == "as" && timeRange >= (31 * 24 * 60 * 60 * 1000) && selectedJob == "cloudflare-worker-uncached-10kb-free-plan" ? (
+                <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    Indian ISPs often route Cloudflare free traffic to Europe due to poor peering. One probe was  affected until Sept 4, 2025 sending traffic to Europe, now switched. Project measures CF internal rerouting, not ISP routing complexity. Asia Pacific tends to be one of the most complex regions for routing from ISPs.</p>
+                </div>
+              ) : null}
+              <RouteGraph
                 endpoint={`v2/jobs/${selectedJob}/locations/region/${region.code}/requestRoutingRegionAnalytics`}
                 label={`${selectedJobLabel} - Requests From ${region.name}`}
                 height={fullscreen ? 600 : 400}

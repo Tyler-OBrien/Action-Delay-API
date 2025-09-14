@@ -1,0 +1,48 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                <!-- Outer ring -->
+                <circle cx="100" cy="100" r="75" fill="none" stroke="#bee3f8" stroke-width="20"></circle>
+                
+                <!-- Inner ring with rotating dashes -->
+                <circle cx="100" cy="100" r="50" fill="none" stroke="#7dd3fc" stroke-width="15" stroke-dasharray="5 10" opacity="0.8">
+                    <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="30s" repeatCount="indefinite"></animateTransform>
+                </circle>
+                
+                <!-- Center circle -->
+                <circle cx="100" cy="100" r="28" fill="#0891b2"></circle>
+                
+                <!-- Clock hands -->
+                <g transform-origin="100 100">
+                    <line x1="100" y1="100" x2="100" y2="85" stroke="white" stroke-width="2.5" stroke-linecap="round">
+                        <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="60s" repeatCount="indefinite"></animateTransform>
+                    </line>
+                </g>
+                <g transform-origin="100 100">
+                    <line x1="100" y1="100" x2="110" y2="95" stroke="white" stroke-width="2" stroke-linecap="round">
+                        <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="5s" repeatCount="indefinite"></animateTransform>
+                    </line>
+                </g>
+                
+                <!-- Status dots with pulsing animation -->
+                <circle cx="100" cy="25" r="10" fill="#10b981">
+                    <animate attributeName="r" values="10;12;10" dur="2s" repeatCount="indefinite"></animate>
+                    <animate attributeName="opacity" values="1;0.7;1" dur="2s" repeatCount="indefinite"></animate>
+                </circle>
+                <circle cx="175" cy="100" r="10" fill="#10b981">
+                    <animate attributeName="r" values="10;12;10" dur="2s" begin="0.5s" repeatCount="indefinite"></animate>
+                    <animate attributeName="opacity" values="1;0.7;1" dur="2s" begin="0.5s" repeatCount="indefinite"></animate>
+                </circle>
+                <circle cx="100" cy="175" r="10" fill="#f59e0b">
+                    <animate attributeName="r" values="10;12;10" dur="2s" begin="1s" repeatCount="indefinite"></animate>
+                    <animate attributeName="opacity" values="1;0.7;1" dur="2s" begin="1s" repeatCount="indefinite"></animate>
+                </circle>
+                <circle cx="25" cy="100" r="10" fill="#ef4444">
+                    <animate attributeName="r" values="10;12;10" dur="1s" repeatCount="indefinite"></animate>
+                    <animate attributeName="opacity" values="1;0.4;1" dur="1s" repeatCount="indefinite"></animate>
+                </circle>
+                
+                <!-- Connection lines -->
+                <line x1="100" y1="72" x2="100" y2="35" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="128" y1="100" x2="165" y2="100" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="100" y1="128" x2="100" y2="165" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+                <line x1="72" y1="100" x2="35" y2="100" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"></line>
+            </svg>
