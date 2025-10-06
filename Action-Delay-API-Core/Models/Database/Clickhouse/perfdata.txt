@@ -157,3 +157,39 @@ AS SELECT
 FROM api_errors_perf
 GROUP BY job_name, location_name, location_id, error_hash, toStartOfInterval(run_time, INTERVAL 12 hour) as average_time;
 
+
+
+
+
+#### for locations routing
+
+
+CREATE MATERIALIZED VIEW job_runs_locations_perf_regions_mv_30_mins
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, location_id, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    location_name,
+    location_id,
+    toStartOfInterval(run_time, INTERVAL 30 MINUTE) AS average_time,
+    countState() AS event_count
+FROM job_runs_locations_perf
+WHERE run_status = 'Success' and job_name in ('cloudflare-worker-uncached-10kb-free-plan', 'cloudflare-worker-uncached-10kb-pro-plan', 'cloudflare-worker-uncached-10kb-business-plan', 'cloudflare-worker-uncached-10kb', 'cloudflare-worker-uncached-10kb-argo', 'cloudflare-worker-uncached-10kb-spectrum')
+GROUP BY job_name, location_name, location_id, average_time;
+
+
+CREATE MATERIALIZED VIEW job_runs_locations_perf_regions_mv_12_hours
+ENGINE = AggregatingMergeTree
+ORDER BY (job_name, location_name, location_id, average_time)
+POPULATE
+AS SELECT
+    job_name,
+    location_name,
+    location_id,
+    toStartOfInterval(run_time, INTERVAL 12 HOUR) AS average_time,
+    countState() AS event_count
+FROM job_runs_locations_perf
+WHERE run_status = 'Success' and job_name in ('cloudflare-worker-uncached-10kb-free-plan', 'cloudflare-worker-uncached-10kb-pro-plan', 'cloudflare-worker-uncached-10kb-business-plan', 'cloudflare-worker-uncached-10kb', 'cloudflare-worker-uncached-10kb-argo', 'cloudflare-worker-uncached-10kb-spectrum')
+GROUP BY job_name, location_name, location_id, average_time;
+
