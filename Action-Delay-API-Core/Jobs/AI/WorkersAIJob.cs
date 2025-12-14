@@ -152,6 +152,18 @@ namespace Action_Delay_API_Core.Jobs.AI
                 _logger.LogInformation($"No Static models from ${InternalName + "_static"}");
             }
 
+            models.RemoveAll(model =>
+            {
+                var deprecationProp = model.Properties?
+                    .FirstOrDefault(p => p.PropertyId == "planned_deprecation_date");
+
+                if (deprecationProp == null) return false;
+
+                var dateString = deprecationProp.GetStringValue();
+
+                return DateTime.TryParse(dateString, out var deprecationDate)
+                       && deprecationDate.Date <= DateTime.Today; 
+            });
 
             var locationsEnabled = new HashSet<string>(_config.AI.Locations, StringComparer.OrdinalIgnoreCase);
             var getUsableLocations = _config.Locations.Where(location =>
@@ -177,7 +189,7 @@ namespace Action_Delay_API_Core.Jobs.AI
             }
             runningJobs.Add(Task.Delay(5000));
             await Task.WhenAll(runningJobs);
-            _logger.LogInformation($"Models with no config: {string.Join(", ", modelswithNoConfigs)}");
+            _logger.LogInformation($"Running with {models.Count} models, Models with no config: {string.Join(", ", modelswithNoConfigs)}");
             try
             {
                 if (Runs.Any())
@@ -384,8 +396,10 @@ namespace Action_Delay_API_Core.Jobs.AI
                                 }
                                 else if (parsedResult is { Success: false, Error: not null })
                                 {
-                                    var newError = new CustomAPIError(parsedResult.Error.Message,
-                                        (int)tryGetValue.StatusCode, parsedResult.Error.Message,
+                                    var parsedErrorMsg =
+                                        parsedResult.Error.Message.IntelligentErrorsFriendlyTruncate(50);
+                                    var newError = new CustomAPIError(parsedErrorMsg,
+                                        (int)tryGetValue.StatusCode, parsedErrorMsg,
                                         parsedResult.Error.Code, tryGetValue.ResponseTimeMs, GetColoId(tryGetValue.Headers));
                                     newError.LocationName = completedLocation.Name;
                                     errors.Add(newError);

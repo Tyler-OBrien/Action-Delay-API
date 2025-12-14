@@ -54,6 +54,23 @@ namespace Action_Delay_API_Core.Jobs.AI
         public AIJobConfig? GetConfig(AIGetModelsResponse.AIGetModelsResponseDTO model)
         {
 
+            if (model.Name.Equals("@cf/qwen/qwen3-30b-a3b-fp8", StringComparison.OrdinalIgnoreCase) ||
+                model.Id.Equals("4090e54c-eee4-4221-b410-10c1c0f92f17", StringComparison.Ordinal))
+                return null; // for now
+
+            if (model.Name.Equals("@cf/deepgram/nova-3", StringComparison.OrdinalIgnoreCase) ||
+                model.Id.Equals("a226909f-eef8-4265-a3a0-90db0422762e", StringComparison.Ordinal))
+                return null; // for now
+
+            if (model.Name.Equals("@cf/deepgram/flux", StringComparison.OrdinalIgnoreCase) ||
+                model.Id.Equals("a2a2afba-b609-4325-8c41-5791ce962239", StringComparison.Ordinal))
+                return null; // for now
+
+            if (model.Name.Equals("@cf/leonardo/lucid-origin", StringComparison.OrdinalIgnoreCase) ||
+                model.Id.Equals("a226909f-eef8-4265-a3a0-90db0422762e", StringComparison.Ordinal))
+                return null; // for now
+
+
 
 
             // NOT SUREIF THESE WILL CHANGE CATEGORIES SO
@@ -304,6 +321,8 @@ namespace Action_Delay_API_Core.Jobs.AI
                 {
                     newConfig.OutputType = "json";
                 }
+
+      
 
 
                 newConfig.ContentStr = System.Text.Json.JsonSerializer.Serialize(new MessagePrompt()

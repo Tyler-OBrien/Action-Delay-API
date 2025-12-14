@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Numerics;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -26,6 +27,25 @@ namespace Action_Delay_API_Core.Extensions
 
         public static Regex HtmlTitleRegex = new Regex(@"<title>(.*?)<\/title>",
             RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.IgnorePatternWhitespace);
+
+        public static string IntelligentErrorsFriendlyTruncate(this string value, int maxLength)
+        {
+            var result = IntelligentCloudflareErrorsFriendlyTruncate(value, maxLength);
+
+            const string failedToParseMarker = "Failed to parse";
+            var failedToParseIndex = result.IndexOf(failedToParseMarker, StringComparison.OrdinalIgnoreCase);
+            var newLineIndex = result.IndexOf(Environment.NewLine, StringComparison.Ordinal);
+
+            var truncateAt = result.Length;
+
+            if (failedToParseIndex != -1)
+                truncateAt = Math.Min(truncateAt, failedToParseIndex + failedToParseMarker.Length);
+
+            if (newLineIndex != -1)
+                truncateAt = Math.Min(truncateAt, newLineIndex);
+
+            return truncateAt < result.Length ? result[..truncateAt] : result;
+        }
 
         public static string IntelligentCloudflareErrorsFriendlyTruncate(this string value, int maxLength)
         {
