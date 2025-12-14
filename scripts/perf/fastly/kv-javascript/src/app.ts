@@ -3,15 +3,7 @@ import { env } from "fastly:env";
 import { SecretStore } from "fastly:secret-store";
 
 export async function app(event: FetchEvent) {
-  // Log out which version of the Fastly Service is responding to this request.
-  // This is useful to know when debugging.
 
-
-  /**
-        Construct an KVStore instance which is connected to the KV Store named `my-store`
-
-        [Documentation for the KVStore constuctor can be found here](https://js-compute-reference-docs.edgecompute.app/docs/fastly:kv-store/KVStore/)
-    */
   var req = event.request;
   var getSecretStartReq = globalThis.performance.now();
   const secrets = new SecretStore('action-delay-api-secrets')
@@ -47,7 +39,7 @@ export async function app(event: FetchEvent) {
 
   if (req.method === "PUT") {
     if (req.body == null) {
-      return new Response("No Body but put", {
+      return new Response("No Body but put request", {
         headers: {
           "x-fastly-pop": env("FASTLY_POP"),
         },

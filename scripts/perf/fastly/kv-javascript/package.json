@@ -10,11 +10,11 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@fastly/js-compute": "^3.0.0"
+    "@fastly/js-compute": "^3.36.0"
   },
   "scripts": {
     "prebuild": "tsc",
-    "build": "js-compute-runtime build/index.js bin/main.wasm",
+    "build": "js-compute-runtime --enable-aot build/index.js bin/main.wasm",
     "deploy": "npm run build && fastly compute deploy"
   }
 }

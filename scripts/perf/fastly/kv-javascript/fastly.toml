@@ -15,6 +15,7 @@ service_id = "CMo2xKaQr2gEgn2r2sYje1"
 
   [local_server.backends]
 
+
   [local_server.kv_stores]
 
     [[local_server.kv_stores.action-delay-api]]
@@ -25,13 +26,20 @@ service_id = "CMo2xKaQr2gEgn2r2sYje1"
       key = "readme"
       path = "./README.md"
 
+  [local_server.secret_stores]
+
+
+    [[local_server.secret_stores.action-delay-api-secrets]]
+      data = "APIKEY"
+      key = "APIKEY"
+
+
 [scripts]
   build = "npm run build"
   post_init = "npm install"
 
 [setup]
-
   [setup.kv_stores]
 
-    [setup.kv_stores.action-delay-api]
+    [setup.kv_stores.action-delay-api-secrets]
       description = "My first kv store"
