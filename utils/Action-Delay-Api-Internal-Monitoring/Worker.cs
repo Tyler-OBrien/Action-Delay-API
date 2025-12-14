@@ -91,7 +91,7 @@ namespace Action_Delay_Api_Incidient_Monitoring
                 if ((DateTime.UtcNow - lastJob.CurrentRunTime.Value).TotalMinutes > 2)
                 {
                     await SendWebhook(
-                        $"{_localConfig.CoreName} has no job updates in the past {(DateTime.UtcNow - lastJob.CurrentRunTime.Value).TotalMinutes} minutes..");
+                        $":rotating_light: POSTGRES DELAY DETECTED :rotating_light:{Environment.NewLine}POSTGRES: {_localConfig.CoreName} has no job updates in the past {(DateTime.UtcNow - lastJob.CurrentRunTime.Value).TotalMinutes} minutes..");
                     _logger.LogInformation($"Fired Alert about Postgres Sync");
 
                 }
@@ -121,7 +121,7 @@ namespace Action_Delay_Api_Incidient_Monitoring
                 if ((DateTime.UtcNow - parsedDateTime).TotalMinutes > 2)
                 {
                     await SendWebhook(
-                        $"{_localConfig.CoreName} has no job updates in the past {(DateTime.UtcNow - parsedDateTime).TotalMinutes} minutes..");
+                        $":rotating_light: CLICKHOUSE DELAY DETECTED :rotating_light:{Environment.NewLine}CLICKHOUSE: {_localConfig.CoreName} has no job updates in the past {(DateTime.UtcNow - parsedDateTime).TotalMinutes} minutes..");
                     _logger.LogInformation($"Fired Alert about Clickhouse Sync");
                 }
                 return parsedDateTime;
