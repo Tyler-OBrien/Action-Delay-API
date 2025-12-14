@@ -117,20 +117,23 @@ namespace Action_Delay_API_Clickhouse_Worker
             //var myRegistry = new NatsJsonContextSerializerRegistry(SerializableRequestJsonContext.Default);
 
 
-            var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL, MaxReconnectRetry = -1, CommandTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), RequestTimeout = TimeSpan.FromSeconds(60) };
-            await using var natsConnection = new NatsConnection(options);
 
-            await natsConnection.ConnectAsync();
-
+   
 
 
             List<Task> ingestStreams = new List<Task>();
-
+            _logger.LogInformation($"{_localConfig.TablesToSync.Count} tables to sync");
             foreach (var syncTable in _localConfig.TablesToSync)
             {
                 var table = syncTable;
                 ingestStreams.Add(Task.Run((async () =>
                 {
+                    var options = NatsOpts.Default with { LoggerFactory = _loggerFactory, Url = _localConfig.NATSConnectionURL, MaxReconnectRetry = -1, CommandTimeout = TimeSpan.FromSeconds(60), ConnectTimeout = TimeSpan.FromSeconds(60), RequestTimeout = TimeSpan.FromSeconds(60) };
+                    await using var natsConnection = new NatsConnection(options);
+
+                    await natsConnection.ConnectAsync();
+
+
                     var js = natsConnection.CreateJetStreamContext();
                     var streamName = $"clickhouse_{table}";
                     var tryGetStream = await js.CreateOrUpdateStreamAsync(new StreamConfig(streamName, new List<string>() { $"clickhouse.{table}" })
@@ -138,13 +141,14 @@ namespace Action_Delay_API_Clickhouse_Worker
                         Storage = StreamConfigStorage.File,
                         Retention = StreamConfigRetention.Interest,
                         Compression = StreamConfigCompression.S2,
-                        MaxMsgs = 20000000
-                    });
+                        MaxMsgs = 20000000,
+                    }, stoppingToken);
 
 
                     var getConsumer =
                         await js.CreateOrUpdateConsumerAsync(streamName, 
-                            new ConsumerConfig($"clickhouse-{table}-{_localConfig.RunnerName}"));
+                            new ConsumerConfig($"clickhouse-{table}-{_localConfig.RunnerName}") { MaxAckPending = 15_000, AckWait = TimeSpan.FromSeconds(20), AckPolicy = ConsumerConfigAckPolicy.Explicit, DeliverPolicy = ConsumerConfigDeliverPolicy.All});
+                    _logger.LogInformation($"Setup consumer for {getConsumer.Info.Name}");
 
                     while (stoppingToken.IsCancellationRequested == false)
                     {
@@ -152,8 +156,14 @@ namespace Action_Delay_API_Clickhouse_Worker
                         try
                         {
 
+                            await getConsumer.RefreshAsync(stoppingToken);
+
+
+                            int maxMessages = 500;
                             var tryFetch = getConsumer.FetchAsync<byte[]>(new NatsJSFetchOpts()
-                                    { Expires = TimeSpan.FromSeconds(10), MaxMsgs = 1_000 })
+                                {
+                                    Expires = TimeSpan.FromSeconds(5), MaxMsgs = maxMessages
+                                })
                                 .WithCancellation(stoppingToken);
 
                             try
@@ -171,6 +181,10 @@ namespace Action_Delay_API_Clickhouse_Worker
                                         var tryDeserialize =
                                             System.Text.Json.JsonSerializer.Deserialize<ClickhouseRow>(getData);
                                         messages.Add(new Tuple<NatsJSMsg<byte[]>, ClickhouseRow>(msg, tryDeserialize));
+                                        if (messages.Count == maxMessages)
+                                        {
+                                            break;
+                                        }
                                     }
                                 }
                                 finally
@@ -198,7 +212,7 @@ namespace Action_Delay_API_Clickhouse_Worker
                                     }
                                 }
                                 if (messages.Count != 0)
-                                    _logger.LogInformation($"Handled {messages.Count} messages for {streamName}, in {newStopWatch.ElapsedMilliseconds}ms");
+                                    _logger.LogInformation($"Handled {messages.Count} messages for {streamName}, in {newStopWatch.ElapsedMilliseconds}ms. Ack pending: {getConsumer.Info.NumAckPending}, NumRedelivered: {getConsumer.Info.NumRedelivered}, num pending: {getConsumer.Info.NumPending}");
                             }
                             finally
                             {
@@ -226,7 +240,7 @@ namespace Action_Delay_API_Clickhouse_Worker
 
 
 
-            _logger.LogInformation($"NATS Enabled, Connection State: {natsConnection.ConnectionState}");
+            _logger.LogInformation($"NATS Enabled");
             await Task.WhenAll(ingestStreams);
             _logger.LogInformation($"NATS Done..");
         }
