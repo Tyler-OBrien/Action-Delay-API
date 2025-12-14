@@ -97,6 +97,7 @@ namespace Action_Delay_API_Core.Models.Local
         public List<DownloadJobGeneric> BasicDownloadJobList { get; set; }
 
         public List<UploadS3Job> S3Jobs { get; set; }
+        public List<DownloadS3Job> S3DownloadJobs { get; set; }
         public List<UploadJobGeneric> UploadJobs { get; set; }
 
         // Sent with every request, just basic auth on endpoints
@@ -159,6 +160,29 @@ namespace Action_Delay_API_Core.Models.Local
     }
 
 
+    public class DownloadS3Job
+    {
+        public string Name { get; set; }
+
+        public string Description { get; set; }
+
+        public string Endpoint { get; set; }
+
+        public string BucketName { get; set; }
+
+        public string Region { get; set; }
+
+        public string AccessKey { get; set; }
+
+        public string SecretKey { get; set; }
+
+        public string[] AllowedEdgeLocations { get; set; }
+
+        public NetType? ForceNetType { get; set; }
+
+        public string? ObjectName { get; set; }
+
+    }
 
     public class UploadS3Job
     {
