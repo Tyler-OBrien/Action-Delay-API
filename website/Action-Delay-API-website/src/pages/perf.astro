@@ -23,7 +23,16 @@ const jobs: Job[] = await getJobsTask;
 const stats: QuickStats[] = await getAnalyticsTask;
 
 
-const reorderedList = jobs.sort()
+const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+const reorderedList = jobs
+  .filter(job => new Date(job.predictedRunTime) >= oneWeekAgo)
+  .sort((a, b) => {
+    const aIsCloudflare = a.jobName.startsWith('cloudflare');
+    const bIsCloudflare = b.jobName.startsWith('cloudflare');
+    if (aIsCloudflare !== bIsCloudflare) return bIsCloudflare - aIsCloudflare;
+    return a.jobName.localeCompare(b.jobName);
+  });
 
 ---
 
