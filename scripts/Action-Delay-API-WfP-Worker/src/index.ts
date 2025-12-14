@@ -1,5 +1,5 @@
 export interface Env {
-	dispatcher: DispatchNamespace 
+	dispatcher: DispatchNamespace
 	AE: AnalyticsEngineDataset
 }
 export default {
@@ -8,49 +8,65 @@ export default {
 		var parseUrl = new URL(req.url);
 		try {
 			if (parseUrl.pathname != "/") {
-				return new Response("Nothing here", { status: 404})
+				return new Response("Nothing here", { status: 404 })
 			}
 			let worker: Fetcher | null = null;
-			if (!parseUrl.searchParams.has("scriptName"))
-			{
-			worker = env.dispatcher.get("main");
+			if (!parseUrl.searchParams.has("scriptName")) {
+				worker = env.dispatcher.get("main");
 			}
 			else {
-			 worker = env.dispatcher.get(parseUrl.searchParams.get("scriptName")!);
+				worker = env.dispatcher.get(parseUrl.searchParams.get("scriptName")!);
 			}
-			var tryGetWorkerResp =  await worker.fetch(req);	
-			var newHeaders = new Headers(tryGetWorkerResp.headers);
-			newHeaders.set("x-adap-dur", (performance.now() - startReq).toString() )
+
+			// 30 retries with 100 ms timeout
+			let tryGetWorkerResp: Response;
+			for (let i = 0; i < 30; i++) {
+				try {
+					const controller = new AbortController();
+					const timeout = setTimeout(() => controller.abort(), 100);
+					try {
+						tryGetWorkerResp = await worker.fetch(req, { signal: controller.signal });
+						break;
+					} finally {
+						clearTimeout(timeout);  // Always clear
+					}
+				} catch (error) {
+					if (i === 29) throw error;
+				}
+			}
+
+
+			var newHeaders = new Headers(tryGetWorkerResp!.headers);
+			newHeaders.set("x-adap-dur", (performance.now() - startReq).toString())
 			try {
 				if (env.AE)
 					env.AE.writeDataPoint({
 						blobs: [req.cf.colo],
 						doubles: [performance.now() - startReq],
 						indexes: [`wfp`],
-					  });
+					});
 			}
 			catch (exception) {
 				console.log(exception)
 			}
 
-			return new Response(tryGetWorkerResp.body, {
+			return new Response(tryGetWorkerResp!.body, {
 				headers: newHeaders
 			})
 		} catch (e: any) {
 			if (e.message.startsWith('Worker not found')) {
-				// we tried to get a worker that doesn't exist in our dispatch namespace
-				return new Response(e.message, { status: 200, headers: {
-					'x-adp-dur': (performance.now() - startReq).toString(),
-				} });
+				return new Response(e.message, {
+					status: 200, headers: {
+						'x-adp-dur': (performance.now() - startReq).toString(),
+					}
+				});
 			}
 
-			// this could be any other exception from `fetch()` *or* an exception
-			// thrown by the called worker (e.g. if the dispatched worker has
-			// `throw MyException()`, you could check for that here).
-			return new Response(e.message, { status: 500, headers: {
-				'x-adp-dur': (performance.now() - startReq).toString(),
-			}  });
+			return new Response(e.message, {
+				status: 500, headers: {
+					'x-adp-dur': (performance.now() - startReq).toString(),
+				}
+			});
 		}
 	},
 };
-
