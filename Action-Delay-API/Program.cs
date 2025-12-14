@@ -15,7 +15,6 @@ using Action_Delay_API.Models.Services;
 using Action_Delay_API.Models.Services.v2;
 using Action_Delay_API.Services;
 using Action_Delay_API.Services.v2;
-using Microsoft.OpenApi.Models;
 using Sentry.Extensibility;
 using Swashbuckle.AspNetCore.Filters;
 using Action_Delay_API.Controllers.v2;
@@ -60,9 +59,7 @@ public class Program
             await cts.CancelAsync();
             return 0;
         }
-        // Note: This will change in .net 7 https://github.com/dotnet/runtime/issues/60600#issuecomment-1068323222
-        // This is being done so we don't report errors about the Host being quit/exited.
-        catch (Exception e) when (e is not OperationCanceledException && e.GetType().Name != "StopTheHostException")
+        catch (Exception e)
         {
             Log.Fatal(e, "Host terminated unexpectedly");
             return 1;
