@@ -63,8 +63,16 @@ namespace Action_Delay_Api_Worker_Cli
             else
             {
                 var splitSelectedLocations = selectedLocations.Split(",");
-                locations = LocalConfig.Locations.Where(location => location.Disabled == false && 
-                    splitSelectedLocations.Contains(location.NATSName ?? location.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                var locationsToDict = LocalConfig.Locations.Where(location => location.Disabled == false)
+                    .ToDictionary(location => location.NATSName ?? location.Name, location => location,
+                        StringComparer.OrdinalIgnoreCase);
+                foreach (var splitSelectedLocation in splitSelectedLocations)
+                {
+                    if (locationsToDict.TryGetValue(splitSelectedLocation, out var foundLocation))
+                        locations.Add(foundLocation);
+                    else
+                        Console.WriteLine($"Could not find {splitSelectedLocation}");
+                }
             }
 
             var runningTasks = new Dictionary<Location, Task<Result<SerializableDNSResponse>>>();
@@ -205,8 +213,16 @@ namespace Action_Delay_Api_Worker_Cli
             else
             {
                 var splitSelectedLocations = selectedLocations.Split(",");
-                locations = LocalConfig.Locations.Where(location => location.Disabled == false &&
-                    splitSelectedLocations.Contains(location.NATSName ?? location.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+                var locationsToDict = LocalConfig.Locations.Where(location => location.Disabled == false)
+                    .ToDictionary(location => location.NATSName ?? location.Name, location => location,
+                        StringComparer.OrdinalIgnoreCase);
+                foreach (var splitSelectedLocation in splitSelectedLocations)
+                {
+                    if (locationsToDict.TryGetValue(splitSelectedLocation, out var foundLocation))
+                        locations.Add(foundLocation);
+                    else 
+                        Console.WriteLine($"Could not find {splitSelectedLocation}");
+                }
             }
 
             var runningTasks = new Dictionary<Location, Task<Result<SerializableHttpResponse>>>();
