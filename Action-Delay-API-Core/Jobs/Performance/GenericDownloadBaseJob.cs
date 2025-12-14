@@ -131,8 +131,18 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
                         foreach (var location in Locations)
                         {
-                            var tryGetLocation = await _dbContext.JobLocations.AsTracking()
-                                .FirstOrDefaultAsync(job => job.InternalJobName == location.JobName && job.LocationName == location.LocationName);
+
+                            // Check local tracked entities first
+                            var tryGetLocation = _dbContext.JobLocations.Local
+                                .FirstOrDefault(job => job.InternalJobName == location.JobName && job.LocationName == location.LocationName);
+
+                            // Only query DB if not found locally
+                            if (tryGetLocation == null)
+                            {
+                                tryGetLocation = await _dbContext.JobLocations.AsTracking()
+                                    .FirstOrDefaultAsync(job => job.InternalJobName == location.JobName && job.LocationName == location.LocationName);
+                            }
+
                             if (tryGetLocation == null)
                             {
                                 var newJobData = tryGetLocation = new JobDataLocation()
