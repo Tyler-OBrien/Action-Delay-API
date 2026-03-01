@@ -546,7 +546,7 @@ namespace Action_Delay_API_Core.Services
                             apiErrors.Select(apiError => new object[]
                                 {
                                     apiError.JobName, apiError.LocationName, apiError.RunTime, apiError.ErrorType, apiError.ErrorDescription,
-                                    apiError.ErrorHash, apiError.ResponseLatency, apiError.LocationName ?? string.Empty,
+                                    apiError.ErrorHash, apiError.ResponseLatency, apiError.LocationId ?? string.Empty,
                                 })
                                 .ToArray(), token);
                     }

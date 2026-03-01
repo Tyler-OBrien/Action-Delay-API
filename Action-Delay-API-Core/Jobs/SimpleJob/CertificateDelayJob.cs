@@ -141,7 +141,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                         certsGroupedByDay.Remove(certToRemove);
                     }
 
-                    if (certsGroupedByDay.Any())
+                    if (!certsGroupedByDay.Any())
                     {
                         _logger.LogWarning($"Not enough certs to delete to continue, aborting");
                         continue;
@@ -190,7 +190,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
                 {
                     _logger.LogInformation(
                         $"No Cert expiring 14 days from now on {fourTeenDaysFromNow}, creating certificate now");
-                    var certificateArrayToUse = _config.CertRenewalDelayJob.OtherCertificateHostnames.ToList() ??
+                    var certificateArrayToUse = _config.CertRenewalDelayJob.OtherCertificateHostnames?.ToList() ??
                                                 new List<string>();
 
                     certificateArrayToUse.Add($"{Guid.NewGuid().ToString("N")}.{_config.CertRenewalDelayJob.TargetHostname}");

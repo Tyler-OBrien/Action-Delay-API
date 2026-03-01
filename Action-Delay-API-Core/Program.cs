@@ -50,10 +50,10 @@ public class Program
 
 
     public static readonly IPAddress CloudflareV4 = IPAddress.Parse("1.1.1.1");
-    public static readonly IPAddress CloudflareV6 = IPAddress.Parse("1.1.1.1");
+    public static readonly IPAddress CloudflareV6 = IPAddress.Parse("2606:4700:4700::1111");
 
     public static readonly IPAddress ControlDV4 = IPAddress.Parse("76.76.2.0");
-    public static readonly IPAddress ControlDV6 = IPAddress.Parse("76.76.2.0");
+    public static readonly IPAddress ControlDV6 = IPAddress.Parse("2606:1a40::");
 
 
     public static LookupClient StaticLookupClientAny;
@@ -163,10 +163,6 @@ public class Program
                     .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                     .AddPolicyHandler(GetRetryPolicy());
 
-
-
-                services.AddTransient<ICloudflareAPIBroker, CloudflareAPIBroker>();
-
                 services.AddHttpClient<IBunnyAPIBroker, BunnyAPIBroker>()
                     .ConfigureHttpClient(httpClient =>
                     {
@@ -177,11 +173,6 @@ public class Program
                     .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                     .AddPolicyHandler(GetRetryPolicy());
 
-
-
-                services.AddTransient<IBunnyAPIBroker, BunnyAPIBroker>();
-
-
                 services.AddHttpClient<IColoDataBroker, ColoDataBroker>()
                     .ConfigureHttpClient(httpClient =>
                     {
@@ -191,8 +182,6 @@ public class Program
                     })
                     .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                     .AddPolicyHandler(GetRetryPolicy());
-
-                services.AddTransient<IColoDataBroker, ColoDataBroker>();
 
                 services.AddHttpClient("CustomClient")
                     .ConfigureHttpClient(httpClient =>

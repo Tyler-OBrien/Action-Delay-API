@@ -31,9 +31,9 @@ namespace Action_Delay_API_Core.Services
         }
 
     
-        public async Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, Location location, CancellationToken token)
+        public Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, Location location, CancellationToken token)
         {
-            return null;
+            return Task.FromResult(Result.Fail<SerializableDNSResponse>("DNS is not supported in HttpQueue mode"));
         }
 
         public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, Location location, CancellationToken token, int secondsTimeout = 30)
@@ -84,7 +84,7 @@ namespace Action_Delay_API_Core.Services
                 if (request.TimeoutMs.HasValue)
                     newHttpMsg.Headers.Add("Action-Delay-Proxy-TimeoutMs", request.TimeoutMs.Value.ToString());
 
-                if (String.IsNullOrWhiteSpace(request.ContentType))
+                if (!String.IsNullOrWhiteSpace(request.ContentType))
                     newHttpMsg.Headers.Add("Action-Delay-Proxy-ContentType", request.ContentType);
 
                 foreach (var headerKvp in request.Headers)
@@ -148,17 +148,17 @@ namespace Action_Delay_API_Core.Services
 
         public Task<Result<SerializablePingResponse>> Ping(NATSPingRequest request, Location location, CancellationToken token)
         {
-           return null;
+            return Task.FromResult(Result.Fail<SerializablePingResponse>("Ping is not supported in HttpQueue mode"));
         }
 
         public Task JobStatusUpdate(string jobName, string? newStatus, ulong? runLength, DateTime? lastUpdate)
         {
-            return null;
+            return Task.CompletedTask;
         }
 
         public Task JobLocationUpdate(string jobName, string locationName, string? newStatus, ulong? runLength, DateTime? lastUpdate)
         {
-            return null;
+            return Task.CompletedTask;
         }
 
 
