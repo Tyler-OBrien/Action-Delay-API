@@ -181,10 +181,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
             var cancellationTokenSource = new CancellationTokenSource();
             try
             {
+                // Virtual-host style requests go to {bucket}.{endpoint}; path style goes to {endpoint}.
+                // Warm the same hostname the real requests will use.
+                var warmupUrl = GetWarmupUrl(s3Job.Endpoint, s3Job.BucketName, s3Job.UsePathStyle is true);
                 Dictionary<Location, Task> preInitWarmTasks = new();
                 foreach (var location in locationsToUse)
                 {
-                    preInitWarmTasks.Add(location, SendRequestWarmup(location, $"https://{s3Job.Endpoint}", s3Job, CancellationToken.None));
+                    preInitWarmTasks.Add(location, SendRequestWarmup(location, warmupUrl, s3Job, CancellationToken.None));
                 }
 
                 foreach (var preInitTask in preInitWarmTasks)
@@ -219,7 +222,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
             var locations = locationsToUse;
 
             var newClient = new S3PresignedUrlGenerator(s3Job.AccessKey, s3Job.SecretKey,
-                String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region, s3Job.Endpoint);
+                String.IsNullOrEmpty(s3Job.Region) ? "auto" : s3Job.Region, s3Job.Endpoint,
+                s3Job.UsePathStyle is true);
 
 
             // Start monitoring on each Location
@@ -320,7 +324,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         {
                             finishedLocationStatus.Add(completedLocation,
                                 new UploadS3PerformanceLocationReturn(tryGetValue.WasSuccess,
-                                    (uint)tryGetValue.ResponseTimeMs.Value,
+                                    (uint)(tryGetValue.ResponseTimeMs ?? 0),
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
                                     GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
 
@@ -542,6 +546,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     {
                         "content-length",
                         "x-amz-version-id",
+                        "x-adp-dur",
                         "colo",
                         "server",
                     },
@@ -570,7 +575,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         newRequest.URL = getUrl;
                         newRequest.Method = MethodType.GET;
                         newRequest.Headers.Remove("Content-MD5");
-                        newRequest.Headers.Remove("X-Amz-Content-Sha25");
+                        newRequest.Headers.Remove("X-Amz-Content-Sha256");
                         newRequest.ReturnBodySha256 = true;
                         newRequest.ReturnBodyOnError = false;
                         var tryGet = await _queue.HTTP(newRequest, location, token);
@@ -705,8 +710,6 @@ namespace Action_Delay_API_Core.Jobs.Performance
                 return Result.Fail($"{job.Name} had {location.Name} error out.");
 
             }
-
-            return Result.Fail("");
         }
 
         public static byte[] GenerateRandomBytes(int sizeInBytes, int seed)
@@ -716,6 +719,9 @@ namespace Action_Delay_API_Core.Jobs.Performance
             random.NextBytes(randomBytes);
             return randomBytes;
         }
+
+        public static string GetWarmupUrl(string endpoint, string bucketName, bool usePathStyle) =>
+            usePathStyle ? $"https://{endpoint}" : $"https://{bucketName}.{endpoint}";
 
         public override Task RunAction()
         {

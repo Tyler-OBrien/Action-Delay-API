@@ -182,6 +182,8 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string? ObjectName { get; set; }
 
+        public bool? UsePathStyle { get; set; }
+
     }
 
     public class UploadS3Job
@@ -212,6 +214,8 @@ namespace Action_Delay_API_Core.Models.Local
         public bool? KeepOldAndDumpToDiskOnMisMatch { get; set; }
 
         public bool? DeleteWithVersionId { get; set; }
+
+        public bool? UsePathStyle { get; set; }
     }
 
     public class CertificateRenewalDelayJob : BaseConfig

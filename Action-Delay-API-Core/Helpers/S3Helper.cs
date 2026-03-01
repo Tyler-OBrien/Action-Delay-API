@@ -13,13 +13,15 @@ namespace Action_Delay_API_Core.Helpers
         private readonly string _secretKey;
         private readonly string _region;
         private readonly string _endpoint;
+        private readonly bool _usePathStyle;
 
-        public S3PresignedUrlGenerator(string accessKey, string secretKey, string region, string endpoint = null)
+        public S3PresignedUrlGenerator(string accessKey, string secretKey, string region, string endpoint = null, bool usePathStyle = false)
         {
             _accessKey = accessKey ?? throw new ArgumentNullException(nameof(accessKey));
             _secretKey = secretKey ?? throw new ArgumentNullException(nameof(secretKey));
             _region = region ?? throw new ArgumentNullException(nameof(region));
             _endpoint = endpoint;
+            _usePathStyle = usePathStyle;
         }
 
         public string GenerateUploadUrl(string bucket, string key, TimeSpan expiration, string contentMd5 = null, string payloadSha256 = null)
@@ -46,11 +48,23 @@ namespace Action_Delay_API_Core.Helpers
             var amzDate = now.ToString("yyyyMMddTHHmmssZ");
             var contentSha256 = Sha256Hash(""); // Empty body for DELETE
 
-            var virtualHost = $"{bucket}.{_endpoint}";
             var encodedKey = UriEncodePath(key);
 
+            string host;
+            string canonicalUri;
+            if (_usePathStyle)
+            {
+                host = _endpoint;
+                canonicalUri = $"/{UriEncodePath(bucket)}/{encodedKey}";
+            }
+            else
+            {
+                host = $"{bucket}.{_endpoint}";
+                canonicalUri = $"/{encodedKey}";
+            }
+
             // Build URL with optional version ID
-            var url = $"https://{virtualHost}/{encodedKey}";
+            var url = $"https://{host}{canonicalUri}";
             var queryString = "";
             if (!string.IsNullOrWhiteSpace(versionId))
             {
@@ -61,16 +75,16 @@ namespace Action_Delay_API_Core.Helpers
             var request = new HttpRequestMessage(HttpMethod.Delete, url);
 
             // Add required headers
-            request.Headers.Add("Host", virtualHost);
+            request.Headers.Add("Host", host);
             request.Headers.Add("X-Amz-Date", amzDate);
             request.Headers.Add("X-Amz-Content-Sha256", contentSha256);
 
             // Create authorization header
             var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
-            var canonicalRequest = CreateCanonicalRequest("DELETE", $"/{encodedKey}", queryString,
+            var canonicalRequest = CreateCanonicalRequest("DELETE", canonicalUri, queryString,
                 new Dictionary<string, string>
                 {
-                    ["host"] = virtualHost,
+                    ["host"] = host,
                     ["x-amz-content-sha256"] = contentSha256,
                     ["x-amz-date"] = amzDate
                 },
@@ -106,8 +120,20 @@ namespace Action_Delay_API_Core.Helpers
             var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
             var credential = $"{_accessKey}/{credentialScope}";
 
-            // For virtual-hosted style, bucket goes in hostname
-            var virtualHost = $"{bucket}.{_endpoint}";
+            // Virtual-host style: bucket in hostname. Path style: bucket in path.
+            var encodedKey = UriEncodePath(key);
+            string host;
+            string canonicalPath;
+            if (_usePathStyle)
+            {
+                host = _endpoint;
+                canonicalPath = $"/{UriEncodePath(bucket)}/{encodedKey}";
+            }
+            else
+            {
+                host = $"{bucket}.{_endpoint}";
+                canonicalPath = $"/{encodedKey}";
+            }
 
             // Calculate payload hash
             var payloadHash = payloadSha256 ?? "UNSIGNED-PAYLOAD";
@@ -123,7 +149,7 @@ namespace Action_Delay_API_Core.Helpers
             };
 
             // Set up headers and signed headers list
-            var headers = new Dictionary<string, string> { ["host"] = virtualHost };
+            var headers = new Dictionary<string, string> { ["host"] = host };
             var signedHeadersList = new List<string> { "host" };
 
             // Add Content-MD5 if provided
@@ -150,15 +176,13 @@ namespace Action_Delay_API_Core.Helpers
             var canonicalQueryString = string.Join("&",
                 queryParams.Select(x => $"{UriEncodeQueryParam(x.Key)}={UriEncodeQueryParam(x.Value)}"));
 
-            // Create canonical request - path is just the key, host includes bucket
-            var encodedKey = UriEncodePath(key);
-            var canonicalRequest = CreateCanonicalRequest(httpMethod, $"/{encodedKey}", canonicalQueryString,
+            var canonicalRequest = CreateCanonicalRequest(httpMethod, canonicalPath, canonicalQueryString,
                 headers, signedHeaders, payloadHash);
 
             var stringToSign = CreateStringToSign(amzDate, credentialScope, canonicalRequest);
             var signature = CalculateSignature(stringToSign, _secretKey, dateStamp, _region, "s3");
 
-            var presignedUrl = $"https://{virtualHost}/{encodedKey}?{canonicalQueryString}&X-Amz-Signature={signature}";
+            var presignedUrl = $"https://{host}{canonicalPath}?{canonicalQueryString}&X-Amz-Signature={signature}";
 
             return presignedUrl;
         }
@@ -181,13 +205,6 @@ namespace Action_Delay_API_Core.Helpers
         {
             using var sha256 = SHA256.Create();
             var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
-            return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
-        }
-
-        private static string Sha256HashBytes(byte[] input)
-        {
-            using var sha256 = SHA256.Create();
-            var bytes = sha256.ComputeHash(input);
             return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
         }
 
