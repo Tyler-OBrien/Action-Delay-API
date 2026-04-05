@@ -193,3 +193,42 @@ FROM job_runs_locations_perf
 WHERE run_status = 'Success' and job_name in ('cloudflare-worker-uncached-10kb-free-plan', 'cloudflare-worker-uncached-10kb-pro-plan', 'cloudflare-worker-uncached-10kb-business-plan', 'cloudflare-worker-uncached-10kb', 'cloudflare-worker-uncached-10kb-argo', 'cloudflare-worker-uncached-10kb-spectrum')
 GROUP BY job_name, location_name, location_id, average_time;
 
+
+
+-- Target table for colo-level 5-minute pre-aggregated perf data (30-day TTL)
+CREATE TABLE job_runs_locations_perf_colo_5m
+(
+    job_name        LowCardinality(String),
+    location_name   LowCardinality(String),
+    location_id     LowCardinality(String),
+    time_bucket     DateTime CODEC(Delta, ZSTD),
+    run_count       UInt64,
+    sum_latency     UInt64,
+    median_latency  AggregateFunction(quantile(0.5), UInt32)
+)
+ENGINE = AggregatingMergeTree()
+PARTITION BY toYYYYMM(time_bucket)
+ORDER BY (job_name, location_name, location_id, time_bucket)
+TTL time_bucket + INTERVAL 30 DAY;
+
+-- Materialized view that populates job_runs_locations_perf_colo_5m
+CREATE MATERIALIZED VIEW job_runs_locations_perf_colo_5m_mv
+TO job_runs_locations_perf_colo_5m
+AS SELECT
+    job_name,
+    location_name,
+    location_id,
+    toStartOfFiveMinutes(run_time)       AS time_bucket,
+    count()                              AS run_count,
+    sum(response_latency)                AS sum_latency,
+    quantileState(0.5)(response_latency) AS median_latency
+FROM job_runs_locations_perf
+WHERE job_name IN (
+    'cloudflare-worker-uncached-10kb-free-plan',
+    'cloudflare-worker-uncached-10kb-pro-plan',
+    'cloudflare-worker-uncached-10kb-business-plan',
+    'cloudflare-worker-uncached-10kb',
+    'cloudflare-worker-uncached-10kb-argo',
+    'cloudflare-worker-uncached-10kb-spectrum'
+)
+GROUP BY job_name, location_name, location_id, time_bucket;

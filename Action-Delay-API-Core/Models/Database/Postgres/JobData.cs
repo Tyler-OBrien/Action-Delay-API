@@ -88,7 +88,6 @@ public class JobDataLocation : BaseEntityClass
     [JsonIgnore]
     public double? ResponseTimeUtc { get; set; }
 
-    [NotMapped]
     [JsonIgnore]
     public int ColoId { get; set; }
 

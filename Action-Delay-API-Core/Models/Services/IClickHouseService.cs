@@ -45,6 +45,8 @@ namespace Action_Delay_API_Core.Models.Services
 
         Task<OverallAnalytics> GetOverallAnalytics(CancellationToken token);
 
-
+        Task<ColoLocationAnalytics> GetColoLocationAnalytics(string[] jobs, string[] locations,
+            DateTime startTime, DateTime endTime,
+            int maxPoints = 200, CancellationToken token = default);
     }
 }

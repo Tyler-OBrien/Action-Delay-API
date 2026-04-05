@@ -17,7 +17,7 @@ namespace Action_Delay_API_Core.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.8")
+                .HasAnnotation("ProductVersion", "10.0.1")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -208,6 +208,9 @@ namespace Action_Delay_API_Core.Migrations
 
                     b.Property<string>("LocationName")
                         .HasColumnType("text");
+
+                    b.Property<int>("ColoId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal?>("CurrentRunLengthMs")
                         .HasColumnType("numeric(20,0)");

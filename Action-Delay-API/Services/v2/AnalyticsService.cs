@@ -640,6 +640,30 @@ public class AnalyticsService : IAnalyticsService
         return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, tryGetJobInternalName, allUniqueErrors.ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
     }
 
+    public async Task<Result<DataResponse<ColoLocationAnalyticsDTO>>> GetJobColoLocationAnalytics(string jobName, string locationName, DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 200)
+    {
+        var tryValidateDates = ValidateParams(startDateTime, endDateTime, JobAnalyticsRequestOptions.MedianRunLength, maxPoints > 250 ? 200 : maxPoints);
+        if (tryValidateDates.IsFailed)
+            return Result.Fail(tryValidateDates.Errors.First());
+
+        if (await _cacheSingletonService.DoesLocationExist(locationName, token) == false)
+            return Result.Fail(new ErrorResponse(404, "Could not find location", "location_not_found"));
+
+        var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+        if (tryGetJobInternalName == null)
+            return Result.Fail(new ErrorResponse(404, "Could not find job", "job_not_found"));
+
+        var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
+        if (!getJobType?.Equals("Perf", StringComparison.OrdinalIgnoreCase) == true)
+            return Result.Fail(new ErrorResponse(400, "Colo analytics are only available for perf jobs", "not_perf_job"));
+
+        var getAnalytics = await _clickhouseService.GetColoLocationAnalytics(
+            new[] { tryGetJobInternalName }, new[] { locationName },
+            startDateTime, endDateTime, maxPoints, token);
+
+        return new DataResponse<ColoLocationAnalyticsDTO>(new ColoLocationAnalyticsDTO(getAnalytics, locationName, tryGetJobInternalName));
+    }
+
     public async Task<DataResponse<OverallAnalyticsResponseDTO>> GetOverallAnalytics(CancellationToken token)
     {
         

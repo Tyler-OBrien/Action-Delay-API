@@ -283,6 +283,27 @@ public class AnalyticsController : CustomBaseController
     }
 
 
+    [HttpGet("{jobName}/locations/{locationName}/coloanalytics")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<ColoLocationAnalyticsDTO>),
+        Description = "On success, return colo connection history for a specific location, grouped by colo_id over time")]
+    public async Task<IActionResult> GetJobColoLocationAnalytics(string jobName, string locationName, [FromQuery] AnalyticsQueryParamsLocations queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams, false);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        if (Math.Abs((queryParams.EndDateTime!.Value - queryParams.StartDateTime!.Value).TotalDays) > 31)
+            return (Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
+                "This endpoint is limited to 31 days. Colo data is not available in pre-aggregated tables for longer ranges.", "bad_query_param"))).MapErrorToResult();
+
+        return (await _analyticsService.GetJobColoLocationAnalytics(
+            jobName, locationName.ToUpper(),
+            queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value,
+            token, queryParams.MaxPoints)).MapToResult();
+    }
+
+
     /// <summary>
     /// Get Overall Analytics
     /// </summary>

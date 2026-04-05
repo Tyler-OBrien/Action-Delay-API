@@ -36,7 +36,8 @@ namespace Action_Delay_API.Models.Services.v2
 
         Task<DataResponse<OverallAnalyticsResponseDTO>> GetOverallAnalytics(CancellationToken token);
 
-
-
+        Task<Result<DataResponse<ColoLocationAnalyticsDTO>>> GetJobColoLocationAnalytics(string jobName,
+            string locationName, DateTime startDateTime, DateTime endDateTime, CancellationToken token,
+            int maxPoints = 200);
     }
 }

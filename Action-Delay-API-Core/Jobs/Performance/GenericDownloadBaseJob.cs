@@ -164,6 +164,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                             tryGetLocation.CurrentRunLengthMs =
                                 location.ResponseLatency; // for Perf jobs, Latency = Latency
                             tryGetLocation.CurrentRunStatus = location.RunStatus;
+                            if (int.TryParse(location.LocationId, out var parsedColo)) // cf only
+                                tryGetLocation.ColoId = parsedColo;
                         }
 
                         await TrySave(true);

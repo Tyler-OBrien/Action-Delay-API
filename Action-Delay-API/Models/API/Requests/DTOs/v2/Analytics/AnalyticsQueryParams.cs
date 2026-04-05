@@ -70,8 +70,7 @@ namespace Action_Delay_API.Models.API.Requests.DTOs.v2.Analytics
         /// </summary>
         [SwaggerParameter(
             "Metrics to return. Comma-separated. Specify at least one. <br /> Run Options: MinRunLength,MaxRunLength,AvgRunLength,MedianRunLength <br />  CF API Response Latency: MinEdgeResponseLatency,MaxEdgeResponseLatency,AvgEdgeResponseLatency,MedianEdgeResponseLatency \n",
-            Required = true)]
-        [Required]
+            Required = false)]
         public string? Metrics
         {
             get => base.Metrics;

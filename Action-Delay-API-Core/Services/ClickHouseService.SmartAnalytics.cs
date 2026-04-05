@@ -344,6 +344,49 @@ ORDER BY time_period";
         }
 
 
+        public async Task<ColoLocationAnalytics> GetColoLocationAnalytics(string[] jobs, string[] locations, DateTime startTime, DateTime endTime, int maxPoints = 200, CancellationToken token = default)
+        {
+            var interval = Math.Max(5, (int)Math.Ceiling((endTime - startTime).TotalMinutes / maxPoints));
+
+            string commandText =
+                $"SELECT location_id, toStartOfInterval(time_bucket, INTERVAL {interval} MINUTES) AS time_period, sum(run_count) AS run_count, quantileMerge(0.5)(median_latency) AS median_latency, sum(sum_latency) AS sum_latency " +
+                $"FROM \"default\".\"job_runs_locations_perf_colo_5m\" " +
+                $"WHERE time_bucket > {{startDateTime:DateTime}} AND time_bucket < {{endDateTime:DateTime}} " +
+                $"AND job_name IN {{jobs:Array(String)}} AND location_name IN {{locations:Array(String)}} " +
+                $"GROUP BY location_id, time_period ORDER BY time_period, location_id";
+
+            await using var connection = CreateConnection();
+            await using var command = connection.CreateCommand();
+            command.AddParameter("startDateTime", "DateTime", startTime);
+            command.AddParameter("endDateTime", "DateTime", endTime);
+            command.AddParameter("jobs", "Array(String)", jobs);
+            command.AddParameter("locations", "Array(String)", locations);
+            command.CommandText = commandText;
+
+            await using var result = await command.ExecuteReaderAsync(token);
+            var data = new List<ColoLocationAnalyticsPoint>();
+            while (await result.ReadAsync(token))
+            {
+                if (!uint.TryParse(result.GetValue("location_id")?.ToString(), out var coloId) || coloId == 0)
+                    continue;
+                var runCount = Convert.ToUInt64(result.GetValue("run_count"));
+                data.Add(new ColoLocationAnalyticsPoint
+                {
+                    ColoId = (int)coloId,
+                    TimePeriod = result.GetDateTime("time_period"),
+                    RunCount = runCount,
+                    MedianLatency = Convert.ToUInt64(result.GetValue("median_latency")),
+                    AvgLatency = runCount > 0 ? Convert.ToUInt64(result.GetValue("sum_latency")) / runCount : 0,
+                });
+            }
+
+            return new ColoLocationAnalytics
+            {
+                Points = data,
+                GroupByMinutesInterval = interval,
+            };
+        }
+
         private NormalJobAnalyticsPoint NormalJobAnalyticsFromReader(DbDataReader reader, JobAnalyticsRequestOptions option, bool locationName)
         {
             var newAnalyticsObj = new NormalJobAnalyticsPoint();

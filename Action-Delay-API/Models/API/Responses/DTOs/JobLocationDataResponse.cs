@@ -113,6 +113,8 @@ public class JobLocationDataResponse
     /// </summary>
     [JsonPropertyName("currentRunStatus")] public string? CurrentRunStatus { get; set; }
 
+    [JsonPropertyName("coloId")] public int ColoId { get; set; }
+
 
     public static JobLocationDataResponse FromJobLocationData(JobDataLocation data)
     {
@@ -127,8 +129,9 @@ public class JobLocationDataResponse
             CurrentRunLengthMs = data.CurrentRunLengthMs,
             CurrentRunStatus = data.CurrentRunStatus,
             ResponseTimeUtc = data.ResponseTimeUtc,
-            LocationName = data.LocationName
+            LocationName = data.LocationName,
+            ColoId = data.ColoId
         };
-        
+
     }
 }
