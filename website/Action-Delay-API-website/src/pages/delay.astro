@@ -7,6 +7,8 @@ import Hero from "../components/Hero.astro";
 import Grid from "../components/Grid.astro";
 import type { QuickStats } from "../../models/cloudflare/quickstat";
 import type { Job } from "../../models/cloudflare/job";
+import type { OverallAnalytics } from "../../models/cloudflare/overallanalytics";
+import type { Incident } from "../../models/types";
 import SmartGraph from "../components/graph/SmartGraph";
 import ErrorGraph from "../components/graph/ErrorGraph";
 
@@ -19,7 +21,6 @@ const getJobs = async () => {
     ).json()
   ).data;
 };
-var getJobsTask = getJobs();
 
 const getAnalytics = async () => {
   return await (
@@ -28,10 +29,26 @@ const getAnalytics = async () => {
     )
   ).json();
 };
-var getAnalyticsTask = getAnalytics();
 
-const jobs: Job[] = await getJobsTask;
-const stats: QuickStats[] = await getAnalyticsTask;
+const getOverallAnalytics = async (): Promise<OverallAnalytics | null> => {
+  try {
+    const r = await fetch("https://delay.cloudflare.chaika.me/v2/jobs/OverallAnalytics");
+    if (!r.ok) return null;
+    const json = await r.json();
+    return json.data ?? json;
+  } catch { return null; }
+};
+
+const getIncidents = async (): Promise<Incident[]> => {
+  try {
+    const r = await fetch("https://delay.cloudflare.chaika.me/v2/incidents/type/CloudflareDelay");
+    return r.ok ? ((await r.json()).data ?? []) : [];
+  } catch { return []; }
+};
+
+const [jobs, stats, overall, incidents]: [Job[], QuickStats[], OverallAnalytics | null, Incident[]] = await Promise.all([
+  getJobs(), getAnalytics(), getOverallAnalytics(), getIncidents()
+]);
 
 // Define your priority groups
 const FIRST_GROUP = ["worker", "dns", 'waf'];  
@@ -88,6 +105,28 @@ globalThis.jobStats = stats;
       <a href="/delay/overview">Overview</a>
       </Hero>
       <a id="websocket-conn-status">Disconnected</a>
+      {overall && (
+        <div class="flex flex-wrap gap-6 justify-center text-sm py-2 border-t border-b border-gray-200 dark:border-gray-700">
+          <span><strong class="text-gray-900 dark:text-white">{overall.uniqueJobs}</strong> delay jobs</span>
+          <span><strong class="text-gray-900 dark:text-white">{overall.uniqueLocations}</strong> locations</span>
+          <span><strong class="text-gray-900 dark:text-white">{(overall.normalJobPerLocationRunsLast24H ?? 0).toLocaleString()}</strong> location-runs in last 24h</span>
+        </div>
+      )}
+      <input
+        id="job-filter"
+        type="text"
+        placeholder="Filter jobs..."
+        class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4"
+      />
+      <script>
+        document.getElementById('job-filter')?.addEventListener('input', function(e) {
+          const q = (e.target as HTMLInputElement).value.toLowerCase();
+          document.querySelectorAll('[id$="grid"]').forEach((card: Element) => {
+            (card.parentElement as HTMLElement).style.display =
+              card.id.toLowerCase().includes(q) ? '' : 'none';
+          });
+        });
+      </script>
       <Grid>
         {
           reorderedList.map((job: Job) => (
@@ -98,6 +137,7 @@ globalThis.jobStats = stats;
                 stats={stats.filter(
                   (stat) => stat.job_name.toLowerCase() == job.internalJobName
                 )}
+                hasIncident={incidents.some(i => i.target === job.internalJobName && i.active)}
               />
             </li>
           ))

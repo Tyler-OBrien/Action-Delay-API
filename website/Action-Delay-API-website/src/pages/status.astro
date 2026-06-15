@@ -155,7 +155,7 @@ function getGroupStatus(groupItems: any[]) {
     { status: 'Normal', color: 'bg-green-500' };
 }
 
-function runLengthDisplayFormat(jobName: string, ms: Number | undefined): string {
+function runLengthDisplayFormat(jobName: string, ms: number | undefined): string {
 
   if (jobName == "cron") {
     if (ms) ms -= 60_000;
@@ -250,8 +250,8 @@ globalThis.incidents = incidents;
                           </span>
                         </div>
                         <div class="mt-2 text-sm">
-                          <span class="font-medium">Current Value:</span> {runLengthDisplayFormat(item.jobName, incident.currentValue)}) / 
-                          <span class="font-medium">Threshold:</span> {runLengthDisplayFormat(item.jobName, incident.thresholdValue)}
+                          <span class="font-medium">Current Value:</span> {runLengthDisplayFormat(item.jobName, parseFloat(incident.currentValue))}) /
+                          <span class="font-medium">Threshold:</span> {runLengthDisplayFormat(item.jobName, parseFloat(incident.thresholdValue))}
                         </div>
                       </div>
                     ))}
@@ -259,7 +259,7 @@ globalThis.incidents = incidents;
 
                   <div class="px-6 py-4 bg-gray-50 dark:bg-[#222122c9]">
                     <div class="h-120 bg-gray-100 dark:bg-[#222122c9] rounded-lg flex items-center justify-center">
-                      <SmartGraphLazy detailsId={`details-${item.jobName}`} endpoint=`v2/jobs/${item.jobName}/analytics` label={item.name} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} client:only="preact"/>
+                      <SmartGraphLazy detailsId={`details-${item.jobName}`} endpoint=`v2/jobs/${item.jobName}/analytics` label={item.name} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} additionalProps={{}} client:only="preact"/>
                     </div>
                     
            </div>

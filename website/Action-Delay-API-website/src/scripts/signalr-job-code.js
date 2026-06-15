@@ -49,6 +49,18 @@ connection.on("receivelocationupdate", (subject, data) => {
     console.error(exception);
     console.log(`error sending job update to iframe`);
   }
+
+  const statusEl = document.getElementById(`loc-status-${data.LocationName}`);
+  if (statusEl) {
+    statusEl.textContent = data.Status;
+    statusEl.className = data.Status === 'Deployed' ? 'text-green-600'
+      : data.Status === 'Errored' ? 'text-red-500' : 'text-yellow-500';
+  }
+  const delayEl = document.getElementById(`loc-delay-${data.LocationName}`);
+  if (delayEl && data.RunLength != null)
+    delayEl.textContent = (Number(data.RunLength) / 1000).toFixed(2) + 's';
+  const updEl = document.getElementById(`loc-updated-${data.LocationName}`);
+  if (updEl) updEl.textContent = new Date().toLocaleTimeString();
 });
 
 connection.on("ReceiveJobUpdate", (subject, data) => {
@@ -128,7 +140,7 @@ setInterval(async () => {
 
 async function handleJobUpdateData(internalJobNameUpdate) {
   var getCurrentData = globalThis.jobData;
-  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name);
+  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name === internalJobNameUpdate);
   let lastUpdatedTxt = "";
   let delayTxt = "";
   let delayTxtUnit = "";
@@ -300,6 +312,9 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   document.getElementById(
     `delayUnit${job.internalJobName}`
   ).innerText = `${delayTxtUnit}`;
+
+  const el1d = document.getElementById(`median1d${job.internalJobName}`);
+  if (el1d && dailyMedian) el1d.innerText = `1 Day Median: ${dailyMedian}`;
 }
 
 start();

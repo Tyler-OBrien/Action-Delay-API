@@ -200,15 +200,17 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
   const [customRange, setCustomRange] = useState(null);
   const [customLabel, setCustomLabel] = useState(null);
   const [data, setData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const lastFetchRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     const fetchId = Date.now();
     lastFetchRef.current = fetchId;
+    setIsLoading(true);
 
     try {
       const endDateFetch = Date.now();
-      const startDateFetch = customRange?.min ?? 
+      const startDateFetch = customRange?.min ??
         (timeRange === Number.MAX_VALUE ? new Date(2023, 8).getTime() : endDateFetch - timeRange);
 
       const response = await fetch(
@@ -224,9 +226,11 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
       if (lastFetchRef.current === fetchId) {
         const processedData = processErrorData(responseData.points);
         setData(processedData);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setIsLoading(false);
     }
   }, [endpoint, timeRange, customRange]);
 
@@ -263,14 +267,21 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
       </div>
 
       <div className="w-full">
-        <PlotlyChart 
-          data={data}
-          timeRange={timeRange}
-          customRange={customRange}
-          label={label}
-          height={fullscreen ? 800 : 700}
-          onZoom={handleZoomed}
-        />
+        {isLoading && data.length === 0 ? (
+          <div
+            className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
+            style={{ height: fullscreen ? '800px' : '700px' }}
+          />
+        ) : (
+          <PlotlyChart
+            data={data}
+            timeRange={timeRange}
+            customRange={customRange}
+            label={label}
+            height={fullscreen ? 800 : 700}
+            onZoom={handleZoomed}
+          />
+        )}
       </div>
     </div>
   );

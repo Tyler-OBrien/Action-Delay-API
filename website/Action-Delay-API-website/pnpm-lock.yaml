@@ -26,6 +26,9 @@ importers:
       plotly.js-basic-dist-min:
         specifier: ^3.0.1
         version: 3.0.1
+      plotly.js-geo-dist-min:
+        specifier: ^3.4.0
+        version: 3.4.0
       preact:
         specifier: ^10.25.4
         version: 10.25.4
@@ -1992,6 +1995,9 @@ packages:
 
   plotly.js-basic-dist-min@3.0.1:
     resolution: {integrity: sha512-2DNfjn0Xv+IAk6ksaIm8AHSlKCxWQOx9f3v5JGvzFKPwEbJRsLIy4Up0cOPqO53kL4jrdw8LnUTrM9FAzvKMsQ==}
+
+  plotly.js-geo-dist-min@3.4.0:
+    resolution: {integrity: sha512-C/WjXzjKORewEVkLqLVqhS1Mo4hT76XEiKWZM0u3iXHW85BTUZrSCsqm8zaLSQwVWEik7MGXnI4VrFJUHGsGFg==}
 
   postcss-import@15.1.0:
     resolution: {integrity: sha512-hpr+J05B2FVYUAXHeK1YyI267J/dDDhMU6B6civm8hSY1jYJnBXxzKDKDswzJmtLHryrjhnDjqqp/49t8FALew==}
@@ -4941,6 +4947,8 @@ snapshots:
   pirates@4.0.6: {}
 
   plotly.js-basic-dist-min@3.0.1: {}
+
+  plotly.js-geo-dist-min@3.4.0: {}
 
   postcss-import@15.1.0(postcss@8.4.49):
     dependencies:

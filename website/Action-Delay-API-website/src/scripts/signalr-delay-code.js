@@ -117,7 +117,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   var getCurrentData = globalThis.jobData.find(
     (job) => job.internalJobName == internalJobNameUpdate
   );
-  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name);
+  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name === internalJobNameUpdate);
   let lastUpdatedTxt = "";
   let delayTxt = "";
   let delayTxtUnit = "";
@@ -288,6 +288,13 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   document.getElementById(
     `delayUnit${job.internalJobName}`
   ).innerText = `${delayTxtUnit}`;
+
+  const el1d = document.getElementById(`median1d${job.internalJobName}`);
+  if (el1d && dailyMedian) el1d.innerText = `1 Day: ${dailyMedian}`;
+  const el30d = document.getElementById(`median30d${job.internalJobName}`);
+  if (el30d && monthlyMedian) el30d.innerText = `30 Days: ${monthlyMedian}`;
+  const el90d = document.getElementById(`median${job.internalJobName}`);
+  if (el90d && quarterlyMedian) el90d.innerText = `90 Days: ${quarterlyMedian}`;
 }
 
 start();

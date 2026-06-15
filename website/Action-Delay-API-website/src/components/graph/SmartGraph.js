@@ -26,6 +26,10 @@ const SELECT_DISPLAY_OPTIONS = [
   { value: "AvgApiResponseLatency", label: "Average API Response Time"},
   { value: "MinApiResponseLatency", label: "Min API Response Time"},
   { value: "MaxApiResponseLatency", label: "Max API Response Time"},
+  { value: "MedianEdgeResponseLatency", label: "Median Edge Response Time"},
+  { value: "AvgEdgeResponseLatency", label: "Average Edge Response Time"},
+  { value: "MinEdgeResponseLatency", label: "Min Edge Response Time"},
+  { value: "MaxEdgeResponseLatency", label: "Max Edge Response Time"},
 ];
 
 function formatTime(ms) {
@@ -350,18 +354,19 @@ const SmartGraph = (props) => {
         </a>
       </div>
 
-      <div 
-        ref={plotRef}
-        style={{ 
-          height: fullscreen ? '700px' : '450px',
-          width: '100%'
-        }}
-      />
-      
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75">
-          <div className="text-gray-600 dark:text-gray-400">Loading...</div>
-        </div>
+      {isLoading && dataPoints.length === 0 ? (
+        <div
+          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
+          style={{ height: fullscreen ? '700px' : '450px' }}
+        />
+      ) : (
+        <div
+          ref={plotRef}
+          style={{
+            height: fullscreen ? '700px' : '450px',
+            width: '100%'
+          }}
+        />
       )}
     </div>
   );

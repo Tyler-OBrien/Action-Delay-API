@@ -1,0 +1,199 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import type { LocationInfo } from '../../models/cloudflare/locationinfo';
+import type { ColoInfo } from '../../models/cloudflare/colo';
+import ColoTimelineChartLazy from '../components/graph/ColoTimelineChartLazy';
+
+const [locResp, coloResp] = await Promise.all([
+	fetch('https://delay.cloudflare.chaika.me/v2/locations'),
+	fetch('https://delay.cloudflare.chaika.me/v2/colos'),
+]);
+
+let locations: LocationInfo[] = [];
+if (locResp.ok) {
+	const json = await locResp.json();
+	locations = json.data ?? [];
+}
+
+// Build coloId → IATA map so we can display the short IATA code
+const coloIdToIATA = new Map<number, string>();
+if (coloResp.ok) {
+	const json = await coloResp.json();
+	for (const colo of (json.results ?? []) as ColoInfo[]) {
+		coloIdToIATA.set(colo.ID, colo.IATA);
+	}
+}
+
+// friendlyRegionName is the meaningful grouping key (EU, NA, AS, OC, SA, AF, ME)
+// region is the CF LB region code (weur, enam, apac, …) — not useful for display
+const REGION_ORDER = ['NA', 'EU', 'AS', 'OC', 'SA', 'AF', 'ME'];
+
+const REGION_NAMES: Record<string, string> = {
+	NA: 'North America',
+	EU: 'Europe',
+	AS: 'Asia-Pacific',
+	OC: 'Oceania',
+	SA: 'South America',
+	AF: 'Africa',
+	ME: 'Middle East',
+};
+
+locations.sort((a, b) => {
+	const ra = a.friendlyRegionName ?? '';
+	const rb = b.friendlyRegionName ?? '';
+	const ri = REGION_ORDER.indexOf(ra) === -1 ? 99 : REGION_ORDER.indexOf(ra);
+	const rj = REGION_ORDER.indexOf(rb) === -1 ? 99 : REGION_ORDER.indexOf(rb);
+	if (ri !== rj) return ri - rj;
+	// Within region: sort by provider, then locationName
+	const pa = (a.provider ?? '').toLowerCase();
+	const pb = (b.provider ?? '').toLowerCase();
+	if (pa < pb) return -1;
+	if (pa > pb) return 1;
+	if (a.locationName < b.locationName) return -1;
+	if (a.locationName > b.locationName) return 1;
+	return 0;
+});
+
+const regionCount = new Set(locations.map(l => l.friendlyRegionName)).size;
+
+// Group by friendlyRegionName
+const grouped = new Map<string, LocationInfo[]>();
+for (const loc of locations) {
+	const key = loc.friendlyRegionName ?? 'Other';
+	if (!grouped.has(key)) grouped.set(key, []);
+	grouped.get(key)!.push(loc);
+}
+
+const orderedGroups = [...grouped.entries()].sort(([a], [b]) => {
+	const ai = REGION_ORDER.indexOf(a) === -1 ? 99 : REGION_ORDER.indexOf(a);
+	const bi = REGION_ORDER.indexOf(b) === -1 ? 99 : REGION_ORDER.indexOf(b);
+	return ai - bi;
+});
+
+function normalizePath(p: string | undefined): string {
+	if (!p) return '—';
+	if (p === 'IXP') return 'IX';
+	if (p === 'PNI') return 'Peering';
+	return p;
+}
+
+function pathBg(path: string): string {
+	if (path === 'IX') return 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400';
+	if (path === 'Peering') return 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400';
+	if (path === 'Transit') return 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400';
+	return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
+}
+---
+
+<BaseLayout title="Locations" description="Edge agent locations used for propagation delay monitoring">
+	<div class="wrapper stack gap-8">
+		<header>
+			<h1 class="text-3xl font-bold">Locations</h1>
+			<p class="text-gray-500 mt-1">{locations.length} monitoring agents across {regionCount} regions</p>
+			<p class="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-2xl">
+				These are the distributed monitoring agents used to measure propagation delay of Cloudflare
+				configuration changes. Each agent polls from its location to detect when a change — such as a
+				Worker deployment or DNS update — becomes visible at that edge. Expand a row to view the
+				Cloudflare PoP each location connects through over time.
+			</p>
+		</header>
+
+		<div class="mb-2">
+			<input
+				id="location-filter"
+				type="text"
+				placeholder="Filter locations..."
+				class="w-full max-w-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-sm"
+			/>
+		</div>
+
+		<div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+			<table class="w-full text-sm border-collapse">
+				<thead>
+					<tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+						<th class="py-2.5 px-3">IATA</th>
+						<th class="py-2.5 px-3">Location</th>
+						<th class="py-2.5 px-3">CF Colo</th>
+						<th class="py-2.5 px-3">Provider</th>
+						<th class="py-2.5 px-3">Path to CF</th>
+						<th class="py-2.5 px-3">CF Latency</th>
+						<th class="py-2.5 px-3">Active</th>
+					</tr>
+				</thead>
+				<tbody>
+					{orderedGroups.flatMap(([region, locs]) => [
+						<tr class="region-header bg-gray-100 dark:bg-gray-800">
+							<td colspan="7" class="py-1.5 px-3 text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+								{REGION_NAMES[region] ?? region} <span class="font-normal normal-case opacity-60">({region})</span> &mdash; {locs.length} location{locs.length !== 1 ? 's' : ''}
+							</td>
+						</tr>,
+						...locs.flatMap(loc => {
+							const path = normalizePath(loc.pathToCf);
+							const coloDetailsId = `loc-colo-details-${loc.iata}`;
+							const coloIATA = coloIdToIATA.get(loc.coloId) ?? loc.coloFriendlyLocationName ?? '—';
+							return [
+								<tr id={`${loc.iata}-row`} class={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors${!loc.enabled ? ' opacity-40' : ''}`}>
+									<td class="py-2 px-3">
+										<span class="font-mono font-bold text-sm">{loc.iata}</span>
+									</td>
+									<td class="py-2 px-3">
+										{loc.friendlyLocationName ?? loc.locationName}
+									</td>
+									<td class="py-2 px-3">
+										<span class="font-mono font-semibold text-sm">{coloIATA}</span>
+									</td>
+									<td class="py-2 px-3 text-gray-500 dark:text-gray-400">
+										{loc.provider}
+									</td>
+									<td class="py-2 px-3">
+										<span class={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${pathBg(path)}`}>{path}</span>
+									</td>
+									<td class="py-2 px-3 tabular-nums text-gray-700 dark:text-gray-300">
+										{loc.cfLatency != null ? loc.cfLatency.toFixed(1) + ' ms' : '—'}
+									</td>
+									<td class="py-2 px-3">
+										{loc.enabled
+											? <span class="text-green-600 dark:text-green-400 font-semibold">✓</span>
+											: <span class="text-gray-400">✗</span>
+										}
+									</td>
+								</tr>,
+								<tr data-for={loc.iata} class="border-b border-gray-100 dark:border-gray-800">
+									<td colspan="7" class="p-0">
+										<details id={coloDetailsId}>
+											<summary class="cursor-pointer px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 select-none">
+												&#9658; CF PoP Connection History
+											</summary>
+											<div class="px-2 pb-3">
+												<ColoTimelineChartLazy
+													detailsId={coloDetailsId}
+													locationName={loc.locationName}
+													client:only="preact"
+												/>
+											</div>
+										</details>
+									</td>
+								</tr>
+							];
+						})
+					])}
+				</tbody>
+			</table>
+		</div>
+	</div>
+</BaseLayout>
+
+<script>
+	const input = document.getElementById('location-filter') as HTMLInputElement;
+	input?.addEventListener('input', () => {
+		const query = input.value.toLowerCase();
+		document.querySelectorAll<HTMLTableRowElement>('tr[id$="-row"]').forEach(row => {
+			const visible = !query || (row.textContent?.toLowerCase().includes(query) ?? true);
+			row.hidden = !visible;
+			const iata = row.id.replace('-row', '');
+			document.querySelectorAll<HTMLTableRowElement>(`tr[data-for="${iata}"]`).forEach(detailRow => {
+				detailRow.hidden = !visible;
+			});
+		});
+	});
+</script>

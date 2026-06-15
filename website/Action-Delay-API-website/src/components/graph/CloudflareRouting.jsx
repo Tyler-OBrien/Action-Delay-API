@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import RouteGraph from './RouteGraph';
+import LocationMap from './LocationMap';
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -141,20 +142,44 @@ const CloudflareRouting = ({ fullscreen = false }) => {
   const [customRange, setCustomRange] = useState(null);
   const [customLabel, setCustomLabel] = useState(null);
   const [locationsByRegion, setLocationsByRegion] = useState({});
+  const [baseLocations, setBaseLocations] = useState([]);
+  const [jobLocationStatus, setJobLocationStatus] = useState({});
+  const [allLocations, setAllLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [showPercentage, setShowPercentage] = useState(true);
+  const [coloMap, setColoMap] = useState({});
 
+  // Fetch all CF PoP metadata once for topology lookups
+  useEffect(() => {
+    fetch('https://delay.cloudflare.chaika.me/v2/colos')
+      .then(r => r.json())
+      .then(data => {
+        const map = {};
+        for (const colo of (data.results ?? [])) {
+          map[colo.ID] = {
+            coloFriendlyLocationName: colo.niceName || colo.IATA,
+            coloLatitude: colo.lat,
+            coloLongitude: colo.long,
+          };
+        }
+        setColoMap(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch base location topology once (colo connections don't change per plan)
   useEffect(() => {
     const fetchLocations = async () => {
       try {
         const response = await fetch('https://delay.cloudflare.chaika.me/v2/locations');
         const data = await response.json();
 
-        // Group enabled locations by friendlyRegionName
+        const enabledLocations = data.data.filter(location => location.enabled);
+        setBaseLocations(enabledLocations);
+
+        // Group enabled locations by friendlyRegionName (just names for the region lists)
         const grouped = {};
-        data.data
-          .filter(location => location.enabled)
-          .forEach(location => {
+        enabledLocations.forEach(location => {
             const regionName = location.friendlyRegionName;
             if (!grouped[regionName]) {
               grouped[regionName] = [];
@@ -162,14 +187,12 @@ const CloudflareRouting = ({ fullscreen = false }) => {
             grouped[regionName].push(location.locationName);
           });
 
-        // Sort IATA codes for each region
         Object.keys(grouped).forEach(region => {
           grouped[region].sort();
         });
 
         setLocationsByRegion(grouped);
       } catch (error) {
-        // Silently ignore errors as requested
         console.error('Failed to fetch locations:', error);
       } finally {
         setLoadingLocations(false);
@@ -178,6 +201,39 @@ const CloudflareRouting = ({ fullscreen = false }) => {
 
     fetchLocations();
   }, []);
+
+  // Fetch per-plan location status whenever the selected job changes
+  useEffect(() => {
+    if (!selectedJob) return;
+    setJobLocationStatus({});
+    fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${selectedJob}/locations`)
+      .then(r => r.json())
+      .then(data => {
+        const byName = {};
+        for (const loc of (data.data ?? [])) {
+          byName[loc.locationName] = loc;
+        }
+        setJobLocationStatus(byName);
+      })
+      .catch(() => {});
+  }, [selectedJob]);
+
+  // Merge base location topology with per-plan run status
+  useEffect(() => {
+    if (!baseLocations.length) return;
+
+    const merged = baseLocations.map(loc => {
+      const jobStatus = jobLocationStatus[loc.locationName];
+      const jobColoId = jobStatus?.coloId ?? 0;
+      // Only use job's colo; null out if no valid per-plan coloId
+      const coloFields = jobColoId > 0
+        ? { coloId: jobColoId, ...(coloMap[jobColoId] ?? { coloFriendlyLocationName: null, coloLatitude: null, coloLongitude: null }) }
+        : { coloId: 0, coloFriendlyLocationName: null, coloLatitude: null, coloLongitude: null };
+      return { ...loc, ...(jobStatus ?? {}), ...coloFields };
+    });
+
+    setAllLocations(merged);
+  }, [baseLocations, jobLocationStatus, coloMap]);
 
   const handleJobChange = (event) => {
     setSelectedJob(event.target.value);
@@ -282,6 +338,18 @@ const CloudflareRouting = ({ fullscreen = false }) => {
           );
         })}
       </div>
+
+      {allLocations.length > 0 && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+            Testing Locations → CF PoP Connections
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+            Shows which Cloudflare PoP each testing location connects to for the <strong>{selectedJobLabel}</strong>. Hover for latest run status. Color groups testing locations with their destination PoP — diamonds are CF PoPs, circles are testing locations.
+          </p>
+          <LocationMap locations={allLocations} planLabel={selectedJobLabel} />
+        </div>
+      )}
     </div>
   );
 };

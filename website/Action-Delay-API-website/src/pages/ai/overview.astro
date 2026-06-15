@@ -23,8 +23,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       >
             <a href="/ai/">AI Jobs</a>
       </Hero>
-			<SmartGraph endpoint=`/v2/jobs/analytics/type/ai` label=`Overall Cloudflare AI Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
-			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/ai` label=`Overall Cloudflare AI Errors` options={["AvgApiResponseLatency" ]} client:only="preact"/> 
+			<SmartGraph endpoint="/v2/jobs/analytics/type/ai" label="Overall Workers AI Job Time" options={["MedianRunLength", "AvgRunLength", "MinRunLength", "MaxRunLength"]} defaultOption="MedianRunLength" client:only="preact"/>
+		<SmartGraph endpoint=`/v2/jobs/analytics/type/ai` label=`Overall Cloudflare AI Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/ai` label=`Overall Cloudflare AI Errors` client:only="preact"/>
     </main>
   </div>
 </BaseLayout>

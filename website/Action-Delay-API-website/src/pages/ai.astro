@@ -32,7 +32,7 @@ const reorderedList = jobs
   .sort((a, b) => {
     const aIsCloudflare = a.jobName.startsWith('cloudflare');
     const bIsCloudflare = b.jobName.startsWith('cloudflare');
-    if (aIsCloudflare !== bIsCloudflare) return bIsCloudflare - aIsCloudflare;
+    if (aIsCloudflare !== bIsCloudflare) return Number(bIsCloudflare) - Number(aIsCloudflare);
     return a.jobName.localeCompare(b.jobName);
   });
 
@@ -52,6 +52,21 @@ const reorderedList = jobs
 			>
 			      <a href="/ai/overview">Overview</a>
 			</Hero>
+			<input
+				id="job-filter"
+				type="text"
+				placeholder="Filter jobs..."
+				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4"
+			/>
+			<script>
+				document.getElementById('job-filter')?.addEventListener('input', function(e) {
+					const q = (e.target as HTMLInputElement).value.toLowerCase();
+					document.querySelectorAll('[id$="grid"]').forEach((card: Element) => {
+						(card.parentElement as HTMLElement).style.display =
+							card.id.toLowerCase().includes(q) ? '' : 'none';
+					});
+				});
+			</script>
 			<Grid>
 				{
 					reorderedList.map((job: Job) => (

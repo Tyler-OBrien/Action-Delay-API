@@ -15,12 +15,12 @@ export default defineConfig({
   },
   vite: {
     ssr: {
-      noExternal: 'plotly.js-basic-dist-min'
+      noExternal: ['plotly.js-basic-dist-min', 'plotly.js-geo-dist-min']
     },
     build: {
-      noExternal: 'plotly.js-basic-dist-min'
+      noExternal: ['plotly.js-basic-dist-min', 'plotly.js-geo-dist-min']
     }
-  }, 
+  },
   output: "server",
   adapter: cloudflare()
 });
