@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Plotly from 'plotly.js-geo-dist-min';
+import { isDarkMode } from './chartTheme';
 
 // Distinct palette for coloring by destination colo
 const PALETTE = [
@@ -15,7 +16,7 @@ function getColoColor(coloId, coloIds) {
 }
 
 function buildTraces(locations, isDark) {
-  const bgColor = isDark ? '#171717' : '#ffffff';
+  const bgColor = 'rgba(0,0,0,0)';
 
   // Build sorted list of unique coloIds for stable color assignment
   const coloIds = [...new Set(locations.map(l => l.coloId).filter(id => id != null && id > 0))].sort((a, b) => a - b);
@@ -141,8 +142,8 @@ const LocationMap = ({ locations, planLabel }) => {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains('dark'));
-    const handler = () => setIsDark(document.documentElement.classList.contains('dark'));
+    setIsDark(isDarkMode());
+    const handler = () => setIsDark(isDarkMode());
     window.addEventListener('themeChange', handler);
     return () => window.removeEventListener('themeChange', handler);
   }, []);

@@ -1,16 +1,13 @@
 ---
-import { getCollection } from 'astro:content';
-
 import BaseLayout from '../layouts/BaseLayout.astro';
 
 import JobDisplay from '../components/JobDisplay.astro';
 import Hero from '../components/Hero.astro';
 import Grid from '../components/Grid.astro';
+import CategorySection from '../components/CategorySection.astro';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
 import type { Job } from '../../models/cloudflare/job';
-import ErrorGraph from '../components/graph/ErrorGraph';
-import SmartGraph from '../components/graph/SmartGraph';
-
+import { groupJobs } from '../data/jobCategories';
 
 const getJobs = async () => {
 	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/ai")).json()).data
@@ -27,16 +24,8 @@ const stats: QuickStats[] = await getAnalyticsTask;
 
 const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-const reorderedList = jobs
-  .filter(job => new Date(job.predictedRunTime) >= oneWeekAgo)
-  .sort((a, b) => {
-    const aIsCloudflare = a.jobName.startsWith('cloudflare');
-    const bIsCloudflare = b.jobName.startsWith('cloudflare');
-    if (aIsCloudflare !== bIsCloudflare) return Number(bIsCloudflare) - Number(aIsCloudflare);
-    return a.jobName.localeCompare(b.jobName);
-  });
-
-
+const activeJobs = jobs.filter(job => new Date(job.predictedRunTime) >= oneWeekAgo);
+const groups = groupJobs(activeJobs, 'ai');
 ---
 
 <BaseLayout
@@ -50,33 +39,34 @@ const reorderedList = jobs
 				tagline="Monitoring the performance and errors of various Cloudflare Models. The inputs are random to avoid caching but roughly the same and we limit text LLMs to 100 output tokens. More data to be exposed in the future (like TPS)."
 				align="start"
 			>
-			      <a href="/ai/overview">Overview</a>
+				<a href="/ai/overview">Overview</a>
 			</Hero>
 			<input
 				id="job-filter"
 				type="text"
 				placeholder="Filter jobs..."
-				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4"
+				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 			/>
-			<script>
-				document.getElementById('job-filter')?.addEventListener('input', function(e) {
-					const q = (e.target as HTMLInputElement).value.toLowerCase();
-					document.querySelectorAll('[id$="grid"]').forEach((card: Element) => {
-						(card.parentElement as HTMLElement).style.display =
-							card.id.toLowerCase().includes(q) ? '' : 'none';
-					});
-				});
-			</script>
-			<Grid>
+			<div class="stack gap-4">
 				{
-					reorderedList.map((job: Job) => (
-						<li>
-							<JobDisplay type="ai" job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
-						</li>
+					groups.map((group, index) => (
+						<CategorySection
+							name={group.name}
+							count={group.jobs.length}
+							open={index === 0}
+						>
+							<Grid>
+								{group.jobs.map((job: Job) => (
+									<li>
+										<JobDisplay type="ai" job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
+									</li>
+								))}
+							</Grid>
+						</CategorySection>
 					))
 				}
-			</Grid>
+			</div>
+			<script src="../scripts/job-filter.js"></script>
 		</main>
-
 	</div>
 </BaseLayout>

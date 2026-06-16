@@ -1,356 +1,94 @@
 ---
-import { type CollectionEntry, getCollection } from 'astro:content';
-
 import BaseLayout from '../../layouts/BaseLayout.astro';
-
 import Hero from '../../components/Hero.astro';
 import Icon from '../../components/Icon.astro';
-import Pill from '../../components/Pill.astro';
 import type { Job } from '../../../models/cloudflare/job';
 import SmartGraph from '../../components/graph/SmartGraph.js';
 import ErrorGraph from '../../components/graph/ErrorGraph';
 import RegionGraphLazy from '../../components/graph/RegionGraphLazy.js';
-
-
+import JobDetailHeader from '../../components/JobDetailHeader.astro';
 
 interface Props {
 	internalJobName: string;
 }
 
-
-
 const { internalJobName } = Astro.params;
 
-const url = "https://delay.cloudflare.chaika.me/v2/jobs/" + internalJobName;
-
-const jobResp = await fetch(url);
-
-let job : Job = (await jobResp.json()).data;
+const jobResp = await fetch("https://delay.cloudflare.chaika.me/v2/jobs/" + internalJobName);
+let job: Job = (await jobResp.json()).data;
 if (!job) {
-	job = { internalJobName: internalJobName ?? '' } as Job
-	console.log(`job was null`)
-}
-//console.log(`Got data: ${JSON.stringify(job)}, got name: ${internalJobName}, nope! ${internalJobName}, ${JSON.stringify(Astro.props)}, ${JSON.stringify(Astro.params)}`)
-//console.log(`tried fetching: ${url}`)
-
-
-let lastUpdatedTxt = "";
-let delayTxt = "";
-let delayTxtUnit = "";
-let pending = { className: "", textContent: ""}
-
-
-
-function formatTime(ms: number | undefined): string {
-
-	if (ms == undefined) return "";
-
-let seconds = ms / 1000;
-if (seconds < 60) {
-return seconds.toFixed(2) + ' second(s)';
-}
-
-let minutes = seconds / 60;
-if (minutes < 60) {
-return minutes.toFixed(2) + ' minute(s)';
-}
-
-let hours = minutes / 60;
-return hours.toFixed(2) + ' hour(s)';
-}
-function formatTimeReturnUnit(ms: number | undefined): string[] {
-
-if (ms == undefined) return ['', ''];
-
-let seconds = ms / 1000;
-if (seconds < 60) {
-return [seconds.toFixed(2), `second(s)`];
-}
-
-let minutes = seconds / 60;
-if (minutes < 60) {
-	return [minutes.toFixed(2), `minute(s)`];
-}
-
-let hours = minutes / 60;
-
-return [hours.toFixed(2), `hour(s)`];
+	job = { internalJobName: internalJobName ?? '' } as Job;
+	console.log(`job was null`);
 }
 
 const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + (job?.internalJobName ?? job?.jobName));
-let quickAnalyticsData = []
+let quickAnalyticsData = [];
 if (quickAnalyticsResponse.ok) {
-quickAnalyticsData = await quickAnalyticsResponse.json();
+	quickAnalyticsData = await quickAnalyticsResponse.json();
 }
 
-// Parsing quickanalytics and updating the HTML
-let peakPeriod, dailyMedian, getJobMedian, monthlyMedian, peakPeriodTxt, quarterlyMedian;
-
-
-quickAnalyticsData?.forEach((item: any) => {
-switch (item.period) {
-case "Last 1 Day":
-    dailyMedian = formatTime(parseInt(item.median_run_length));
-    if (item.median_run_length && (parseInt(item.median_run_length)) > 0)
-			getJobMedian = parseInt(item.median_run_length);
-    break;
-case "Last 30 Days":
-    monthlyMedian = formatTime(parseInt(item.median_run_length));
-    break;
-case "Last 90 Days":
-    quarterlyMedian = formatTime(parseInt(item.median_run_length));
-    break;
-default:
-    peakPeriod = formatTime(parseInt(item.median_run_length));
-	peakPeriodTxt  = `From ${new Date(item.period + "Z").toLocaleTimeString()} - ${new Date(new Date(item.period + "Z").getTime() + parseInt(item.median_run_length)).toLocaleTimeString()}`
-}
-})
-
-var runTimeToUse = job.currentRunTime;
-if (job.currentRunStatus === "Deployed") {
-    if (job.internalJobName === "cron") {
-        delayTxtUnit = "Last Event: " + formatTime(new Date().getTime() - new Date(job.currentRunTime).getTime()) + " ago"
-		/*
-        if (job.currentRunLengthMs < 120000) {
-            cronId.textContent = "Healthy";
-            cronId.className =  cronId.className.replaceAll("highlightYellow", "") + 'highlightGreen';
-        }
-        else {
-            cronId.textContent = "Delayed";
-            pending.className =  cronId.className.replaceAll("highlightGreen", "") + 'sub-header highlightYellow';
-        }
-		*/
-    }
-    else {
-		[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
-    }
-    pending.className = '';
-    pending.textContent = '';
-} else if (job.currentRunStatus === "Undeployed" && ((!getJobMedian || (job.currentRunLengthMs ?? 0) > getJobMedian * 1.2) && (job.currentRunLengthMs ?? 0) > 5000)) {
-	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
-    if ((!getJobMedian || ((job.currentRunLengthMs ?? 0) * 3) > getJobMedian) && (job.currentRunLengthMs ?? 0) > 30000)
-    {
-        pending.textContent = 'IN PROGRESS';
-        pending.className = 'highlightRed';
-    }
-    else {
-    pending.textContent = 'IN PROGRESS';
-    pending.className = 'highlightYellow';
-    }
-}
-else if (job.currentRunStatus == "API_Error" && job.lastRunStatus == "API_Error") {
-    delayTxt = 'CF API Error';
-	delayTxtUnit = "";
-    pending.textContent = 'CF API Error';
-    pending.className = 'highlightRed';
-}
-else
-{
-	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
-    pending.className = '';
-    pending.textContent = '';
-    runTimeToUse = job.lastRunTime;
-}
-
-let noLastUpdate = false;
-
-lastUpdatedTxt = formatTime(new Date().getTime() - new Date(runTimeToUse ?? '').getTime()) + " ago";
-if (job.internalJobName === "cron") {
-	noLastUpdate = true;
-}
-
-
-
-
+const enc = job.internalJobName;
 ---
 
-<BaseLayout title={job?.jobName ?? ""} description ={job?.jobDescription ?? ""}>
-	<div class="stack gap-20">
-		<div class="stack gap-15">
-			<header>
-				<div class="wrapper stack gap-2">
-					<a class="back-link" href="/delay/"><Icon icon="arrow-left" />All Jobs</a>
-					<Hero title={job?.jobName} align="start">
-						<p>{job?.jobDescription}</p>
-						<a id="websocket-conn-status">Disconnected</a>
-						<div class="details">
-							<div class="w-full p-12">
-								<div class="container mx-auto max-w-3xl">
-							
-						
+<BaseLayout title={job?.jobName ?? ""} description={job?.jobDescription ?? ""}>
+	<div class="stack gap-8">
+		<header class="wrapper stack gap-3">
+			<a class="back-link" href="/delay/"><Icon icon="arrow-left" />All Jobs</a>
+			<Hero title={job?.jobName} align="start">
+				<p>{job?.jobDescription}</p>
+				<a id="websocket-conn-status">Disconnected</a>
+			</Hero>
+			<JobDetailHeader job={job} stats={quickAnalyticsData} type="job" />
+		</header>
 
-									<div class="flex flex-col md:flex-row justify-center items-center mb-8">
-
-
-										<div class="text-7xl font-bold text-center md:w-1/2" id=`delayNumberOuter${job.internalJobName}`><span class="text-7xl font-bold text-center md:w-1/2" id=`delayNumber${job.internalJobName}`>{delayTxt}</span> <span class="text-2xl" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span></div> 
-									</div>
-									<div class="flex flex-col md:flex-row justify-center items-center mb-8">
-										<div class=`${pending.className} text-center mb-2 h-4` id=`pending${job.internalJobName}`>{pending.textContent}</div>
-									</div>
-							
-									<div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 mx-auto max-w-3xl">
-										{noLastUpdate ? null : (
-										<div class="flex flex-col items-center">
-											<div class="text-gray-600 text-base">Last Update:</div>
-											<div class="font-semibold text-lg" id=`lastUpdate${job.internalJobName}`>{lastUpdatedTxt}</div> 
-										</div>
-										)}
-							
-										{!peakPeriod ? null : ( 
-										<div class="flex flex-col items-center">
-											<div class="text-gray-600 text-base">Last 24H Peak:</div> 
-											<div class="font-semibold text-lg" id=`peak${job.internalJobName}`>{peakPeriod}</div> 
-											<div class="text-gray-600 text-sm" id=`peak-period${job.internalJobName}`>{peakPeriodTxt}</div> 
-										</div>
-										)}
-							
-										<div class="flex flex-col items-center">
-											<div class="text-gray-600 text-base">1 Day Median:</div>
-											<div class="font-semibold text-lg" id=`median1d${job.internalJobName}`>{dailyMedian}</div>
-									</div>
-
-									<div class="flex flex-col items-center">
-											<div class="text-gray-600 text-base">30 Days Median:</div>
-											<div class="font-semibold text-lg" id=`median30d${job.internalJobName}`>{monthlyMedian}</div>
-										</div>
-							
-										<div class="flex flex-col items-center">
-											<div class="text-gray-600 text-base">90 Days Median:</div>
-											<div class="font-semibold text-lg" id=`median90d${job.internalJobName}`>{quarterlyMedian}</div>
-										</div>
-
-								{job.predictedDelayLengthMs && job.predictedDelayLengthMs > 0 && (
-								<div class="flex flex-col items-center">
-									<div class="text-gray-600 text-base">Predicted:</div>
-									<div class="font-semibold text-lg">~{formatTime(job.predictedDelayLengthMs)}</div>
-								</div>
-								)}
-							
-										{}
-									</div>
-							
-								</div>
-							</div>
-						</div>
-					</Hero>
+		<main class="wrapper stack gap-6">
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+				<div class="surface p-4">
+					<SmartGraph endpoint={`v2/jobs/${enc}/analytics`} label={job.jobName} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} client:only="preact"/>
 				</div>
-			</header>
-			<main class="wrapper">
-				<div class="stack gap-10 content">
-					
-					<div class="content">
-						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["MedianRunLength", "MinRunLength", "MaxRunLength", "AvgRunLength"]} client:only="preact"/>
-						<SmartGraph endpoint=`v2/jobs/${job.internalJobName}/analytics` label={job.jobName} options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
-						<ErrorGraph endpoint=`v2/jobs/${job.internalJobName}/erroranalytics` label={job.jobName} client:only="preact"/>
-						<details id="region-breakdown" class="mt-4">
-					<summary class="cursor-pointer font-semibold text-lg mb-2">Regional Breakdown</summary>
-					<RegionGraphLazy detailsId="region-breakdown" jobName={job.internalJobName} label={job.jobName} client:only="preact"/>
-				</details>
-					</div>
-
-
-					
+				<div class="surface p-4">
+					<SmartGraph endpoint={`v2/jobs/${enc}/analytics`} label={job.jobName} options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
 				</div>
-			</main>
-			<iframe id="jobmapiframe" src="https://jobmap.cloudflare.chaika.me/" width="100%" style="height: 80vh !important;"></iframe>
-		</div>
+				<div class="surface p-4 lg:col-span-2">
+					<SmartGraph endpoint={`v2/jobs/${enc}/analytics`} label={job.jobName} options={["MedianEdgeResponseLatency", "AvgEdgeResponseLatency", "MinEdgeResponseLatency", "MaxEdgeResponseLatency"]} client:only="preact"/>
+				</div>
+			</div>
+
+			<div class="surface p-2">
+				<ErrorGraph endpoint={`v2/jobs/${enc}/erroranalytics`} label={job.jobName} client:only="preact"/>
+			</div>
+
+			<details id="region-breakdown" class="surface p-4" open>
+				<summary class="cursor-pointer font-semibold text-lg">Regional Breakdown</summary>
+				<RegionGraphLazy detailsId="region-breakdown" jobName={job.internalJobName} label={job.jobName} client:only="preact"/>
+			</details>
+
+			<details class="surface p-4" open>
+				<summary class="cursor-pointer font-semibold text-lg">Geographic Map</summary>
+				<iframe id="jobmapiframe" src="https://jobmap.cloudflare.chaika.me/" width="100%" style="height: 70vh !important;" class="mt-3 rounded-lg"></iframe>
+			</details>
+		</main>
 	</div>
+
 	<script define:vars={{ quickAnalyticsData, job }}>
-globalThis.jobStats = quickAnalyticsData;
-globalThis.jobData = job;
-globalThis.jobName = job.internalJobName;
-</script>
+		globalThis.jobStats = quickAnalyticsData;
+		globalThis.jobData = job;
+		globalThis.jobName = job.internalJobName;
+	</script>
 	<script src="../assets/js/8.0.7/signalr.min.js" is:inline> </script>
-      <script src="../assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
-      <script src="../../scripts/signalr-job-code.js"> </script>
+	<script src="../assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
+	<script src="../../scripts/signalr-job-code.js"> </script>
 </BaseLayout>
 
 <style>
-	header {
-		padding-bottom: 2.5rem;
-		border-bottom: 1px solid var(--gray-800);
-	}
-
 	.back-link {
 		display: none;
-	}
-
-	.details {
-		display: flex;
-		flex-direction: column;
-		padding: 0.5rem;
-		gap: 1.5rem;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.tags {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.description {
-		font-size: var(--text-lg);
-		max-width: 54ch;
-	}
-
-
-	.content > :global(* + *) {
-		margin-top: 1rem;
-	}
-
-	.content :global(h1),
-	.content :global(h2),
-	.content :global(h3),
-	.content :global(h4),
-	.content :global(h5) {
-		margin: 1.5rem 0;
-	}
-
-	.content :global(img) {
-		border-radius: 1.5rem;
-		box-shadow: var(--shadow-sm);
-		background: var(--gradient-subtle);
-		border: 1px solid var(--gray-800);
-	}
-
-	.content :global(blockquote) {
-		font-size: var(--text-lg);
-		font-family: var(--font-brand);
-		font-weight: 600;
-		line-height: 1.1;
-		padding-inline-start: 1.5rem;
-		border-inline-start: 0.25rem solid var(--accent-dark);
-		color: var(--gray-0);
-	}
-
-	.back-link,
-	.content :global(a) {
-		text-decoration: 1px solid underline transparent;
-		text-underline-offset: 0.25em;
-		transition: text-decoration-color var(--theme-transition);
-	}
-
-	.back-link:hover,
-	.back-link:focus,
-	.content :global(a:hover),
-	.content :global(a:focus) {
-		text-decoration-color: currentColor;
 	}
 
 	@media (min-width: 50em) {
 		.back-link {
 			display: block;
 			align-self: flex-start;
-		}
-
-		.details {
-			flex-direction: row;
-			gap: 2.5rem;
-		}
-
-		.content :global(blockquote) {
-			font-size: var(--text-2xl);
 		}
 	}
 </style>

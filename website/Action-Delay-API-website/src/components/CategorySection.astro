@@ -1,0 +1,65 @@
+---
+/**
+ * Collapsible category section for the job listing pages.
+ * Pure <details>/<summary> — no framework JS — so it works with the
+ * shared job-filter script (src/scripts/job-filter.js), which toggles
+ * `open` and `display` via the `data-category` hook.
+ */
+interface Props {
+  name: string;
+  count: number;
+  /** Tailwind bg color class for the status dot, e.g. "bg-green-500". */
+  statusColor?: string;
+  open?: boolean;
+  /** Tailwind padding for the body wrapper. Tighten for dense table content. */
+  bodyClass?: string;
+}
+
+const { name, count, statusColor, open = false, bodyClass = "pt-5 pb-2" } = Astro.props;
+---
+
+<details class="category-section" data-category open={open}>
+  <summary
+    class="surface surface-hover flex items-center justify-between gap-3 cursor-pointer select-none px-4 py-3"
+  >
+    <span class="flex items-center gap-2.5 min-w-0">
+      {statusColor && <span class={`shrink-0 w-2.5 h-2.5 rounded-full ${statusColor}`}></span>}
+      <span class="font-semibold text-lg truncate">{name}</span>
+      <span
+        class="shrink-0 text-sm text-gray-500 dark:text-gray-400 tabular-nums"
+        data-count
+      >{count}</span>
+    </span>
+    <svg
+      class="chevron shrink-0 w-5 h-5 text-gray-400 transition-transform"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>
+  </summary>
+  <div class={bodyClass}>
+    <slot />
+  </div>
+</details>
+
+<style>
+  .category-section {
+    margin-block: 0;
+  }
+  .category-section[open] > summary .chevron {
+    transform: rotate(180deg);
+  }
+  /* Remove the default disclosure triangle. */
+  .category-section > summary {
+    list-style: none;
+  }
+  .category-section > summary::-webkit-details-marker {
+    display: none;
+  }
+</style>

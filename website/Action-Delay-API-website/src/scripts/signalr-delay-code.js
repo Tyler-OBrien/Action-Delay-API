@@ -1,3 +1,9 @@
+// Strip any stale value-good|elevated|bad class — the value text is no longer color-coded.
+function applyHealthClass(el) {
+  if (!el) return;
+  el.className = el.className.replace(/\bvalue-(good|elevated|bad)\b/g, "").replace(/\s+/g, " ").trim();
+}
+
 const connection = new signalR.HubConnectionBuilder()
   .withUrl("https://delay.cloudflare.chaika.me/v2/jobs/signalr", {
     transport: signalR.HttpTransportType.WebSockets,
@@ -136,7 +142,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   const type = getCurrentData.jobType;
 
   function formatTime(ms) {
-    if (ms == undefined) return "";
+    if (ms == undefined || isNaN(ms)) return "";
 
     let seconds = ms / 1000;
     if (seconds < 60) {
@@ -282,19 +288,22 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     ).innerText = `Last Update: ${lastUpdatedTxt}`;
   }
 
-  document.getElementById(
-    `delayNumber${job.internalJobName}`
-  ).innerText = `${delayTxt}`;
+  const delayNumberEl = document.getElementById(`delayNumber${job.internalJobName}`);
+  delayNumberEl.innerText = `${delayTxt}`;
+  const hasIncident = (globalThis.incidents || []).some(
+    (i) => i.target === job.internalJobName && i.active
+  );
+  applyHealthClass(delayNumberEl, job, hasIncident);
   document.getElementById(
     `delayUnit${job.internalJobName}`
   ).innerText = `${delayTxtUnit}`;
 
   const el1d = document.getElementById(`median1d${job.internalJobName}`);
-  if (el1d && dailyMedian) el1d.innerText = `1 Day: ${dailyMedian}`;
+  if (el1d && dailyMedian) el1d.innerText = dailyMedian;
   const el30d = document.getElementById(`median30d${job.internalJobName}`);
-  if (el30d && monthlyMedian) el30d.innerText = `30 Days: ${monthlyMedian}`;
+  if (el30d && monthlyMedian) el30d.innerText = monthlyMedian;
   const el90d = document.getElementById(`median${job.internalJobName}`);
-  if (el90d && quarterlyMedian) el90d.innerText = `90 Days: ${quarterlyMedian}`;
+  if (el90d && quarterlyMedian) el90d.innerText = quarterlyMedian;
 }
 
 start();

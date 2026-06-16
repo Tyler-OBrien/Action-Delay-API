@@ -5,12 +5,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import JobDisplay from "../components/JobDisplay.astro";
 import Hero from "../components/Hero.astro";
 import Grid from "../components/Grid.astro";
+import CategorySection from "../components/CategorySection.astro";
 import type { QuickStats } from "../../models/cloudflare/quickstat";
 import type { Job } from "../../models/cloudflare/job";
 import type { OverallAnalytics } from "../../models/cloudflare/overallanalytics";
 import type { Incident } from "../../models/types";
-import SmartGraph from "../components/graph/SmartGraph";
-import ErrorGraph from "../components/graph/ErrorGraph";
+import { groupJobs } from "../data/jobCategories";
 
 const getJobs = async () => {
   return (
@@ -50,45 +50,23 @@ const [jobs, stats, overall, incidents]: [Job[], QuickStats[], OverallAnalytics 
   getJobs(), getAnalytics(), getOverallAnalytics(), getIncidents()
 ]);
 
-// Define your priority groups
-const FIRST_GROUP = ["worker", "dns", 'waf'];  
-const LAST_GROUP = ["analytics", "wfp", 'cron', 'cert'];  
+const groups = groupJobs(jobs, "delay");
 
-const reorderedList = jobs
-  .filter(job => job.internalJobName !== "workertesting")
-  .sort((joba, jobb) => {
-    const jobAName = joba.internalJobName;
-    const jobBName = jobb.internalJobName;
+// Flatten (visible, grouped) jobs for the live-update script.
+const visibleJobs = groups.flatMap((g) => g.jobs);
 
-    // Check if jobs are in FIRST_GROUP
-    const aIsFirst = FIRST_GROUP.some(prefix => jobAName === prefix || jobAName.startsWith(prefix + "-"));
-    const bIsFirst = FIRST_GROUP.some(prefix => jobBName === prefix || jobBName.startsWith(prefix + "-"));
-    
-    // Check if jobs are in LAST_GROUP
-    const aIsLast = LAST_GROUP.some(prefix => jobAName === prefix || jobAName.startsWith(prefix + "-"));
-    const bIsLast = LAST_GROUP.some(prefix => jobBName === prefix || jobBName.startsWith(prefix + "-"));
+const hasIncident = (job: Job) =>
+  incidents.some((i) => i.target === job.internalJobName && i.active);
 
-    if (aIsFirst && bIsFirst) {
-      // Both in first group - sort alphabetically within group
-      return jobAName.localeCompare(jobBName);
-    }
-    if (aIsLast && bIsLast) {
-      // Both in last group - sort alphabetically within group
-      return jobAName.localeCompare(jobBName);
-    }
-    
-    // Handle priority ordering
-    if (aIsFirst) return -1;  // a goes first
-    if (bIsFirst) return 1;   // b goes first
-    if (aIsLast) return 1;    // a goes last
-    if (bIsLast) return -1;   // b goes last
-
-    // Neither in special groups - sort alphabetically
-    return jobAName.localeCompare(jobBName);
-  });
+// A delay category is "degraded" if any member has an active incident,
+// an API error, or is currently marked delayed.
+const groupIssue = (groupJobsList: Job[]) =>
+  groupJobsList.some(
+    (j) => hasIncident(j) || j.predictedRunStatus === "API_Error" || j.type === "delayed"
+  );
 ---
-<script define:vars={{ reorderedList, stats }}>
-globalThis.jobData = reorderedList;
+<script define:vars={{ visibleJobs, stats }}>
+globalThis.jobData = visibleJobs;
 globalThis.jobStats = stats;
 </script>
 <BaseLayout
@@ -116,33 +94,36 @@ globalThis.jobStats = stats;
         id="job-filter"
         type="text"
         placeholder="Filter jobs..."
-        class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4"
+        class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
       />
-      <script>
-        document.getElementById('job-filter')?.addEventListener('input', function(e) {
-          const q = (e.target as HTMLInputElement).value.toLowerCase();
-          document.querySelectorAll('[id$="grid"]').forEach((card: Element) => {
-            (card.parentElement as HTMLElement).style.display =
-              card.id.toLowerCase().includes(q) ? '' : 'none';
-          });
-        });
-      </script>
-      <Grid>
+      <div class="stack gap-4">
         {
-          reorderedList.map((job: Job) => (
-            <li>
-              <JobDisplay
-                type="job"
-                job={job}
-                stats={stats.filter(
-                  (stat) => stat.job_name.toLowerCase() == job.internalJobName
-                )}
-                hasIncident={incidents.some(i => i.target === job.internalJobName && i.active)}
-              />
-            </li>
+          groups.map((group) => (
+            <CategorySection
+              name={group.name}
+              count={group.jobs.length}
+              statusColor={groupIssue(group.jobs) ? "bg-yellow-500" : "bg-green-500"}
+              open={true}
+            >
+              <Grid>
+                {group.jobs.map((job: Job) => (
+                  <li>
+                    <JobDisplay
+                      type="job"
+                      job={job}
+                      stats={stats.filter(
+                        (stat) => stat.job_name.toLowerCase() == job.internalJobName
+                      )}
+                      hasIncident={hasIncident(job)}
+                    />
+                  </li>
+                ))}
+              </Grid>
+            </CategorySection>
           ))
         }
-      </Grid>
+      </div>
+      <script src="../scripts/job-filter.js"></script>
       <script src="/assets/js/8.0.7/signalr.min.js" is:inline> </script>
       <script src="/assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
       <script src="../scripts/signalr-delay-code.js"> </script>

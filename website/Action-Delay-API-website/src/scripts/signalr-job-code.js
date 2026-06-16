@@ -1,3 +1,9 @@
+// Strip any stale value-good|elevated|bad class — the value text is no longer color-coded.
+function applyHealthClass(el) {
+  if (!el) return;
+  el.className = el.className.replace(/\bvalue-(good|elevated|bad)\b/g, "").replace(/\s+/g, " ").trim();
+}
+
 const connection = new signalR.HubConnectionBuilder()
   .withUrl("https://delay.cloudflare.chaika.me/v2/jobs/signalr", {
     transport: signalR.HttpTransportType.WebSockets,
@@ -159,7 +165,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   const type = getCurrentData.jobType;
 
   function formatTime(ms) {
-    if (ms == undefined) return "";
+    if (ms == undefined || isNaN(ms)) return "";
 
     let seconds = ms / 1000;
     if (seconds < 60) {
@@ -306,15 +312,18 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     ).innerText = `${lastUpdatedTxt}`;
   }
 
-  document.getElementById(
-    `delayNumber${job.internalJobName}`
-  ).innerText = `${delayTxt}`;
+  const delayNumberEl = document.getElementById(`delayNumber${job.internalJobName}`);
+  delayNumberEl.innerText = `${delayTxt}`;
+  const hasIncident = (globalThis.incidents || []).some(
+    (i) => i.target === job.internalJobName && i.active
+  );
+  applyHealthClass(delayNumberEl, job, hasIncident);
   document.getElementById(
     `delayUnit${job.internalJobName}`
   ).innerText = `${delayTxtUnit}`;
 
   const el1d = document.getElementById(`median1d${job.internalJobName}`);
-  if (el1d && dailyMedian) el1d.innerText = `1 Day Median: ${dailyMedian}`;
+  if (el1d && dailyMedian) el1d.innerText = dailyMedian;
 }
 
 start();

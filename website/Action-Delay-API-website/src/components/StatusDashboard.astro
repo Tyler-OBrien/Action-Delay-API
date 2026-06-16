@@ -1,0 +1,315 @@
+---
+import type { Job } from "../../models/cloudflare/job";
+import type { Incident } from "../../models/types";
+import Sparkline from "./graph/Sparkline.jsx";
+import { statusConfig as config } from "../data/jobCategories";
+import { jobHealth, dotClass, type Health } from "../data/jobHealth";
+
+/**
+ * Self-contained Cloudflare status dashboard. Rendered on both `/` and `/status`.
+ *
+ * NOTE: the DOM ids below (item-{job}-*, grp-{group}-*, details-{job},
+ * websocket-conn-status) and the globalThis.{jobData,config,incidents} wiring are
+ * relied on by src/scripts/signalr-status-code.js — do not rename them.
+ */
+
+const getJobs = async () => {
+  return (
+    await (
+      await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/CloudflareDelay")
+    ).json()
+  ).data;
+};
+
+const getIncidentsData = async () => {
+  return (
+    await (
+      await fetch("https://delay.cloudflare.chaika.me/v2/incidents/type/CloudflareDelay")
+    ).json()
+  ).data;
+};
+
+const [jobs, incidents]: [Job[], Incident[]] = await Promise.all([
+  getJobs(),
+  getIncidentsData(),
+]);
+
+function getItemStatus(jobName: string) {
+  const job = jobs.find((j) => j.internalJobName === jobName);
+  if (!job) return { status: "Unknown", color: "bg-gray-500", time: null };
+
+  const incident = incidents.find((inc) => inc.target === jobName && inc.active);
+
+  if (incident) {
+    return {
+      status: "Degraded",
+      color: "bg-yellow-500",
+      time: job.predictedRunTime,
+      length: job.predictedDelayLengthMs,
+      runStatus: job.predictedRunStatus,
+    };
+  }
+
+  if (job.predictedRunStatus === "API_Error") {
+    return {
+      status: "API Down",
+      color: "bg-red-500",
+      time: null,
+      length: job.predictedDelayLengthMs,
+      runStatus: job.predictedRunStatus,
+    };
+  }
+
+  if (job.type === "delayed") {
+    return {
+      status: "Delayed",
+      color: "bg-orange-500",
+      time: job.predictedRunTime,
+      length: job.predictedDelayLengthMs,
+      runStatus: job.predictedRunStatus,
+    };
+  }
+
+  return {
+    status: "Normal",
+    color: "bg-green-500",
+    time: job.predictedRunTime,
+    length: job.predictedDelayLengthMs,
+    runStatus: job.predictedRunStatus,
+  };
+}
+
+function getGroupStatus(groupItems: any[]) {
+  const hasIssues = groupItems.some((item) => {
+    const job = jobs.find((j) => j.internalJobName === item.jobName);
+    if (!job) return false;
+
+    const incident = incidents.find((inc) => inc.target === item.jobName && inc.active);
+    if (incident) return true;
+
+    if (job.predictedRunStatus === "API_Error" || job.type === "delayed") {
+      return true;
+    }
+
+    return false;
+  });
+
+  return hasIssues
+    ? { status: "Partially Degraded", color: "bg-yellow-500" }
+    : { status: "Normal", color: "bg-green-500" };
+}
+
+function runLengthDisplayFormat(jobName: string, ms: number | undefined): string {
+  if (jobName == "cron") {
+    if (ms) ms -= 60_000;
+  }
+
+  if (ms == undefined) return "";
+
+  let seconds = ms / 1000;
+  if (seconds < 60) {
+    return seconds.toFixed(2) + " second(s)";
+  }
+
+  let minutes = seconds / 60;
+  if (minutes < 60) {
+    return minutes.toFixed(2) + " minute(s)";
+  }
+
+  let hours = minutes / 60;
+  return hours.toFixed(2) + " hour(s)";
+}
+
+function formatTime(date: Date | null) {
+  if (!date) return "";
+  return new Date(date).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+/** Health level for a job (drives the inline sparkline color). */
+function rowHealth(jobName: string): Health {
+  const job = jobs.find((j) => j.internalJobName === jobName);
+  if (!job) return "good";
+  const hasIncident = incidents.some((inc) => inc.target === jobName && inc.active);
+  return jobHealth(job as any, hasIncident);
+}
+
+/** Job description for the row "?" tooltip (empty string if none). */
+function itemDescription(jobName: string): string {
+  return jobs.find((j) => j.internalJobName === jobName)?.jobDescription ?? "";
+}
+
+/** Tally every configured item's status into the overall summary counts. */
+function buildSummary() {
+  const counts = { operational: 0, delayed: 0, degraded: 0, apiDown: 0 };
+  for (const group of config.groups) {
+    for (const item of group.items) {
+      const s = getItemStatus(item.jobName).status;
+      if (s === "API Down") counts.apiDown++;
+      else if (s === "Degraded") counts.degraded++;
+      else if (s === "Delayed") counts.delayed++;
+      else if (s === "Normal") counts.operational++;
+    }
+  }
+
+  let health: Health = "good";
+  let headline = "All Cloudflare Systems Normal";
+  if (counts.apiDown > 0) {
+    health = "bad";
+    headline = `${counts.apiDown} Service${counts.apiDown > 1 ? "s" : ""} Reporting API Errors`;
+  } else if (counts.degraded > 0) {
+    health = "elevated";
+    headline = `${counts.degraded} Service${counts.degraded > 1 ? "s" : ""} Degraded`;
+  } else if (counts.delayed > 0) {
+    health = "elevated";
+    headline = `${counts.delayed} Service${counts.delayed > 1 ? "s" : ""} Delayed`;
+  }
+  return { counts, health, headline };
+}
+
+const summary = buildSummary();
+---
+
+<script define:vars={{ jobs, config, incidents }}>
+  globalThis.jobData = jobs;
+  globalThis.config = config;
+  globalThis.incidents = incidents;
+</script>
+
+<div class="surface px-5 py-4 sm:px-6 sm:py-5 mb-6">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-3">
+      <span
+        class={`w-3.5 h-3.5 rounded-full flex-none ${dotClass(summary.health)}`}
+        id="overall-status-dot"
+      />
+      <div>
+        <h2 class="text-xl font-semibold leading-tight" id="overall-status-headline">
+          {summary.headline}
+        </h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Live propagation-delay monitoring · auto-updating
+        </p>
+      </div>
+    </div>
+    <a id="websocket-conn-status" class="websocket-conn-pill self-start sm:self-auto">
+      Connecting to Live Updates…
+    </a>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mt-4">
+    <span
+      class={`status-chip status-chip-good ${summary.counts.operational === 0 ? "is-zero" : ""}`}
+      id="summary-count-operational"
+    >
+      <span class="chip-dot" />{summary.counts.operational} Operational
+    </span>
+    <span
+      class={`status-chip status-chip-elevated ${summary.counts.delayed === 0 ? "is-zero" : ""}`}
+      id="summary-count-delayed"
+    >
+      <span class="chip-dot" />{summary.counts.delayed} Delayed
+    </span>
+    <span
+      class={`status-chip status-chip-elevated ${summary.counts.degraded === 0 ? "is-zero" : ""}`}
+      id="summary-count-degraded"
+    >
+      <span class="chip-dot" />{summary.counts.degraded} Degraded
+    </span>
+    <span
+      class={`status-chip status-chip-bad ${summary.counts.apiDown === 0 ? "is-zero" : ""}`}
+      id="summary-count-apidown"
+    >
+      <span class="chip-dot" />{summary.counts.apiDown} API Down
+    </span>
+  </div>
+</div>
+
+<div class="space-y-4">
+  {
+    config.groups.map((group) => {
+      const groupStatus = getGroupStatus(group.items);
+
+      return (
+        <div class="surface overflow-hidden">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+            <h2 class="text-lg font-semibold">{group.name}</h2>
+            <div class="flex items-center">
+              <span
+                class={`w-2.5 h-2.5 rounded-full mr-2 ${groupStatus.color}`}
+                id={`grp-${group.name}-color`}
+              />
+              <span class="text-sm font-medium" id={`grp-${group.name}-status`}>
+                {groupStatus.status}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            {group.items.map((item) => {
+              const status = getItemStatus(item.jobName);
+
+              return (
+                <a
+                  href={`/job/${item.jobName}`}
+                  class="flex items-center justify-between gap-3 px-6 py-3 hover:bg-gray-50 dark:hover:bg-white/5 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                >
+                  <span class="flex items-center gap-1.5 min-w-0">
+                    <span class="font-medium">{item.name}</span>
+                    {itemDescription(item.jobName) && (
+                      <span
+                        class="flex-none inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] cursor-help"
+                        title={itemDescription(item.jobName)}
+                      >?</span>
+                    )}
+                  </span>
+                  <div class="flex items-center gap-3">
+                    <div class="hidden sm:block w-24 md:w-28 flex-none">
+                      <Sparkline
+                        endpoint={`v2/jobs/${item.jobName}/analytics`}
+                        metric="MedianRunLength"
+                        health={rowHealth(item.jobName)}
+                        days={7}
+                        client:visible
+                      />
+                    </div>
+                    <span
+                      class="text-sm text-gray-500 dark:text-gray-300 text-right"
+                      id={`item-${item.jobName}-runLength`}
+                    >
+                      {runLengthDisplayFormat(item.jobName, status.length)}
+                    </span>
+                    {status.time && (
+                      <span
+                        class="text-sm text-gray-500 dark:text-gray-300 hidden sm:inline"
+                        id={`item-${item.jobName}-time`}
+                      >
+                        {formatTime(status.time)}
+                      </span>
+                    )}
+                    <div class="flex items-center">
+                      <span
+                        class={`w-2.5 h-2.5 rounded-full mr-2 ${status.color}`}
+                        id={`item-${item.jobName}-color`}
+                      />
+                      <span class="text-sm font-medium" id={`item-${item.jobName}-status`}>
+                        {status.status}
+                      </span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      );
+    })
+  }
+</div>
+
+<script src="/assets/js/8.0.7/signalr.min.js" is:inline></script>
+<script src="/assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline></script>
+<script src="../scripts/signalr-status-code.js"></script>

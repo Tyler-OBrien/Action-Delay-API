@@ -15,6 +15,8 @@ const RegionGraphLazy = ({ detailsId, ...props }) => {
         });
       }
     };
+    // Load immediately if it's already open (e.g. `<details open>`), otherwise wait for toggle.
+    handler();
     details.addEventListener('toggle', handler);
     return () => details.removeEventListener('toggle', handler);
   }, [detailsId, loaded]);

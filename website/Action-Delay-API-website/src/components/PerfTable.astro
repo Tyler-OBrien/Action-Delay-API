@@ -1,0 +1,250 @@
+---
+import type { Job } from "../../models/cloudflare/job";
+import type { QuickStats } from "../../models/cloudflare/quickstat";
+import type { JobGroup } from "../data/jobCategories";
+import { perfVariant } from "../data/jobCategories";
+import { jobHealth, dotClass } from "../data/jobHealth";
+import CategorySection from "./CategorySection.astro";
+import Sparkline from "./graph/Sparkline.jsx";
+
+/**
+ * Cross-provider comparison tables for the /perf listing — one sortable table per
+ * workload category. Within a category, near-duplicate jobs (same service across
+ * regions / sizes / read-write) collapse under an expandable parent row keyed by
+ * provider + service + operation; the parent shows the median variant. Sorting,
+ * expand/collapse and the shared #job-filter are wired by perf-table.js via the
+ * per-row data-* hooks. Static snapshot (no SignalR on the perf listing).
+ */
+
+interface Props {
+  groups: JobGroup<Job>[];
+  stats: QuickStats[];
+}
+
+const { groups, stats } = Astro.props;
+
+/** Latency formatter — ms first (perf values are ~10–200 ms), then s / min. */
+function fmtLatency(ms: number | null | undefined): string {
+  if (ms == null || isNaN(ms)) return "—";
+  if (ms < 1000) return `${ms < 10 ? ms.toFixed(1) : Math.round(ms)} ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(2)} s`;
+  return `${(ms / 60_000).toFixed(2)} min`;
+}
+
+/** p50 (median_run_length) for a job over a named QuickStats period. */
+function p50(jobName: string, period: string): number | null {
+  const s = stats?.find(
+    (x) => x.job_name?.toLowerCase() === jobName.toLowerCase() && x.period === period
+  );
+  const v = s ? parseInt(s.median_run_length) : NaN;
+  return isNaN(v) ? null : v;
+}
+
+/** Current latency snapshot: deployed -> current run, else last run; API errors flagged. */
+function nowLatency(job: Job): { ms: number | null; apiError: boolean } {
+  if (job.currentRunStatus === "API_Error" && job.lastRunStatus === "API_Error") {
+    return { ms: null, apiError: true };
+  }
+  if (job.currentRunStatus === "Deployed") {
+    return { ms: job.currentRunLengthMs ?? null, apiError: false };
+  }
+  return { ms: job.lastRunLengthMs ?? job.currentRunLengthMs ?? null, apiError: false };
+}
+
+/** Sort-key for missing values: always last regardless of asc/desc. */
+const SORT_LAST = Number.MAX_SAFE_INTEGER;
+
+interface Variant {
+  job: Job;
+  variantLabel: string;
+  now: { ms: number | null; apiError: boolean };
+  p1: number | null;
+  p30: number | null;
+  health: "good" | "elevated" | "bad";
+  enc: string;
+}
+interface Parent {
+  key: string;
+  label: string;
+  provider: string;
+  variants: Variant[];
+  rep: Variant;
+  count: number;
+  health: "good" | "elevated" | "bad";
+}
+
+/** Collapse a category's jobs into median-summarised parents (provider+service+op). */
+function buildParents(jobs: Job[]): Parent[] {
+  const map = new Map<string, Parent>();
+  for (const job of jobs) {
+    const wl = perfVariant(job);
+    const v: Variant = {
+      job,
+      variantLabel: wl.variantLabel,
+      now: nowLatency(job),
+      p1: p50(job.internalJobName, "Last 1 Day"),
+      p30: p50(job.internalJobName, "Last 30 Days"),
+      health: jobHealth(job, false),
+      enc: job.internalJobName.replaceAll("/", "%2F"),
+    };
+    let p = map.get(wl.parentKey);
+    if (!p) {
+      p = { key: wl.parentKey, label: wl.parentLabel, provider: wl.provider, variants: [], rep: v, count: 0, health: "good" };
+      map.set(wl.parentKey, p);
+    }
+    p.variants.push(v);
+  }
+
+  const parents = [...map.values()];
+  for (const p of parents) {
+    p.variants.sort((a, b) => (a.p1 ?? SORT_LAST) - (b.p1 ?? SORT_LAST));
+    p.count = p.variants.length;
+    p.rep = p.variants[Math.floor((p.count - 1) / 2)]; // lower-median variant
+    p.health = p.variants.some((x) => x.health === "bad")
+      ? "bad"
+      : p.variants.some((x) => x.health === "elevated")
+      ? "elevated"
+      : "good";
+  }
+  // Grouped (multi-variant) services first, then by median p50.
+  parents.sort((a, b) => {
+    const ga = a.count > 1 ? 0 : 1;
+    const gb = b.count > 1 ? 0 : 1;
+    if (ga !== gb) return ga - gb;
+    return (a.rep.p1 ?? SORT_LAST) - (b.rep.p1 ?? SORT_LAST);
+  });
+  return parents;
+}
+
+/** Worst-health dot for a whole category, for the section header. */
+function groupDot(jobs: Job[]): string {
+  let worst: "good" | "elevated" | "bad" = "good";
+  for (const j of jobs) {
+    const h = jobHealth(j, false);
+    if (h === "bad") return dotClass("bad");
+    if (h === "elevated") worst = "elevated";
+  }
+  return dotClass(worst);
+}
+
+const built = groups.map((group) => ({ group, parents: buildParents(group.jobs) }));
+---
+
+{
+  built.map(({ group, parents }) => (
+    <CategorySection name={group.name} count={parents.length} statusColor={groupDot(group.jobs)} bodyClass="pt-2 pb-1" open>
+      <div class="surface overflow-x-auto">
+        <table class="perf-table w-full text-sm">
+          <thead>
+            <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
+              <th class="px-4 py-2.5 font-medium cursor-pointer select-none" data-sort="name">Service<span class="sort-ind" /></th>
+              <th class="px-4 py-2.5 font-medium cursor-pointer select-none" data-sort="provider">Provider<span class="sort-ind" /></th>
+              <th class="px-4 py-2.5 font-medium cursor-pointer select-none text-right" data-sort="now">Now<span class="sort-ind" /></th>
+              <th class="px-4 py-2.5 font-medium cursor-pointer select-none text-right" data-sort="p50">p50 · 1d<span class="sort-ind" /></th>
+              <th class="px-4 py-2.5 font-medium cursor-pointer select-none text-right hidden sm:table-cell" data-sort="p50-30d">p50 · 30d<span class="sort-ind" /></th>
+              <th class="px-4 py-2.5 font-medium hidden md:table-cell">7-day trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parents.map((p) => {
+              const expandable = p.count > 1;
+              const childNames = p.variants.map((v) => `${v.job.internalJobName} ${v.variantLabel}`).join(" ");
+              const filterName = `${p.label} ${p.provider} ${childNames}`.toLowerCase();
+              const rep = p.rep;
+
+              return (
+                <Fragment>
+                  <tr
+                    class={`perf-parent border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/5 ${expandable ? "cursor-pointer" : ""}`}
+                    data-key={p.key}
+                    data-name={filterName}
+                    data-provider={p.provider.toLowerCase()}
+                    data-now={rep.now.ms ?? SORT_LAST}
+                    data-p50={rep.p1 ?? SORT_LAST}
+                    data-p50-30d={rep.p30 ?? SORT_LAST}
+                    data-count={p.count}
+                    data-expandable={expandable ? "true" : "false"}
+                    aria-expanded={expandable ? "false" : undefined}
+                  >
+                    <td class="px-4 py-2.5">
+                      {expandable ? (
+                        <span class="flex items-center gap-2.5">
+                          <svg class="chev shrink-0 w-4 h-4 text-gray-400 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>
+                          <span class={`shrink-0 w-2.5 h-2.5 rounded-full ${dotClass(p.health)}`} title={p.health} />
+                          <span class="font-semibold">{p.label}</span>
+                          <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">· {p.count}</span>
+                        </span>
+                      ) : (
+                        <a href={`/perf/${rep.job.internalJobName}`} class="flex items-center gap-2.5 group">
+                          <span class="w-4 h-4 shrink-0" />
+                          <span class={`shrink-0 w-2.5 h-2.5 rounded-full ${dotClass(p.health)}`} title={p.health} />
+                          <span class="min-w-0">
+                            <span class="font-semibold text-[var(--accent-regular)] group-hover:underline">{p.label}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400 truncate">{rep.variantLabel}</span>
+                          </span>
+                          {rep.job.jobDescription && (
+                            <span class="flex-none inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] cursor-help" title={rep.job.jobDescription}>?</span>
+                          )}
+                        </a>
+                      )}
+                    </td>
+                    <td class="px-4 py-2.5">
+                      <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">{p.provider}</span>
+                    </td>
+                    <td class="px-4 py-2.5 text-right tabular-nums whitespace-nowrap">
+                      {rep.now.apiError ? <span class="text-red-600 dark:text-red-400 font-medium">API Error</span> : fmtLatency(rep.now.ms)}
+                    </td>
+                    <td class="px-4 py-2.5 text-right tabular-nums whitespace-nowrap font-medium">{fmtLatency(rep.p1)}{expandable ? <span class="text-gray-400 dark:text-gray-500 font-normal"> med</span> : null}</td>
+                    <td class="px-4 py-2.5 text-right tabular-nums whitespace-nowrap hidden sm:table-cell">{fmtLatency(rep.p30)}</td>
+                    <td class="px-4 py-2.5 hidden md:table-cell w-32">
+                      <Sparkline endpoint={`v2/jobs/${rep.enc}/analytics`} metric="MedianApiResponseLatency" health={p.health} days={7} client:visible />
+                    </td>
+                  </tr>
+
+                  {expandable &&
+                    p.variants.map((v) => (
+                      <tr class="perf-child border-b border-gray-100 dark:border-gray-700 bg-black/[0.015] dark:bg-white/[0.02]" data-key={p.key} data-name={`${v.job.internalJobName} ${v.variantLabel} ${p.label} ${p.provider}`.toLowerCase()} data-now={v.now.ms ?? SORT_LAST} data-p50={v.p1 ?? SORT_LAST} data-p50-30d={v.p30 ?? SORT_LAST} hidden>
+                        <td class="px-4 py-2">
+                          <a href={`/perf/${v.job.internalJobName}`} class="flex items-center gap-2.5 group pl-6">
+                            <span class={`shrink-0 w-2 h-2 rounded-full ${dotClass(v.health)}`} title={v.health} />
+                            <span class="text-gray-700 dark:text-gray-200 group-hover:underline">{v.variantLabel}</span>
+                            {v.job.jobDescription && (
+                              <span class="flex-none inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] cursor-help" title={v.job.jobDescription}>?</span>
+                            )}
+                          </a>
+                        </td>
+                        <td class="px-4 py-2" />
+                        <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                          {v.now.apiError ? <span class="text-red-600 dark:text-red-400 font-medium">API Error</span> : fmtLatency(v.now.ms)}
+                        </td>
+                        <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap">{fmtLatency(v.p1)}</td>
+                        <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap hidden sm:table-cell">{fmtLatency(v.p30)}</td>
+                        <td class="px-4 py-2 hidden md:table-cell w-32">
+                          <Sparkline endpoint={`v2/jobs/${v.enc}/analytics`} metric="MedianApiResponseLatency" health={v.health} days={7} client:visible />
+                        </td>
+                      </tr>
+                    ))}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </CategorySection>
+  ))
+}
+
+<style>
+  .perf-table th[data-sort] {
+    white-space: nowrap;
+  }
+  .perf-table th .sort-ind {
+    display: inline-block;
+    width: 0.9em;
+    text-align: left;
+    opacity: 0.9;
+  }
+  .perf-table tr.perf-parent[aria-expanded="true"] .chev {
+    transform: rotate(90deg);
+  }
+</style>

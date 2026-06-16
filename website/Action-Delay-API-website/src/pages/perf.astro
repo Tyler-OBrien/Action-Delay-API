@@ -1,13 +1,11 @@
 ---
-import { getCollection } from 'astro:content';
-
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-import JobDisplay from '../components/JobDisplay.astro';
+import PerfTable from '../components/PerfTable.astro';
 import Hero from '../components/Hero.astro';
-import Grid from '../components/Grid.astro';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
 import type { Job } from '../../models/cloudflare/job';
+import { groupJobs } from '../data/jobCategories';
 
 const getJobs = async () => {
 	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/Perf")).json()).data
@@ -22,18 +20,10 @@ var getAnalyticsTask = getAnalytics()
 const jobs: Job[] = await getJobsTask;
 const stats: QuickStats[] = await getAnalyticsTask;
 
-
 const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-const reorderedList = jobs
-  .filter(job => new Date(job.predictedRunTime) >= oneWeekAgo)
-  .sort((a, b) => {
-    const aIsCloudflare = a.jobName.startsWith('cloudflare');
-    const bIsCloudflare = b.jobName.startsWith('cloudflare');
-    if (aIsCloudflare !== bIsCloudflare) return Number(bIsCloudflare) - Number(aIsCloudflare);
-    return a.jobName.localeCompare(b.jobName);
-  });
-
+const activeJobs = jobs.filter(job => new Date(job.predictedRunTime) >= oneWeekAgo);
+const groups = groupJobs(activeJobs, 'perf');
 ---
 
 <BaseLayout
@@ -44,7 +34,7 @@ const reorderedList = jobs
 		<main class="wrapper stack gap-8">
 			<Hero
 				title="Performance Jobs"
-				tagline="See Performance Monitoring Jobs, Cloudflare and non-Cloudflare. We measure the performance of various services from 50+ locations worldwide. The goal of this is to for comparison and to identify changes with some proper UI for that. If you click on any specific job, there's an internal description and you can see a map of latency per location."
+				tagline="Compare the performance of Cloudflare and non-Cloudflare services, measured from 50+ locations worldwide. Jobs are grouped by workload — Compute, Object Storage, Key-Value and SQL — so you can line providers up side by side. Each service shows its median; expand it to see per-region and per-size variants. Sort any column, or click a job for its description and a per-location latency map."
 				align="start"
 			>
 			</Hero>
@@ -52,26 +42,12 @@ const reorderedList = jobs
 				id="job-filter"
 				type="text"
 				placeholder="Filter jobs..."
-				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4"
+				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
 			/>
-			<script>
-				document.getElementById('job-filter')?.addEventListener('input', function(e) {
-					const q = (e.target as HTMLInputElement).value.toLowerCase();
-					document.querySelectorAll('[id$="grid"]').forEach((card: Element) => {
-						(card.parentElement as HTMLElement).style.display =
-							card.id.toLowerCase().includes(q) ? '' : 'none';
-					});
-				});
-			</script>
-			<Grid>
-				{
-					reorderedList.map((job: Job) => (
-						<li>
-							<JobDisplay  type="perf"  job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
-							</li>
-					))
-				}
-			</Grid>
+			<div class="stack gap-4">
+				<PerfTable groups={groups} stats={stats} />
+			</div>
+			<script src="../scripts/perf-table.js"></script>
 		</main>
 	</div>
 </BaseLayout>

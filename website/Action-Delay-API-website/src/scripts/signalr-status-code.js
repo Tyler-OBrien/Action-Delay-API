@@ -15,23 +15,24 @@ async function start() {
     console.log("SignalR Connected " + connection.state);
     console.log(connection);
     connStatus.innerText = "Connected: Live Updates";
-    connStatus.classList = ["websocket-connected"];
+    connStatus.classList.add("websocket-connected");
     await connection.invoke("SubscribeToType", "CloudflareDelay");
   } catch (err) {
     console.log(err);
     connStatus.innerText = "Reconnecting: Not Live";
+    connStatus.classList.remove("websocket-connected");
     setTimeout(start, 5000);
   }
 }
 
 connection.onreconnecting((error) => {
   connStatus.innerText = "Reconnecting: Not Live";
-  connStatus.classList = [];
+  connStatus.classList.remove("websocket-connected");
 });
 
 connection.onclose(async () => {
   connStatus.innerText = "Disconnected: Not Live";
-  connStatus.classList = [];
+  connStatus.classList.remove("websocket-connected");
   await start();
 });
 
@@ -52,6 +53,7 @@ connection.on("ReceiveJobUpdate", (subject, data) => {
     getCurrentData.currentRunStatus = data.Status;
     getCurrentData.currentRunTime = new Date(new Date().getTime());
     handleJobUpdateData(getCurrentData.internalJobName);
+    recomputeSummary();
   }
 });
 
@@ -61,6 +63,7 @@ setInterval(async () => {
     for (let job of globalThis.jobData) {
       handleJobUpdateData(job.internalJobName);
     }
+    recomputeSummary();
   } catch (exception) {
     console.error(exception);
     console.log(`Error in refresh data`);
@@ -170,10 +173,64 @@ async function handleJobUpdateData(internalJobNameUpdate) {
 
 }
 
+// Recompute the overall-status banner (headline, dot, count chips) from the
+// data the script already maintains on globalThis — no extra network calls.
+function recomputeSummary() {
+  try {
+    if (!globalThis.config || !globalThis.jobData) return;
+    const counts = { operational: 0, delayed: 0, degraded: 0, apiDown: 0 };
+    for (const group of globalThis.config.groups) {
+      for (const item of group.items) {
+        const s = getItemStatus(item.jobName).status;
+        if (s === "API Down") counts.apiDown++;
+        else if (s === "Degraded") counts.degraded++;
+        else if (s === "Delayed") counts.delayed++;
+        else if (s === "Normal") counts.operational++;
+      }
+    }
+
+    let dot = "bg-green-500";
+    let headline = "All Cloudflare Systems Normal";
+    if (counts.apiDown > 0) {
+      dot = "bg-red-500";
+      headline = `${counts.apiDown} Service${counts.apiDown > 1 ? "s" : ""} Reporting API Errors`;
+    } else if (counts.degraded > 0) {
+      dot = "bg-amber-500";
+      headline = `${counts.degraded} Service${counts.degraded > 1 ? "s" : ""} Degraded`;
+    } else if (counts.delayed > 0) {
+      dot = "bg-amber-500";
+      headline = `${counts.delayed} Service${counts.delayed > 1 ? "s" : ""} Delayed`;
+    }
+
+    const headlineEl = document.getElementById("overall-status-headline");
+    if (headlineEl) headlineEl.innerText = headline;
+    const dotEl = document.getElementById("overall-status-dot");
+    if (dotEl) dotEl.className = `w-3.5 h-3.5 rounded-full flex-none ${dot}`;
+
+    setChip("summary-count-operational", counts.operational, "Operational");
+    setChip("summary-count-delayed", counts.delayed, "Delayed");
+    setChip("summary-count-degraded", counts.degraded, "Degraded");
+    setChip("summary-count-apidown", counts.apiDown, "API Down");
+  } catch (exception) {
+    console.error(exception);
+    console.log(`Error recomputing summary`);
+  }
+}
+
+function setChip(id, count, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("is-zero", count === 0);
+  el.innerHTML = `<span class="chip-dot"></span>${count} ${label}`;
+}
+
 // Function to refresh incidents display
 function refreshIncidentsDisplay(group, internalJobNameUpdate) {
   // Get the container div for incidents
   const incidentsContainer = document.getElementById(`item-${group.name}-incidents`);
+  // Status-dashboard rows no longer expand (they link to the job page), so the
+  // per-job incident containers are gone — nothing to refresh.
+  if (!incidentsContainer) return;
 
   // Clear the current content
   incidentsContainer.innerHTML = '';
@@ -185,18 +242,18 @@ function refreshIncidentsDisplay(group, internalJobNameUpdate) {
   filteredIncidents.forEach(incident => {
     // Create main incident container
     const incidentDiv = document.createElement('div');
-    incidentDiv.className = 'mt-4 p-3 bg-red-50 border border-red-200 rounded';
+    incidentDiv.className = 'incident-box';
 
     // Create header with incident status and start time
     const headerDiv = document.createElement('div');
     headerDiv.className = 'flex justify-between';
 
     const statusSpan = document.createElement('span');
-    statusSpan.className = 'font-medium text-red-800';
+    statusSpan.className = 'font-semibold';
     statusSpan.textContent = 'Active Incident';
 
     const timeSpan = document.createElement('span');
-    timeSpan.className = 'text-sm text-red-800';
+    timeSpan.className = 'text-sm incident-muted';
     timeSpan.textContent = `Started: ${new Date(incident.startedAt).toLocaleString()}`;
 
     headerDiv.appendChild(statusSpan);
@@ -347,6 +404,7 @@ function formatTime(date) {
 }
 
 start();
+recomputeSummary();
   try {
 
     // silly hack to go from UTC times to local...

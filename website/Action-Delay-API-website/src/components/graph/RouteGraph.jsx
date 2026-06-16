@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as Plotly from 'plotly.js-basic-dist-min'
+import { isDarkMode, themeColors, baseLayout, axis } from './chartTheme';
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -97,17 +98,6 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
 };
 
 
-const getTheme = () => {
-  const isDark = document.documentElement.classList.contains('dark');
-  return {
-    mode: isDark ? "dark" : "light",
-    paper_bgcolor: isDark ? '#171717' : '#ffffff',
-    plot_bgcolor: isDark ? '#262626' : '#fafafa',
-    font_color: isDark ? '#ffffff' : '#000000',
-    grid_color: isDark ? '#404040' : '#e5e5e5'
-  };
-};
-
 const TimeRangeSelector = ({ value, onChange, customLabel }) => {
   return (
     <select 
@@ -129,7 +119,7 @@ const TimeRangeSelector = ({ value, onChange, customLabel }) => {
 
 const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regionName, showPercentage }) => {
   const chartRef = useRef(null);
-  const [theme, setTheme] = useState(getTheme);
+  const [isDark, setIsDark] = useState(isDarkMode);
 
   const updateChart = useCallback(() => {
     if (!chartRef.current || !data.length) return;
@@ -185,39 +175,21 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
       : `${label} - Request Count by Executing Region`;
 
     const layout = {
+      ...baseLayout(isDark),
       title: {
         text: chartTitle,
         x: 0.5,
-        font: { color: theme.font_color, size: 16 }
+        font: { color: themeColors(isDark).textStrong, size: 16 }
       },
-      xaxis: {
-        title: 'Time',
-        type: 'date',
-        range: [new Date(startDate), new Date(endDate)],
-        color: theme.font_color,
-        gridcolor: theme.grid_color
-      },
-      yaxis: {
+      xaxis: axis(isDark, { title: 'Time', type: 'date', range: [new Date(startDate), new Date(endDate)] }),
+      yaxis: axis(isDark, {
         title: yAxisTitle,
-        color: theme.font_color,
-        gridcolor: theme.grid_color,
         fixedrange: true,
-        ...(showPercentage && {
-          range: [0, 100],
-          ticksuffix: '%'
-        })
-      },
+        ...(showPercentage && { range: [0, 100], ticksuffix: '%' })
+      }),
       barmode: 'stack',
-      paper_bgcolor: theme.paper_bgcolor,
-      plot_bgcolor: theme.plot_bgcolor,
-      font: { color: theme.font_color },
       height: height,
       showlegend: true,
-      legend: {
-        orientation: 'h',
-        y: -0.2,
-        font: { color: theme.font_color, size: 12 }
-      },
     };
 
     const config = {
@@ -245,7 +217,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
 
       chartRef.current.on('plotly_relayout', handleRelayout);
     });
-  }, [data, timeRange, customRange, label, height, theme, regionName, showPercentage]);
+  }, [data, timeRange, customRange, label, height, isDark, regionName, showPercentage]);
 
   // Cleanup event listeners
   useEffect(() => {
@@ -264,7 +236,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
   // Handle theme changes
   useEffect(() => {
     const handleThemeChange = () => {
-      setTheme(getTheme());
+      setIsDark(isDarkMode());
     };
 
     window.addEventListener('themeChange', handleThemeChange);

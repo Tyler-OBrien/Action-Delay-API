@@ -1,6 +1,8 @@
 ---
 import type { Job } from '../../models/cloudflare/job';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
+import { jobHealth, dotClass } from '../data/jobHealth';
+import Sparkline from './graph/Sparkline.jsx';
 
 interface Props {
 	job: Job;
@@ -21,7 +23,7 @@ const type = Astro.props.type;
 
 function formatTime(ms: number | undefined): string {
 
-	if (ms == undefined) return "";
+	if (ms == undefined || isNaN(ms)) return "";
 
 let seconds = ms / 1000;
 if (seconds < 60) {
@@ -81,7 +83,7 @@ default:
 
 var runTimeToUse = job.currentRunTime;
 var runLengthToUse = job.currentRunLengthMs;
-if (job.currentRunStatus === "Deployed") {
+if (job.currentRunStatus === "Deployed" || job.currentRunStatus === "Success") {
     if (job.internalJobName === "cron") {
         delayTxtUnit = "Last Event: " + formatTime(new Date().getTime() - new Date(job.currentRunTime).getTime()) + " ago"
 		/*
@@ -118,6 +120,12 @@ else if (job.currentRunStatus == "API_Error" && job.lastRunStatus == "API_Error"
     pending.textContent = 'CF API Error';
     pending.className = 'highlightRed';
 }
+else if (job.currentRunStatus === "Failure") {
+    delayTxt = 'Error';
+	delayTxtUnit = "";
+    pending.textContent = 'Error';
+    pending.className = 'highlightRed';
+}
 else
 {
 	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
@@ -133,34 +141,72 @@ lastUpdatedTxt = formatTime(new Date().getTime() - new Date(runTimeToUse ?? '').
 if (job.internalJobName === "cron") {
 	noLastUpdate = true;
 }
+
+const hasIncident = Astro.props.hasIncident ?? false;
+const health = jobHealth(job, hasIncident);
+const dot = dotClass(health);
+const sparkEnc = job.internalJobName.replaceAll("/", "%2F");
+const sparkEndpoint = `v2/jobs/${sparkEnc}/analytics`;
+// Perf/AI jobs only record API latency (their run-length series is empty/zero).
+const sparkMetric = type === "perf" || type === "ai" ? "MedianApiResponseLatency" : "MedianRunLength";
+// AI jobs fail often — overlay error occurrences behind the latency line.
+const sparkErrorEndpoint = type === "ai" ? `v2/jobs/${sparkEnc}/erroranalytics` : undefined;
 ---
 
-<div class="relative w-full min-w-[22rem] min-h-80 dark:bg-[#222122c9] bg-white rounded-lg shadow-lg p-8" id=`${job.internalJobName}grid`>
-    {Astro.props.hasIncident && (
+<div class="relative w-full min-w-0 min-h-80 surface surface-hover p-6 flex flex-col" id=`${job.internalJobName}grid`>
+    {hasIncident && (
       <div class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">Incident</div>
     )}
-    <div class="text-2xl font-semibold text-center mb-4">
-        <a href=`/${type}/${job.internalJobName}` class="text-blue-600 hover:underline">{job.jobName.replaceAll("Job", "").trimEnd()}</a>
+
+    <div class="flex items-center justify-between gap-2 mb-4">
+        <span class="flex items-center gap-1.5 min-w-0">
+            <a href=`/${type}/${job.internalJobName}` class="text-lg font-semibold text-[var(--accent-regular)] hover:underline break-words leading-tight">{job.jobName.replaceAll("Job", "").trimEnd()}</a>
+            {job.jobDescription && (
+                <span class="flex-none inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] cursor-help" title={job.jobDescription}>?</span>
+            )}
+        </span>
+        <span class={`shrink-0 w-2.5 h-2.5 rounded-full ${dot}`} title={health}></span>
     </div>
-    <div class="text-5xl font-bold text-center mb-2" id=`delayNumberOuter${job.internalJobName}`><span class="text-5xl font-bold text-center mb-2" id=`delayNumber${job.internalJobName}`>{delayTxt}</span> <span class="text-lg" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span></div> 
-	<div class=`${pending.className} text-center mb-2 h-4` id=`pending${job.internalJobName}`>{pending.textContent}</div>
-	{noLastUpdate ? null : (<div class="text-gray text-sm text-center mb-4" id=`lastUpdate${job.internalJobName}`>Last Update: {lastUpdatedTxt}</div>)}
-    
-	{!peakPeriod ? null : ( 
-    <div class="border-t border-gray-200 pt-2 mb-2">
-        <div class="text-gray text-sm text-center">Last 24H Peak:</div> 
-        <div class="font-semibold text-center" id=`peak${job.internalJobName}`>{peakPeriod}</div> 
-        <div class="text-gray text-xs text-center" id=`peak-period${job.internalJobName}`>{peakPeriodTxt}</div> 
+
+    <div class="text-5xl font-bold text-center mb-1" id=`delayNumberOuter${job.internalJobName}`><span class="text-5xl font-bold text-center" id=`delayNumber${job.internalJobName}`>{delayTxt}</span> <span class="text-lg" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span>{type === "ai" && (<span class="inline-flex items-center justify-center w-4 h-4 ml-1 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] align-middle cursor-help" title="For 100 output tokens">?</span>)}</div>
+	<div class=`${pending.className} text-center mb-1 h-4` id=`pending${job.internalJobName}`>{pending.textContent}</div>
+	{noLastUpdate ? null : (<div class="text-gray text-xs text-center mb-3" id=`lastUpdate${job.internalJobName}`>Last Update: {lastUpdatedTxt}</div>)}
+
+    <div class="mt-1 mb-3">
+        <Sparkline endpoint={sparkEndpoint} metric={sparkMetric} errorEndpoint={sparkErrorEndpoint} health={health} client:visible />
+    </div>
+
+    <div class="mt-auto flex justify-center gap-6 border-t pt-3">
+        {dailyMedian && (
+          <div class="text-center">
+            <div class="text-gray text-xs">1 Day</div>
+            <div class="font-semibold" id=`median1d${job.internalJobName}`>{dailyMedian}</div>
+          </div>
+        )}
+        {monthlyMedian && (
+          <div class="text-center">
+            <div class="text-gray text-xs">30 Days</div>
+            <div class="font-semibold" id=`median30d${job.internalJobName}`>{monthlyMedian}</div>
+          </div>
+        )}
+        {quarterlyMedian && (
+          <div class="text-center">
+            <div class="text-gray text-xs">90 Days</div>
+            <div class="font-semibold" id=`median${job.internalJobName}`>{quarterlyMedian}</div>
+          </div>
+        )}
+    </div>
+
+	{!peakPeriod ? null : (
+    <div class="text-center mt-3">
+        <span class="text-gray text-xs">24H Peak: </span>
+        <span class="text-gray text-xs font-semibold" id=`peak${job.internalJobName}`>{peakPeriod}</span>
+        <div class="text-gray text-xs" id=`peak-period${job.internalJobName}`>{peakPeriodTxt}</div>
     </div>
 	)}
 
-    <div class="flex flex-col space-y-1 border-t pt-2">
-        <div class="text-gray text-sm text-center mt-1" id=`median1d${job.internalJobName}`>1 Day: {dailyMedian}</div>
-        <div class="text-gray text-sm text-center" id=`median30d${job.internalJobName}`>30 Days: {monthlyMedian}</div>
-        <div class="text-gray text-sm text-center" id=`median${job.internalJobName}`>90 Days: {quarterlyMedian}</div>
-    </div>
     {type === 'delay' && job.predictedDelayLengthMs && job.predictedDelayLengthMs > 0 && (
-      <div class="text-gray text-xs text-center mt-1 italic">
+      <div class="text-gray text-xs text-center mt-2 italic">
         Predicted: ~{formatTimeReturnUnit(job.predictedDelayLengthMs).join(' ')}
       </div>
     )}

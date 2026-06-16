@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min';
+import { isDarkMode, baseLayout, axis } from './chartTheme';
 
 const PALETTE = [
   '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4',
@@ -41,8 +42,8 @@ const ColoTimelineChart = ({ locationName }) => {
   const [customTimeRange, setCustomTimeRange] = useState(null);
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains('dark'));
-    const handler = () => setIsDark(document.documentElement.classList.contains('dark'));
+    setIsDark(isDarkMode());
+    const handler = () => setIsDark(isDarkMode());
     window.addEventListener('themeChange', handler);
     return () => window.removeEventListener('themeChange', handler);
   }, []);
@@ -148,28 +149,12 @@ const ColoTimelineChart = ({ locationName }) => {
       };
     });
 
-    const bgColor = isDark ? '#171717' : '#ffffff';
-    const textColor = isDark ? '#e5e7eb' : '#111827';
-    const gridColor = isDark ? '#374151' : '#e5e7eb';
-
     const layout = {
+      ...baseLayout(isDark),
       height: 300,
       margin: { l: 60, r: 20, t: 10, b: 50 },
-      paper_bgcolor: bgColor,
-      plot_bgcolor: bgColor,
-      font: { color: textColor, size: 11 },
-      xaxis: {
-        type: 'date',
-        gridcolor: gridColor,
-        linecolor: gridColor,
-      },
-      yaxis: {
-        title: { text: 'Latency (ms)', font: { size: 11 } },
-        gridcolor: gridColor,
-        linecolor: gridColor,
-        ticksuffix: ' ms',
-      },
-      legend: { orientation: 'h', y: -0.2 },
+      xaxis: axis(isDark, { type: 'date' }),
+      yaxis: axis(isDark, { title: { text: 'Latency (ms)', font: { size: 11 } }, ticksuffix: ' ms' }),
       showlegend: true,
     };
 

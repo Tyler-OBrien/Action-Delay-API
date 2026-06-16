@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min'
+import { isDarkMode, themeColors, baseLayout, axis, themeRelayout, REGION_COLORS } from './chartTheme';
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -25,14 +26,6 @@ const SELECT_DISPLAY_OPTIONS = [
 ];
 
 const REGIONS = ['NA', 'EU', 'AS', 'OC', 'SA'];
-
-const REGION_COLORS = {
-  NA: '#3b82f6',
-  EU: '#10b981',
-  AS: '#f59e0b',
-  OC: '#8b5cf6',
-  SA: '#ef4444',
-};
 
 function formatTime(ms) {
   if (typeof ms !== 'number' || !isFinite(ms)) return ms;
@@ -104,8 +97,7 @@ const RegionGraph = (props) => {
   useEffect(() => {
     if (!plotRef.current) return;
 
-    const htmlElement = document.documentElement;
-    const hasDarkClass = htmlElement.classList.contains('dark');
+    const isDark = isDarkMode();
 
     let xRange = null;
     if (customTimeRangeObj) {
@@ -142,49 +134,33 @@ const RegionGraph = (props) => {
       else if (maxY >= 1000) { unit = 's'; divisor = 1000; }
     }
 
+    const yTicks = allY.length > 0 ? (() => {
+      const minY = Math.min(...allY);
+      const maxY = Math.max(...allY);
+      const range = maxY - minY;
+      const numTicks = 8;
+      const tickvals = [], ticktext = [];
+      for (let i = 0; i <= numTicks; i++) {
+        const val = minY + (range * i / numTicks);
+        tickvals.push(val);
+        ticktext.push(`${(val / divisor).toFixed(divisor === 1 ? 0 : 2)} ${unit}`);
+      }
+      return { tickvals, ticktext };
+    })() : {};
+
     const layout = {
+      ...baseLayout(isDark),
       title: {
         text: `${label} - By Region (${displayOptionLabel})`,
-        font: { size: 16, color: hasDarkClass ? '#e5e5e5' : '#333' }
+        font: { size: 16, color: themeColors(isDark).textStrong }
       },
-      xaxis: {
-        title: 'Time',
-        type: 'date',
-        range: xRange,
-        gridcolor: hasDarkClass ? '#333' : '#e5e5e5',
-        tickfont: { size: 12, color: hasDarkClass ? '#e5e5e5' : '#333' },
-        titlefont: { size: 13, color: hasDarkClass ? '#e5e5e5' : '#333' },
-      },
-      yaxis: {
+      xaxis: axis(isDark, { title: 'Time', type: 'date', range: xRange }),
+      yaxis: axis(isDark, {
         title: 'Duration',
         tickmode: allY.length > 0 ? 'array' : 'auto',
-        gridcolor: hasDarkClass ? '#333' : '#e5e5e5',
-        tickfont: { size: 12, color: hasDarkClass ? '#e5e5e5' : '#333' },
-        titlefont: { size: 13, color: hasDarkClass ? '#e5e5e5' : '#333' },
         fixedrange: true,
-        ...(allY.length > 0 ? (() => {
-          const minY = Math.min(...allY);
-          const maxY = Math.max(...allY);
-          const range = maxY - minY;
-          const numTicks = 8;
-          const tickvals = [], ticktext = [];
-          for (let i = 0; i <= numTicks; i++) {
-            const val = minY + (range * i / numTicks);
-            tickvals.push(val);
-            ticktext.push(`${(val / divisor).toFixed(divisor === 1 ? 0 : 2)} ${unit}`);
-          }
-          return { tickvals, ticktext };
-        })() : {}),
-      },
-      plot_bgcolor: hasDarkClass ? '#171717' : '#ffffff',
-      paper_bgcolor: hasDarkClass ? '#171717' : '#ffffff',
-      font: { color: hasDarkClass ? '#e5e5e5' : '#333' },
-      margin: { l: 80, r: 50, t: 80, b: 80 },
-      hovermode: 'x unified',
-      legend: {
-        x: 0, y: -0.2, orientation: 'h',
-        font: { size: 13, color: hasDarkClass ? '#e5e5e5' : '#333' }
-      }
+        ...yTicks,
+      }),
     };
 
     const config = {
@@ -217,21 +193,7 @@ const RegionGraph = (props) => {
   useEffect(() => {
     function handleThemeChange() {
       if (!plotRef.current) return;
-      const hasDarkClass = document.documentElement.classList.contains('dark');
-      const update = {
-        'plot_bgcolor': hasDarkClass ? '#171717' : '#ffffff',
-        'paper_bgcolor': hasDarkClass ? '#171717' : '#ffffff',
-        'font.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'xaxis.gridcolor': hasDarkClass ? '#333' : '#e5e5e5',
-        'yaxis.gridcolor': hasDarkClass ? '#333' : '#e5e5e5',
-        'xaxis.tickfont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'yaxis.tickfont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'xaxis.titlefont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'yaxis.titlefont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'title.font.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'legend.font.color': hasDarkClass ? '#e5e5e5' : '#333',
-      };
-      Plotly.relayout(plotRef.current, update);
+      Plotly.relayout(plotRef.current, themeRelayout(isDarkMode()));
     }
     window.addEventListener('themeChange', handleThemeChange);
     return () => window.removeEventListener('themeChange', handleThemeChange);
