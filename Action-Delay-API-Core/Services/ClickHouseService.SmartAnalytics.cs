@@ -163,6 +163,59 @@ namespace Action_Delay_API_Core.Services
             };
         }
 
+        /// <summary>
+        /// Success rate over time for a job. Reads the RAW runs table (config.NormalDataSet) — the
+        /// pre-aggregated MVs only retain successful rows and carry no count, so they cannot produce a
+        /// rate. Window is expected to be capped by the caller; counts over the run_time primary-key range
+        /// are cheap.
+        /// </summary>
+        public async Task<JobSuccessRateAnalytics> GetJobSuccessRate(string[] jobs, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default)
+        {
+            var output = PickRightDataSet(startTime, endTime, maxPoints);
+
+            // Always the raw runs table — the success-only MVs have no count to derive a rate from.
+            string dataSetName = config.NormalDataSet;
+            string successFilter = config.NormalDataSetRunStatusFilter;
+
+            string commandText =
+                $"SELECT toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period, countIf(run_status = {{successStatus:String}}) AS \"success_count\", count() AS \"total_count\" FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and run_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} Group by time_period ORDER BY time_period";
+
+            await using var connection = CreateConnection();
+
+            await using var command = connection.CreateCommand();
+            command.AddParameter("startDateTime", "DateTime", startTime);
+            command.AddParameter("endDateTime", "DateTime", endTime);
+            command.AddParameter("jobs", "Array(String)", jobs);
+            command.AddParameter("successStatus", "String", successFilter);
+
+            command.CommandText = commandText;
+            await using var result = await command.ExecuteReaderAsync(token);
+            var predictedPoints = (int)Math.Ceiling((endTime - startTime).TotalMinutes / output.Interval);
+            List<JobSuccessRateAnalyticsPoint> data = new List<JobSuccessRateAnalyticsPoint>(predictedPoints);
+            ulong totalSuccess = 0, totalRuns = 0;
+            while (await result.ReadAsync(token))
+            {
+                var successCount = Convert.ToUInt64(result.GetValue("success_count"));
+                var totalCount = Convert.ToUInt64(result.GetValue("total_count"));
+                totalSuccess += successCount;
+                totalRuns += totalCount;
+                data.Add(new JobSuccessRateAnalyticsPoint
+                {
+                    TimePeriod = result.GetDateTime("time_period"),
+                    SuccessCount = successCount,
+                    TotalCount = totalCount,
+                });
+            }
+
+            return new JobSuccessRateAnalytics()
+            {
+                Points = data,
+                GroupByMinutesInterval = output.Interval,
+                SuccessCount = totalSuccess,
+                TotalCount = totalRuns,
+            };
+        }
+
         private ErrorJobAnalyticsPoint GetErrorAnalyticsReader(DbDataReader reader, bool locationName)
         {
             var newAnalyticsObj = new ErrorJobAnalyticsPoint();

@@ -596,7 +596,7 @@ public class AnalyticsService : IAnalyticsService
 
 
 
-        return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, jobType, allUniqueErrors.ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
+        return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, jobType, allUniqueErrors.DistinctBy(e => e.ErrorHash).ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
     }
 
 
@@ -637,7 +637,38 @@ public class AnalyticsService : IAnalyticsService
 
 
 
-        return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, tryGetJobInternalName, allUniqueErrors.ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
+        return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, tryGetJobInternalName, allUniqueErrors.DistinctBy(e => e.ErrorHash).ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
+    }
+
+    public async Task<Result<DataResponse<JobSuccessRateDTO>>> GetJobSuccessRate(string jobName, DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100)
+    {
+        var tryValidate = ValidateParams(startDateTime, endDateTime, JobAnalyticsRequestOptions.MedianRunLength, maxPoints);
+        if (tryValidate.IsFailed)
+            return Result.Fail(tryValidate.Errors.First());
+
+        // Reads the raw runs table (no MV carries counts), so cap the window to keep it cheap.
+        if (Math.Abs((endDateTime - startDateTime).TotalDays) > 31)
+            return Result.Fail(new ErrorResponse(HttpStatusCode.UnprocessableEntity,
+                "This endpoint is limited to 31 days.", "bad_query_param"));
+
+        var tryGetJobInternalName = await _cacheSingletonService.GetInternalJobName(jobName, token);
+        if (tryGetJobInternalName == null)
+            return Result.Fail(new ErrorResponse(404,
+                "Could not find job", "job_not_found"));
+
+        var getJobType = await _cacheSingletonService.GetJobTypeFromName(tryGetJobInternalName, token);
+
+        JobAnalyticsConfiguration config;
+        if (getJobType?.Equals("AI", StringComparison.OrdinalIgnoreCase) ?? false)
+            config = JobAnalyticsAIConfig;
+        else if (getJobType?.Equals("Perf", StringComparison.OrdinalIgnoreCase) ?? false)
+            config = JobAnalyticsPerfConfig;
+        else
+            config = JobAnalyticsWorkersDelayConfig;
+
+        var getAnalytics = await _clickhouseService.GetJobSuccessRate(new[] { tryGetJobInternalName }, startDateTime, endDateTime, config, maxPoints, token);
+
+        return new DataResponse<JobSuccessRateDTO>(new JobSuccessRateDTO(getAnalytics, tryGetJobInternalName));
     }
 
     public async Task<Result<DataResponse<ColoLocationAnalyticsDTO>>> GetJobColoLocationAnalytics(string jobName, string locationName, DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 200)

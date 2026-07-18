@@ -41,7 +41,7 @@ public class ColoDataService : IColoDataService
 
     public async Task<Result<DataResponse<Dictionary<int, string>>>> GetColosRegionID(CancellationToken token)
     {
-        return new DataResponse<Dictionary<int, string>>((await _genericServersContext.ColoData.ToListAsync(token)).Where(data => data.CfRegionDo != null && string.IsNullOrWhiteSpace(data.CfRegionDo) == false).OrderBy(data => data.ColoId)
+        return new DataResponse<Dictionary<int, string>>((await _genericServersContext.ColoData.ToListAsync(token)).Where(data => data.CfRegionDo != null && string.IsNullOrWhiteSpace(data.CfRegionDo) == false).DistinctBy(data => data.ColoId)
             .ToDictionary(data => data.ColoId, data => data.CfRegionDo!));
     }
 }

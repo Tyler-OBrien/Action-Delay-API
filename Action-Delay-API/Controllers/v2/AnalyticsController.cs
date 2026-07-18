@@ -163,6 +163,27 @@ public class AnalyticsController : CustomBaseController
 
 
     /// <summary>
+    /// Get success rate (% of successful runs) over time for a job
+    /// </summary>
+    /// <param name="jobName"></param>
+    /// <param name="queryParams"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    [HttpGet("{jobName}/successrate")]
+    [SwaggerResponse(200, Type = typeof(DataResponse<JobSuccessRateDTO>),
+        Description = "On success, return the success rate over time plus overall success/total counts")]
+    public async Task<IActionResult> GetJobSuccessRate(string jobName, [FromQuery] AnalyticsQueryParams queryParams, CancellationToken token)
+    {
+        var tryGetRequestOptions = ProcessQueryParameters(queryParams, false);
+
+        if (tryGetRequestOptions.IsFailed)
+            return tryGetRequestOptions.MapToResult();
+
+        return (await _analyticsService.GetJobSuccessRate(jobName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, token, queryParams.MaxPoints)).MapToResult();
+    }
+
+
+    /// <summary>
     /// Get Adaptively Sampled Job Analytics
     /// </summary>
     /// <param name="jobName"></param>

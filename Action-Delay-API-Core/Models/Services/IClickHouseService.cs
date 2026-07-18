@@ -32,6 +32,9 @@ namespace Action_Delay_API_Core.Models.Services
         Task<ErrorJobAnalytics> GetJobErrorAnalytics(string[] jobs, DateTime startTime, DateTime endTime,
             JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default);
 
+        Task<JobSuccessRateAnalytics> GetJobSuccessRate(string[] jobs, DateTime startTime, DateTime endTime,
+            JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default);
+
 
          Task<NormalJobAnalytics> GetNormalJobLocationAnalytics(string[] jobs, string[] locations,
              DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100,

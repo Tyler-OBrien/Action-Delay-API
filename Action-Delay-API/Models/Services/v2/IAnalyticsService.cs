@@ -27,6 +27,9 @@ namespace Action_Delay_API.Models.Services.v2
         Task<Result<DataResponse<ErrorJobAnalyticsDTO>>> GetErrorAnalyticsForJob(string jobName,
             DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100);
 
+        Task<Result<DataResponse<JobSuccessRateDTO>>> GetJobSuccessRate(string jobName,
+            DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100);
+
         Task<Result<DataResponse<NormalJobAnalyticsDTO>>> GetJobAnalyticsByType(string jobType, DateTime startDateTime,
             DateTime endDateTime, JobAnalyticsRequestOptions options, CancellationToken token, int maxPoints = 100);
 

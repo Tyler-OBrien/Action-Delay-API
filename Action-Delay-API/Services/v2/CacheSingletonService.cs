@@ -35,7 +35,7 @@ public class CacheSingletonService : ICacheSingletonService
 
     public void CacheJobNames(List<JobData> jobs)
     {
-        Interlocked.Exchange(ref INTERNAL_JOB_NAME_TO_TYPE, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.InternalJobName, job => job.JobType, StringComparer.OrdinalIgnoreCase));
+        Interlocked.Exchange(ref INTERNAL_JOB_NAME_TO_TYPE, jobs.DistinctBy(job => job.InternalJobName).ToDictionary(job => job.InternalJobName, job => job.JobType, StringComparer.OrdinalIgnoreCase));
         Interlocked.Exchange(ref PUBLIC_TO_INTERNAL_NAMES, jobs.DistinctBy(job => job.JobName).ToDictionary(job => job.JobName, job => job.InternalJobName, StringComparer.OrdinalIgnoreCase));
         Interlocked.Exchange(ref RESOLVE_TYPE, jobs.DistinctBy(job => job.JobType).ToDictionary(job => job.JobType, job => job.JobType, StringComparer.OrdinalIgnoreCase));
 
