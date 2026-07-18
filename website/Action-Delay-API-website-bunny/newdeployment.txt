@@ -1,9 +1,15 @@
 How to get Astro deployed on Bunny
 Disclaimer: This is hacky/experimental and will probably have issues with some setups
+0. PREREQ (astro.config.mjs): use the no-op image service so `sharp` is NOT bundled.
+   image: { service: { entrypoint: 'astro/assets/services/noop' } }
+   Why: Astro's default `sharp` image service imports `node:child_process` (libvips/arch detection via spawnSync),
+   and Bunny's Deno runtime does NOT provide `node:child_process`. If sharp is bundled, the module fails to load
+   and Bunny returns an empty HTTP 400 on EVERY route. The noop service skips build-time image resizing (fine here).
 1. Switch to Deno's ssr astro adapter
 2. run build (npx astro build)
-3. esbuild the server int one big file, like so (assuming running in base of project and outputting to dist):
-npx esbuild ./dist/server/entry.mjs --bundle --outfile=index.mjs --format=esm --platform=neutral --external:jsr:*
+3. esbuild the server int one big file, like so (assuming running in base of project and outputting to dist).
+   NOTE: keep BOTH externals — the current build imports node: builtins, which --platform=neutral can't resolve:
+npx esbuild ./dist/server/entry.mjs --bundle --outfile=index.mjs --format=esm --platform=neutral --external:jsr:* --external:node:*
 
 Then, we have to manually pick apart/modify the index.mjs
 
@@ -42,13 +48,58 @@ Look for handlerInfo.remoteAddr?.hostname usages, replace with request.headers.g
 In the current version of Astro, there's only one, and it's under the handler in the start method, called hostname2.
 
 
-Now you have the "correct" server side code in theory. Make a new standalone script and just copy paste the entire file contents into the code editor. It worked well enough for my smaller sized Astro project w/ 12k lines. At some point you might have to use the API directly.
+Now you have the "correct" server side code in theory. Deploy it with the official Bunny CLI (npm i -g @bunny.net/cli):
+  bunny login                                   # browser/interactive
+  bunny scripts create <name> --type standalone # the linked pull zone provides the *.bunny.run hostname
+                                                # (do NOT pass --no-pull-zone, or the script has no reachable host)
+  bunny scripts deploy index.mjs <id>           # uploads + publishes; prints the *.bunny.run URL
+(You can still copy-paste the whole file into the dashboard code editor instead, but the CLI is easier now.)
 
-Then, upload all client assets to storage zone. Navigate to `dist/client/` and upload them all. The dashboard Upload Folder utility works well enough.
+Troubleshooting: an empty HTTP 400 on EVERY route = the module failed to load, so Bunny.v1.serve never registered
+a handler. Most likely an unsupported node: import (e.g. node:child_process from sharp — see prereq step 0).
+Confirm by running the bundle locally: `deno run -A index.mjs` — reaching "ReferenceError: Bunny is not defined"
+means module load is fine (problem is per-request); an earlier error is the load failure. To enumerate which node:
+builtins the runtime supports, deploy a tiny script that `await import()`s each one in the handler and returns them.
 
-Make a pull zone off the storage zone. 
+Then, upload all client assets (`dist/client/*`) to the storage zone behind the script's pull zone.
+The dashboard "Upload Folder" utility works, but the Bunny CLI has NO storage command, so for a scripted
+clean replace use the Storage API directly (storage.bunnycdn.com + the zone's write AccessKey).
+
+  # 1. Get the storage zone's write key (Password). Find the zone id via: bunny api GET /storagezone
+  KEY=$(bunny api GET /storagezone/<storageZoneId> | python3 -c "import sys,json;print(json.load(sys.stdin)['Password'])")
+  ZONE=<storageZoneName>
+  BASE="https://storage.bunnycdn.com/$ZONE"   # host is the zone's StorageHostname (region-dependent; DE = storage.bunnycdn.com)
+
+  # 2. (optional, for a clean replace) list + delete existing contents. Directories need a trailing slash (recursive).
+  curl -sS -H "AccessKey: $KEY" "$BASE/"                       # lists root as JSON
+  curl -sS -X DELETE -H "AccessKey: $KEY" "$BASE/<file>"       # delete a file
+  curl -sS -X DELETE -H "AccessKey: $KEY" "$BASE/<dir>/"       # delete a dir (recursive)
+
+  # 3. upload dist/client recursively (PUT each file; storage auto-creates dirs). Expect HTTP 201 each.
+  cd dist/client
+  while IFS= read -r f; do rel="${f#./}";
+    curl -sS -X PUT -H "AccessKey: $KEY" --data-binary @"$f" "$BASE/$rel";
+  done < <(find . -type f)
+
+Make a pull zone off the storage zone.
 Then, the last bit is to make an Edge Rule used to run the script and not hit storage.
 You can make a rule that specifically match none and then specify all the folders of your assets and the root ones, if none are hit to match it.
 Or you can just use `https://{hostname}/*.*`, match none (so don't match anything with an extension, will break if you have a dynamic page with an extension you want to use)  to fall back to running the edge script. Make sure to bypass cache too in the rule if your content is dynamic.
+
+IMPORTANT: deploying the SCRIPT alone is not a full deploy. Each build produces new hashed asset filenames
+(`/_astro/<hash>.css|js`); if you don't re-upload `dist/client/*`, the new SSR HTML references assets that 404 and
+the live site renders unstyled / without working graphs. Always do both: deploy index.mjs AND upload dist/client.
+
+---
+CURRENT PRODUCTION SETUP (as deployed):
+  Edge Script:   action-delay-api-astro-ssr  (id 24523)   -> bunny scripts deploy index.mjs 24523
+  Storage zone:  astro-action-delay-api      (id 1031552, region DE, host storage.bunnycdn.com)
+  Pull zone:     action-delay-api-astro-ssr  -> custom domain https://delay.bunny.chaika.me
+  The *.bunny.run host (action-delay-api-astro-ssr-ai794.bunny.run) 301-redirects to delay.bunny.chaika.me.
+  Verify after deploy:
+    curl -sS "https://delay.bunny.chaika.me/" | grep -o "<title>[^<]*</title>"        # new build => Bunny titles
+    curl -sS "https://delay.bunny.chaika.me/" | grep -o 'content="Astro v[0-9.]*"'    # confirms fresh build
+    ASSET=$(curl -sS "https://delay.bunny.chaika.me/" | grep -o '/_astro/[^"]*\.css' | head -1)
+    curl -sS -o /dev/null -w "%{http_code}\n" "https://delay.bunny.chaika.me$ASSET"   # expect 200, not 404
 
 SSR Page w/ dynamic content example: https://delay.bunny.chaika.me/delay/

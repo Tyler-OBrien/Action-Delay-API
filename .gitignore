@@ -378,3 +378,4 @@ scripts/perf/queue-test-e2e/.wrangler
 scripts/perf/dbs/cloudflare-d1-replication-test/.wrangler
 website/Action-Delay-API-website/.wrangler
 .wrangler
+*.DS_Store

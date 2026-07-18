@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as Plotly from 'plotly.js-basic-dist-min'
+import { isDarkMode, themeColors, baseLayout, axis, ERROR_COLORS } from './chartTheme';
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -36,17 +37,6 @@ const processErrorData = (points) => {
   }));
 };
 
-const getTheme = () => {
-  const isDark = document.documentElement.classList.contains('dark');
-  return {
-    mode: isDark ? "dark" : "light",
-    paper_bgcolor: isDark ? '#171717' : '#ffffff',
-    plot_bgcolor: isDark ? '#262626' : '#fafafa',
-    font_color: isDark ? '#ffffff' : '#000000',
-    grid_color: isDark ? '#404040' : '#e5e5e5'
-  };
-};
-
 const TimeRangeSelector = ({ value, onChange, customLabel }) => {
   return (
     <select 
@@ -68,7 +58,7 @@ const TimeRangeSelector = ({ value, onChange, customLabel }) => {
 
 const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) => {
   const chartRef = useRef(null);
-  const [theme, setTheme] = useState(getTheme);
+  const [isDark, setIsDark] = useState(isDarkMode);
 
   const updateChart = useCallback(() => {
     if (!chartRef.current || !data.length) return;
@@ -89,6 +79,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
         y: series.data.map(d => d.y),
         type: 'bar',
         name: displayName,
+        marker: { color: ERROR_COLORS[index % ERROR_COLORS.length] },
         hovertemplate: `<b>%{fullData.name}</b><br>` +
                        `Date: %{x|%b %d, %Y}<br>` +
                        `Count: %{y}<br>` +
@@ -97,35 +88,17 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
     });
 
     const layout = {
+      ...baseLayout(isDark),
       title: {
         text: `${label} - Error Occurrences`,
         x: 0.5,
-        font: { color: theme.font_color, size: 16 }
+        font: { color: themeColors(isDark).textStrong, size: 16 }
       },
-      xaxis: {
-        title: 'Date',
-        type: 'date',
-        range: [new Date(startDate), new Date(endDate)],
-        color: theme.font_color,
-        gridcolor: theme.grid_color
-      },
-      yaxis: {
-        title: 'Error Count',
-        color: theme.font_color,
-        gridcolor: theme.grid_color,
-        fixedrange: true
-      },
+      xaxis: axis(isDark, { title: 'Date', type: 'date', range: [new Date(startDate), new Date(endDate)] }),
+      yaxis: axis(isDark, { title: 'Error Count', fixedrange: true }),
       barmode: 'stack',
-      paper_bgcolor: theme.paper_bgcolor,
-      plot_bgcolor: theme.plot_bgcolor,
-      font: { color: theme.font_color },
       height: height,
-      legend: {
-        orientation: 'h',
-        y: -0.2,
-        font: { color: theme.font_color, size: 12 }
-      },
-      margin: { l: 60, r: 40, t: 60, b: 120 }
+      showlegend: true,
     };
 
     const config = {
@@ -153,7 +126,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
 
       chartRef.current.on('plotly_relayout', handleRelayout);
     });
-  }, [data, timeRange, customRange, label, height, theme]);
+  }, [data, timeRange, customRange, label, height, isDark]);
 
   // Cleanup event listeners
   useEffect(() => {
@@ -172,7 +145,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
   // Handle theme changes
   useEffect(() => {
     const handleThemeChange = () => {
-      setTheme(getTheme());
+      setIsDark(isDarkMode());
     };
 
     window.addEventListener('themeChange', handleThemeChange);
@@ -200,19 +173,21 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
   const [customRange, setCustomRange] = useState(null);
   const [customLabel, setCustomLabel] = useState(null);
   const [data, setData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const lastFetchRef = useRef(null);
 
   const fetchData = useCallback(async () => {
     const fetchId = Date.now();
     lastFetchRef.current = fetchId;
+    setIsLoading(true);
 
     try {
       const endDateFetch = Date.now();
-      const startDateFetch = customRange?.min ?? 
+      const startDateFetch = customRange?.min ??
         (timeRange === Number.MAX_VALUE ? new Date(2023, 8).getTime() : endDateFetch - timeRange);
 
       const response = await fetch(
-        `https://delay.cloudflare.chaika.me/${endpoint}?` +
+        `https://api.bunny.chaika.me/${endpoint}?` +
         `StartDateTime=${new Date(startDateFetch).toISOString()}&` +
         `EndDateTime=${new Date(Math.min(endDateFetch, Date.now())).toISOString()}&` +
         `Metrics=AvgRunLength`
@@ -224,9 +199,11 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
       if (lastFetchRef.current === fetchId) {
         const processedData = processErrorData(responseData.points);
         setData(processedData);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setIsLoading(false);
     }
   }, [endpoint, timeRange, customRange]);
 
@@ -263,14 +240,21 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
       </div>
 
       <div className="w-full">
-        <PlotlyChart 
-          data={data}
-          timeRange={timeRange}
-          customRange={customRange}
-          label={label}
-          height={fullscreen ? 800 : 700}
-          onZoom={handleZoomed}
-        />
+        {isLoading && data.length === 0 ? (
+          <div
+            className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
+            style={{ height: fullscreen ? '800px' : '700px' }}
+          />
+        ) : (
+          <PlotlyChart
+            data={data}
+            timeRange={timeRange}
+            customRange={customRange}
+            label={label}
+            height={fullscreen ? 800 : 700}
+            onZoom={handleZoomed}
+          />
+        )}
       </div>
     </div>
   );

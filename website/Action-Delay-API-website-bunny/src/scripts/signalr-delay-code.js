@@ -1,3 +1,9 @@
+// Strip any stale value-good|elevated|bad class — the value text is no longer color-coded.
+function applyHealthClass(el) {
+  if (!el) return;
+  el.className = el.className.replace(/\bvalue-(good|elevated|bad)\b/g, "").replace(/\s+/g, " ").trim();
+}
+
 const connection = new signalR.HubConnectionBuilder()
   .withUrl("https://api.bunny.chaika.me/v2/jobs/signalr", {
     transport: signalR.HttpTransportType.WebSockets,
@@ -92,7 +98,7 @@ setInterval(async () => {
     );
   } catch (exception) {
     console.error(exception);
-    console.log(`Error in job refresh, are you connected to the internet?`);
+    console.log(`Error in job refresh, are you interwebular connected?`);
   }
 }, 30_000);
 
@@ -108,7 +114,7 @@ setInterval(async () => {
   } catch (exception) {
     console.error(exception);
     console.log(
-      `Error in job analytics refresh, are you connected to the internet?`
+      `Error in job analytics refresh, are you interwebular connected?`
     );
   }
 }, 120_000);
@@ -117,7 +123,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   var getCurrentData = globalThis.jobData.find(
     (job) => job.internalJobName == internalJobNameUpdate
   );
-  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name);
+  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name === internalJobNameUpdate);
   let lastUpdatedTxt = "";
   let delayTxt = "";
   let delayTxtUnit = "";
@@ -136,7 +142,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   const type = getCurrentData.jobType;
 
   function formatTime(ms) {
-    if (ms == undefined) return "";
+    if (ms == undefined || isNaN(ms)) return "";
 
     let seconds = ms / 1000;
     if (seconds < 60) {
@@ -247,9 +253,9 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     job.currentRunStatus == "API_Error" &&
     job.lastRunStatus == "API_Error"
   ) {
-    delayTxt = "Bunny API Error";
+    delayTxt = "CF API Error";
     delayTxtUnit = "";
-    pending.textContent = "Bunny API Error";
+    pending.textContent = "CF API Error";
     pending.className = "highlightRed  text-center mb-2 h-4";
   } else {
     [delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
@@ -282,12 +288,22 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     ).innerText = `Last Update: ${lastUpdatedTxt}`;
   }
 
-  document.getElementById(
-    `delayNumber${job.internalJobName}`
-  ).innerText = `${delayTxt}`;
+  const delayNumberEl = document.getElementById(`delayNumber${job.internalJobName}`);
+  delayNumberEl.innerText = `${delayTxt}`;
+  const hasIncident = (globalThis.incidents || []).some(
+    (i) => i.target === job.internalJobName && i.active
+  );
+  applyHealthClass(delayNumberEl, job, hasIncident);
   document.getElementById(
     `delayUnit${job.internalJobName}`
   ).innerText = `${delayTxtUnit}`;
+
+  const el1d = document.getElementById(`median1d${job.internalJobName}`);
+  if (el1d && dailyMedian) el1d.innerText = dailyMedian;
+  const el30d = document.getElementById(`median30d${job.internalJobName}`);
+  if (el30d && monthlyMedian) el30d.innerText = monthlyMedian;
+  const el90d = document.getElementById(`median${job.internalJobName}`);
+  if (el90d && quarterlyMedian) el90d.innerText = quarterlyMedian;
 }
 
 start();

@@ -1,0 +1,102 @@
+diff --git a/src/server.ts b/src/server.ts
+index 7fac65c0a311ba150366ec787fe28759ab18df0e..1a6d900a9304ba1aaf25591a6d3d576cd2070ee8 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -1,8 +1,6 @@
+ import { createApp } from "astro/app/entrypoint";
+ import { setGetEnv } from "astro/env/setup";
+ setGetEnv((key) => Deno.env.get(key));
+-import { serveFile } from "jsr:@std/http@^1.1.0/file-server";
+-import { fromFileUrl } from "jsr:@std/path@^1.1.4";
+ import * as options from "virtual:@deno/astro-adapter:config";
+ 
+ const app = createApp();
+@@ -10,26 +8,11 @@ const app = createApp();
+ let _server: Deno.HttpServer | undefined = undefined;
+ let _startPromise: Promise<void> | undefined = undefined;
+ 
+-async function* getPrerenderedFiles(clientRoot: URL): AsyncGenerator<URL> {
+-  for await (const ent of Deno.readDir(clientRoot)) {
+-    if (ent.isDirectory) {
+-      yield* getPrerenderedFiles(new URL(`./${ent.name}/`, clientRoot));
+-    } else if (ent.name.endsWith(".html")) {
+-      yield new URL(`./${ent.name}`, clientRoot);
+-    }
+-  }
+-}
+-
+-function removeTrailingForwardSlash(path: string) {
+-  return path.endsWith("/") ? path.slice(0, path.length - 1) : path;
+-}
+-
+ async function start() {
+   // undefined = not yet loaded, null = not installed
+   let trace: import("@opentelemetry/api").TraceAPI | null | undefined;
+ 
+-  const clientRoot = new URL(options.relativeClientPath, import.meta.url);
+-  const handler: Deno.ServeHandler = async (request, handlerInfo) => {
++  const handler: Deno.ServeHandler = async (request) => {
+     if (trace === undefined) {
+       try {
+         trace = (await import("@opentelemetry/api")).trace;
+@@ -45,7 +28,7 @@ async function start() {
+       span?.setAttribute("http.route", routeData.route);
+       span?.setAttribute("astro.prerendered", routeData.prerender);
+       span?.setAttribute("astro.type", routeData.type);
+-      const hostname = handlerInfo.remoteAddr?.hostname;
++      const hostname = request.headers.get("x-real-ip") || "0.0.0.0";
+       Reflect.set(request, Symbol.for("astro.clientAddress"), hostname);
+       const response = await app.render(request, { routeData });
+       if (app.setCookieHeaders) {
+@@ -56,44 +39,15 @@ async function start() {
+       return response;
+     }
+ 
+-    // If the request path wasn't found in astro,
+-    // try to fetch a static file instead
+-    const url = new URL(request.url);
+-    const localPath = new URL("./" + app.removeBase(url.pathname), clientRoot);
+-
+-    let fileResp = await serveFile(request, fromFileUrl(localPath));
+-
+-    // Attempt to serve `index.html` if 404
+-    if (fileResp.status === 404) {
+-      let fallback: URL | undefined;
+-      for await (const file of getPrerenderedFiles(clientRoot)) {
+-        const pathname = file.pathname.replace(/\/(index)?\.html$/, "");
+-        if (removeTrailingForwardSlash(localPath.pathname).endsWith(pathname)) {
+-          fallback = file;
+-          break;
+-        }
+-      }
+-      if (fallback) {
+-        fileResp = await serveFile(request, fromFileUrl(fallback));
+-      }
+-    }
+-
+-    // If the static file can't be found
+-    if (fileResp.status === 404) {
+-      // Render the astro custom 404 page
+-      const response = await app.render(request);
+-
+-      if (app.setCookieHeaders) {
+-        for (const setCookieHeader of app.setCookieHeaders(response)) {
+-          response.headers.append("Set-Cookie", setCookieHeader);
+-        }
++    // Static assets are served outside the worker on this deploy; for any
++    // unmatched route just render astro (handles the custom 404 page).
++    const response = await app.render(request);
++    if (app.setCookieHeaders) {
++      for (const setCookieHeader of app.setCookieHeaders(response)) {
++        response.headers.append("Set-Cookie", setCookieHeader);
+       }
+-      return response;
+-
+-      // If the static file is found
+-    } else {
+-      return fileResp;
+     }
++    return response;
+   };
+ 
+   const port = options.port ?? 8085;

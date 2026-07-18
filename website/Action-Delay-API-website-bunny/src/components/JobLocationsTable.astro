@@ -1,0 +1,96 @@
+---
+import type { JobLocation } from '../../models/cloudflare/location';
+
+interface Props {
+	jobName: string;
+}
+
+const { jobName } = Astro.props;
+const encoded = jobName.replaceAll("/", "%2F");
+
+let locations: JobLocation[] = [];
+try {
+	const res = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${encoded}/locations`);
+	if (res.ok) locations = (await res.json()).data ?? [];
+} catch (e) {
+	console.log(`failed to fetch locations for ${jobName}`);
+}
+
+// Errored / not-yet-deployed first, then alphabetical.
+const rank = (s: string) => (s === "Errored" ? 0 : s === "Deployed" ? 2 : 1);
+locations.sort((a, b) => rank(a.currentRunStatus) - rank(b.currentRunStatus)
+	|| a.locationName.localeCompare(b.locationName));
+
+const statusClass = (s: string) =>
+	(s === "Deployed" || s === "Success") ? "text-green-600"
+		: (s === "Errored" || s === "Failure") ? "text-red-500"
+		: "text-yellow-500";
+
+const delayTxt = (loc: JobLocation) => {
+	const cur = loc.currentRunStatus === "Deployed" || loc.currentRunStatus === "Success";
+	const ms = cur ? loc.currentRunLengthMs : loc.lastRunLengthMs;
+	if (ms == null || isNaN(ms)) return "—";
+	if (ms < 1000) return Math.round(ms) + " ms";
+	if (ms < 60000) return (ms / 1000).toFixed(2) + " s";
+	return (ms / 60000).toFixed(2) + " min";
+};
+const updatedTxt = (loc: JobLocation) => {
+	const t = loc.responseTimeUtc || loc.currentRunTime || loc.lastRunTime;
+	const d = t ? new Date(t) : null;
+	return d && !isNaN(d.getTime()) ? d.toLocaleTimeString() : "—";
+};
+
+const tableId = `loc-table-${jobName.replaceAll(/[^a-zA-Z0-9]/g, "")}`;
+const filterId = `${tableId}-filter`;
+---
+
+<div class="surface p-4">
+	<div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
+		<h3 class="font-semibold text-lg">Locations <span class="text-gray text-sm">({locations.length})</span></h3>
+		<input
+			id={filterId}
+			type="text"
+			placeholder="Filter locations..."
+			class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+		/>
+	</div>
+	{locations.length === 0 ? (
+		<div class="text-gray text-sm py-6 text-center">No location data available.</div>
+	) : (
+		<div class="overflow-x-auto">
+			<table id={tableId} class="w-full text-sm">
+				<thead>
+					<tr class="text-gray text-xs uppercase border-b border-gray-200 dark:border-gray-700">
+						<th class="text-left font-medium py-2 pr-4">Location</th>
+						<th class="text-left font-medium py-2 pr-4">Status</th>
+						<th class="text-left font-medium py-2 pr-4">Delay</th>
+						<th class="text-left font-medium py-2">Last Updated</th>
+											</tr>
+				</thead>
+				<tbody>
+					{locations.map((loc) => (
+						<tr class="border-b border-gray-100 dark:border-gray-800 loc-row" data-loc={loc.locationName.toLowerCase()}>
+							<td class="py-2 pr-4 font-medium break-all">{loc.locationName}</td>
+							<td class={`py-2 pr-4 ${statusClass(loc.currentRunStatus)}`} id={`loc-status-${loc.locationName}`}>{loc.currentRunStatus}</td>
+							<td class="py-2 pr-4 tabular-nums" id={`loc-delay-${loc.locationName}`}>{delayTxt(loc)}</td>
+							<td class="py-2 pr-4 text-gray" id={`loc-updated-${loc.locationName}`}>{updatedTxt(loc)}</td>
+													</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	)}
+</div>
+
+<script define:vars={{ filterId, tableId }}>
+	const input = document.getElementById(filterId);
+	const table = document.getElementById(tableId);
+	if (input && table) {
+		input.addEventListener("input", () => {
+			const q = input.value.toLowerCase();
+			table.querySelectorAll(".loc-row").forEach((row) => {
+				row.style.display = row.getAttribute("data-loc").includes(q) ? "" : "none";
+			});
+		});
+	}
+</script>

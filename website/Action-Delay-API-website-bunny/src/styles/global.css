@@ -71,6 +71,22 @@
 
 	/* Transitions */
 	--theme-transition: 0.2s ease-in-out;
+
+	/* Semantic status colors (health of a value) */
+	--status-good: #15803d;
+	--status-elevated: #b45309;
+	--status-bad: #b91c1c;
+	--status-good-bg: rgba(21, 128, 61, 0.1);
+	--status-elevated-bg: rgba(180, 83, 9, 0.1);
+	--status-bad-bg: rgba(185, 28, 28, 0.1);
+
+	/* Card / panel surfaces */
+	--surface-bg: #ffffff;
+	--surface-bg-hover: #f7f8fa;
+	--surface-border: rgba(9, 11, 17, 0.08);
+
+	/* Page background accent glow */
+	--page-glow: hsla(280, 89%, 67%, 0.1);
 }
 
 :root.theme-dark {
@@ -113,6 +129,22 @@
 		0px 7px 7px rgba(255, 255, 255, 0.05), 0px 2px 4px rgba(255, 255, 255, 0.06);
 	--shadow-lg: 0px 62px 25px rgba(255, 255, 255, 0.01), 0px 35px 21px rgba(255, 255, 255, 0.05),
 		0px 16px 16px rgba(255, 255, 255, 0.1), 0px 4px 9px rgba(255, 255, 255, 0.12);
+
+	/* Semantic status colors (health of a value) */
+	--status-good: #4ade80;
+	--status-elevated: #fbbf24;
+	--status-bad: #f87171;
+	--status-good-bg: rgba(74, 222, 128, 0.12);
+	--status-elevated-bg: rgba(251, 191, 36, 0.12);
+	--status-bad-bg: rgba(248, 113, 113, 0.12);
+
+	/* Card / panel surfaces */
+	--surface-bg: #1b1b1f;
+	--surface-bg-hover: #232329;
+	--surface-border: rgba(255, 255, 255, 0.08);
+
+	/* Page background accent glow */
+	--page-glow: hsla(280, 89%, 55%, 0.16);
 }
 
 html,
@@ -177,6 +209,138 @@ h5 {
 }
 
 /* Utilities */
+
+/* Reusable card/panel surface. Themes via CSS vars (flips with .theme-dark). */
+.surface {
+	background-color: var(--surface-bg);
+	border: 1px solid var(--surface-border);
+	border-radius: 0.75rem;
+	box-shadow: var(--shadow-sm);
+}
+
+.surface-hover {
+	transition:
+		box-shadow var(--theme-transition),
+		border-color var(--theme-transition),
+		background-color var(--theme-transition);
+}
+
+.surface-hover:hover {
+	background-color: var(--surface-bg-hover);
+	box-shadow: var(--shadow-md);
+}
+
+/* Health-colored values (applied to the big delay/latency numbers). */
+.value-good {
+	color: var(--status-good);
+}
+.value-elevated {
+	color: var(--status-elevated);
+}
+.value-bad {
+	color: var(--status-bad);
+}
+
+/* Status-page summary chips, tinted by health token. */
+.status-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.3rem 0.7rem;
+	border-radius: 999rem;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+}
+.status-chip .chip-dot {
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 999rem;
+	flex: none;
+}
+.status-chip.is-zero {
+	opacity: 0.5;
+}
+.status-chip-good {
+	color: var(--status-good);
+	background-color: var(--status-good-bg);
+}
+.status-chip-good .chip-dot {
+	background-color: var(--status-good);
+}
+.status-chip-elevated {
+	color: var(--status-elevated);
+	background-color: var(--status-elevated-bg);
+}
+.status-chip-elevated .chip-dot {
+	background-color: var(--status-elevated);
+}
+.status-chip-bad {
+	color: var(--status-bad);
+	background-color: var(--status-bad-bg);
+}
+.status-chip-bad .chip-dot {
+	background-color: var(--status-bad);
+}
+
+/* Live-connection pill (id="websocket-conn-status"). Defaults to a muted
+   "connecting/disconnected" look; .websocket-connected flips it green-live. */
+.websocket-conn-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	padding: 0.3rem 0.75rem;
+	border-radius: 999rem;
+	font-size: var(--text-sm);
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--status-elevated);
+	background-color: var(--status-elevated-bg);
+	transition:
+		color var(--theme-transition),
+		background-color var(--theme-transition);
+}
+.websocket-conn-pill::before {
+	content: "";
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 999rem;
+	background-color: currentColor;
+	flex: none;
+}
+.websocket-conn-pill.websocket-connected {
+	color: var(--status-good);
+	background-color: var(--status-good-bg);
+}
+.websocket-conn-pill.websocket-connected::before {
+	animation: ws-pulse 1.8s ease-in-out infinite;
+}
+@keyframes ws-pulse {
+	0%,
+	100% {
+		opacity: 1;
+		box-shadow: 0 0 0 0 var(--status-good-bg);
+	}
+	50% {
+		opacity: 0.55;
+		box-shadow: 0 0 0 0.25rem transparent;
+	}
+}
+
+/* Incident callout box — dark-mode aware (replaces light-only red utilities). */
+.incident-box {
+	margin-top: 1rem;
+	padding: 0.75rem;
+	border-radius: 0.5rem;
+	color: var(--status-bad);
+	background-color: var(--status-bad-bg);
+	border: 1px solid var(--status-bad);
+}
+.incident-box .incident-muted {
+	color: inherit;
+	opacity: 0.85;
+}
 
 .sr-only {
 	position: absolute;

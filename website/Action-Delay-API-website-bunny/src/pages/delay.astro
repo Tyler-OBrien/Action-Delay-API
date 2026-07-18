@@ -5,8 +5,12 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import JobDisplay from "../components/JobDisplay.astro";
 import Hero from "../components/Hero.astro";
 import Grid from "../components/Grid.astro";
+import CategorySection from "../components/CategorySection.astro";
 import type { QuickStats } from "../../models/cloudflare/quickstat";
 import type { Job } from "../../models/cloudflare/job";
+import type { OverallAnalytics } from "../../models/cloudflare/overallanalytics";
+import type { Incident } from "../../models/types";
+import { groupJobs } from "../data/jobCategories";
 
 const getJobs = async () => {
   return (
@@ -17,7 +21,6 @@ const getJobs = async () => {
     ).json()
   ).data;
 };
-var getJobsTask = getJobs();
 
 const getAnalytics = async () => {
   return await (
@@ -26,50 +29,44 @@ const getAnalytics = async () => {
     )
   ).json();
 };
-var getAnalyticsTask = getAnalytics();
 
-const jobs: Job[] = await getJobsTask;
-const stats: QuickStats[] = await getAnalyticsTask;
+const getOverallAnalytics = async (): Promise<OverallAnalytics | null> => {
+  try {
+    const r = await fetch("https://delay.cloudflare.chaika.me/v2/jobs/OverallAnalytics");
+    if (!r.ok) return null;
+    const json = await r.json();
+    return json.data ?? json;
+  } catch { return null; }
+};
 
-// Define your priority groups
-const FIRST_GROUP = ["worker", "dns", 'waf'];  
-const LAST_GROUP = ["analytics", "wfp", 'cron', 'cert'];  
+const getIncidents = async (): Promise<Incident[]> => {
+  try {
+    const r = await fetch("https://delay.cloudflare.chaika.me/v2/incidents/type/BunnyDelay");
+    return r.ok ? ((await r.json()).data ?? []) : [];
+  } catch { return []; }
+};
 
-const reorderedList = jobs
-  .filter(job => job.internalJobName !== "workertesting")
-  .sort((joba, jobb) => {
-    const jobAName = joba.internalJobName;
-    const jobBName = jobb.internalJobName;
+const [jobs, stats, overall, incidents]: [Job[], QuickStats[], OverallAnalytics | null, Incident[]] = await Promise.all([
+  getJobs(), getAnalytics(), getOverallAnalytics(), getIncidents()
+]);
 
-    // Check if jobs are in FIRST_GROUP
-    const aIsFirst = FIRST_GROUP.some(prefix => jobAName === prefix || jobAName.startsWith(prefix + "-"));
-    const bIsFirst = FIRST_GROUP.some(prefix => jobBName === prefix || jobBName.startsWith(prefix + "-"));
-    
-    // Check if jobs are in LAST_GROUP
-    const aIsLast = LAST_GROUP.some(prefix => jobAName === prefix || jobAName.startsWith(prefix + "-"));
-    const bIsLast = LAST_GROUP.some(prefix => jobBName === prefix || jobBName.startsWith(prefix + "-"));
+const groups = groupJobs(jobs, "delay");
 
-    if (aIsFirst && bIsFirst) {
-      // Both in first group - sort alphabetically within group
-      return jobAName.localeCompare(jobBName);
-    }
-    if (aIsLast && bIsLast) {
-      // Both in last group - sort alphabetically within group
-      return jobAName.localeCompare(jobBName);
-    }
-    
-    // Handle priority ordering
-    if (aIsFirst) return -1;  // a goes first
-    if (bIsFirst) return 1;   // b goes first
-    if (aIsLast) return 1;    // a goes last
-    if (bIsLast) return -1;   // b goes last
+// Flatten (visible, grouped) jobs for the live-update script.
+const visibleJobs = groups.flatMap((g) => g.jobs);
 
-    // Neither in special groups - sort alphabetically
-    return jobAName.localeCompare(jobBName);
-  });
+const hasIncident = (job: Job) =>
+  incidents.some((i) => i.target === job.internalJobName && i.active);
+
+// A delay category is "degraded" if any member has an active incident,
+// an API error, or is currently marked delayed.
+const groupIssue = (groupJobsList: Job[]) =>
+  groupJobsList.some(
+    (j) => hasIncident(j) || j.predictedRunStatus === "API_Error" || j.type === "delayed"
+  );
 ---
-<script define:vars={{ reorderedList, stats }}>
-globalThis.jobData = reorderedList;
+<script define:vars={{ visibleJobs, stats }}>
+globalThis.jobData = visibleJobs;
 globalThis.jobStats = stats;
 </script>
 <BaseLayout
@@ -80,27 +77,53 @@ globalThis.jobStats = stats;
     <main class="wrapper stack gap-8">
       <Hero
         title="Bunny Delay Jobs"
-        tagline="See Bunny Delay Monitoring Jobs"
+        tagline="See the delay between an action being performed (DNS Update, Worker Update, etc) and it being visible on edge from 50+ locations worldwide."
         align="start"
       >
       <a href="/delay/overview">Overview</a>
       </Hero>
       <a id="websocket-conn-status">Disconnected</a>
-      <Grid>
+      {overall && (
+        <div class="flex flex-wrap gap-6 justify-center text-sm py-2 border-t border-b border-gray-200 dark:border-gray-700">
+          <span><strong class="text-gray-900 dark:text-white">{overall.uniqueJobs}</strong> delay jobs</span>
+          <span><strong class="text-gray-900 dark:text-white">{overall.uniqueLocations}</strong> locations</span>
+          <span><strong class="text-gray-900 dark:text-white">{(overall.normalJobPerLocationRunsLast24H ?? 0).toLocaleString()}</strong> location-runs in last 24h</span>
+        </div>
+      )}
+      <input
+        id="job-filter"
+        type="text"
+        placeholder="Filter jobs..."
+        class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      />
+      <div class="stack gap-4">
         {
-          reorderedList.map((job: Job) => (
-            <li>
-              <JobDisplay
-                type="job"
-                job={job}
-                stats={stats.filter(
-                  (stat) => stat.job_name.toLowerCase() == job.internalJobName
-                )}
-              />
-            </li>
+          groups.map((group) => (
+            <CategorySection
+              name={group.name}
+              count={group.jobs.length}
+              statusColor={groupIssue(group.jobs) ? "bg-yellow-500" : "bg-green-500"}
+              open={true}
+            >
+              <Grid>
+                {group.jobs.map((job: Job) => (
+                  <li>
+                    <JobDisplay
+                      type="job"
+                      job={job}
+                      stats={stats.filter(
+                        (stat) => stat.job_name.toLowerCase() == job.internalJobName
+                      )}
+                      hasIncident={hasIncident(job)}
+                    />
+                  </li>
+                ))}
+              </Grid>
+            </CategorySection>
           ))
         }
-      </Grid>
+      </div>
+      <script src="../scripts/job-filter.js"></script>
       <script src="/assets/js/8.0.7/signalr.min.js" is:inline> </script>
       <script src="/assets/js/8.0.7/signalr-protocol-msgpack.min.js" is:inline> </script>
       <script src="../scripts/signalr-delay-code.js"> </script>

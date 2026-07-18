@@ -1,5 +1,6 @@
 import  { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min'
+import { isDarkMode, themeColors, baseLayout, axis, seriesColor, themeRelayout } from './chartTheme';
 
 const SELECT_OPTIONS = [
   { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
@@ -26,9 +27,16 @@ const SELECT_DISPLAY_OPTIONS = [
   { value: "AvgApiResponseLatency", label: "Average API Response Time"},
   { value: "MinApiResponseLatency", label: "Min API Response Time"},
   { value: "MaxApiResponseLatency", label: "Max API Response Time"},
+  { value: "MedianEdgeResponseLatency", label: "Median Edge Response Time"},
+  { value: "AvgEdgeResponseLatency", label: "Average Edge Response Time"},
+  { value: "MinEdgeResponseLatency", label: "Min Edge Response Time"},
+  { value: "MaxEdgeResponseLatency", label: "Max Edge Response Time"},
 ];
 
 function formatTime(ms) {
+   if (typeof ms !== 'number' || !isFinite(ms)) {
+    return ms;
+  }
   if (ms < 1000) {
     return ms.toFixed(0) + ' ms';
   }
@@ -99,9 +107,9 @@ const SmartGraph = (props) => {
   useEffect(() => {
     if (!plotRef.current) return;
 
-    const htmlElement = document.documentElement;
-    const hasDarkClass = htmlElement.classList.contains('dark');
-    
+    const isDark = isDarkMode();
+    const lineColor = seriesColor(displayOption);
+
     const x = dataPoints.map(point => new Date(point.x));
     const y = dataPoints.map(point => point.y);
 
@@ -123,72 +131,23 @@ const SmartGraph = (props) => {
       line: {
         shape: 'spline',
         width: 2,
-        color: hasDarkClass ? '#3b82f6' : '#1d4ed8'
+        color: lineColor
       },
       marker: {
         size: 4,
-        color: hasDarkClass ? '#3b82f6' : '#1d4ed8'
+        color: lineColor
       },
       connectgaps: true
     }];
 
     const layout = {
+      ...baseLayout(isDark),
       title: {
         text: `${label} - ${displayOptionLabel}`,
-        font: {
-          size: 16,
-          color: hasDarkClass ? '#e5e5e5' : '#333'
-        }
+        font: { size: 16, color: themeColors(isDark).textStrong }
       },
-      xaxis: {
-        title: 'Time',
-        type: 'date',
-        range: xRange,
-        gridcolor: hasDarkClass ? '#333' : '#e5e5e5',
-        tickfont: {
-          size: 12,
-          color: hasDarkClass ? '#e5e5e5' : '#333'
-        },
-        titlefont: {
-          size: 13,
-          color: hasDarkClass ? '#e5e5e5' : '#333'
-        },
-      },
-      yaxis: {
-        title: 'Duration',
-        tickmode: 'array',
-        gridcolor: hasDarkClass ? '#333' : '#e5e5e5',
-        tickfont: {
-          size: 12,
-          color: hasDarkClass ? '#e5e5e5' : '#333'
-        },
-        titlefont: {
-          size: 13,
-          color: hasDarkClass ? '#e5e5e5' : '#333'
-        },
-        fixedrange: true
-      },
-      plot_bgcolor: hasDarkClass ? '#171717' : '#ffffff',
-      paper_bgcolor: hasDarkClass ? '#171717' : '#ffffff',
-      font: {
-        color: hasDarkClass ? '#e5e5e5' : '#333'
-      },
-      margin: {
-        l: 80,
-        r: 50,
-        t: 80,
-        b: 80
-      },
-      hovermode: 'x unified',
-      legend: {
-        x: 0,
-        y: -0.2,
-        orientation: 'h',
-        font: {
-          size: 13,
-          color: hasDarkClass ? '#e5e5e5' : '#333'
-        }
-      }
+      xaxis: axis(isDark, { title: 'Time', type: 'date', range: xRange }),
+      yaxis: axis(isDark, { title: 'Duration', tickmode: 'array', fixedrange: true }),
     };
 
     const config = {
@@ -271,31 +230,8 @@ const SmartGraph = (props) => {
   useEffect(() => {
     function handleThemeChange() {
       if (!plotRef.current) return;
-      
-      const htmlElement = document.documentElement;
-      const hasDarkClass = htmlElement.classList.contains('dark');
-      
-      const update = {
-        'plot_bgcolor': hasDarkClass ? '#171717' : '#ffffff',
-        'paper_bgcolor': hasDarkClass ? '#171717' : '#ffffff',
-        'font.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'xaxis.gridcolor': hasDarkClass ? '#333' : '#e5e5e5',
-        'yaxis.gridcolor': hasDarkClass ? '#333' : '#e5e5e5',
-        'xaxis.tickfont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'yaxis.tickfont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'xaxis.titlefont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'yaxis.titlefont.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'title.font.color': hasDarkClass ? '#e5e5e5' : '#333',
-        'legend.font.color': hasDarkClass ? '#e5e5e5' : '#333'
-      };
-      
-      const traceUpdate = {
-        'line.color': hasDarkClass ? '#3b82f6' : '#1d4ed8',
-        'marker.color': hasDarkClass ? '#3b82f6' : '#1d4ed8'
-      };
-      
-      Plotly.restyle(plotRef.current, traceUpdate, 0);
-      Plotly.relayout(plotRef.current, update);
+      // Series color is metric-based (not theme-based), so only relayout chrome.
+      Plotly.relayout(plotRef.current, themeRelayout(isDarkMode()));
     }
 
     window.addEventListener('themeChange', handleThemeChange);
@@ -347,18 +283,19 @@ const SmartGraph = (props) => {
         </a>
       </div>
 
-      <div 
-        ref={plotRef}
-        style={{ 
-          height: fullscreen ? '700px' : '450px',
-          width: '100%'
-        }}
-      />
-      
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75">
-          <div className="text-gray-600 dark:text-gray-400">Loading...</div>
-        </div>
+      {isLoading && dataPoints.length === 0 ? (
+        <div
+          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
+          style={{ height: fullscreen ? '700px' : '450px' }}
+        />
+      ) : (
+        <div
+          ref={plotRef}
+          style={{
+            height: fullscreen ? '700px' : '450px',
+            width: '100%'
+          }}
+        />
       )}
     </div>
   );
@@ -373,7 +310,7 @@ async function fetchData(endpoint, start, end, displayOption) {
     endParam = datetimeNow.toISOString();
   }
 
-  const response = await fetch(`https://delay.cloudflare.chaika.me/${endpoint}?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${displayOption}`);
+  const response = await fetch(`https://api.bunny.chaika.me/${endpoint}?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${displayOption}`);
   const json = await response.json();
   
   return json.data.points.map(point => {

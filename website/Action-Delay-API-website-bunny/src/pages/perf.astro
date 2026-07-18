@@ -1,13 +1,11 @@
 ---
-import { getCollection } from 'astro:content';
-
 import BaseLayout from '../layouts/BaseLayout.astro';
 
-import JobDisplay from '../components/JobDisplay.astro';
+import PerfTable from '../components/PerfTable.astro';
 import Hero from '../components/Hero.astro';
-import Grid from '../components/Grid.astro';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
 import type { Job } from '../../models/cloudflare/job';
+import { groupJobs } from '../data/jobCategories';
 
 const getJobs = async () => {
 	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/Perf")).json()).data
@@ -22,32 +20,35 @@ var getAnalyticsTask = getAnalytics()
 const jobs: Job[] = await getJobsTask;
 const stats: QuickStats[] = await getAnalyticsTask;
 
+const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-const reorderedList = jobs.sort()
-
+const activeJobs = jobs.filter(job => new Date(job.predictedRunTime) >= oneWeekAgo);
+const bunnyJobs = activeJobs.filter(job => (job.internalJobName || '').toLowerCase().startsWith('bunny-'));
+const groups = groupJobs(bunnyJobs, 'perf');
 ---
 
 <BaseLayout
 	title="Bunny Performance Monitoring"
-	description="See Bunny Performance Monitoring Jobs"
+	description="See Bunny performance monitoring jobs."
 >
 	<div class="stack gap-20">
 		<main class="wrapper stack gap-8">
 			<Hero
 				title="Bunny Performance Jobs"
-				tagline="See Bunny Performance Monitoring Jobs"
+				tagline="Compare the performance of Bunny services, measured from 50+ locations worldwide. Jobs are grouped by workload — Compute, Object Storage and SQL. Each service shows its median; expand it to see per-region and per-size variants. Sort any column, or click a job for its description and a per-location latency map."
 				align="start"
 			>
 			</Hero>
-			<Grid>
-				{
-					reorderedList.filter(job => job.internalJobName.startsWith("bunny")).map((job: Job) => (
-						<li>
-							<JobDisplay  type="perf"  job={job} stats={stats.filter(stat => stat.job_name.toLowerCase() == job.internalJobName)} />
-							</li>
-					))
-				}
-			</Grid>
+			<input
+				id="job-filter"
+				type="text"
+				placeholder="Filter jobs..."
+				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+			/>
+			<div class="stack gap-4">
+				<PerfTable groups={groups} stats={stats} />
+			</div>
+			<script src="../scripts/perf-table.js"></script>
 		</main>
 	</div>
 </BaseLayout>

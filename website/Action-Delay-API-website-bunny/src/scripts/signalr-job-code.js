@@ -1,3 +1,9 @@
+// Strip any stale value-good|elevated|bad class — the value text is no longer color-coded.
+function applyHealthClass(el) {
+  if (!el) return;
+  el.className = el.className.replace(/\bvalue-(good|elevated|bad)\b/g, "").replace(/\s+/g, " ").trim();
+}
+
 const connection = new signalR.HubConnectionBuilder()
   .withUrl("https://api.bunny.chaika.me/v2/jobs/signalr", {
     transport: signalR.HttpTransportType.WebSockets,
@@ -49,6 +55,18 @@ connection.on("receivelocationupdate", (subject, data) => {
     console.error(exception);
     console.log(`error sending job update to iframe`);
   }
+
+  const statusEl = document.getElementById(`loc-status-${data.LocationName}`);
+  if (statusEl) {
+    statusEl.textContent = data.Status;
+    statusEl.className = data.Status === 'Deployed' ? 'text-green-600'
+      : data.Status === 'Errored' ? 'text-red-500' : 'text-yellow-500';
+  }
+  const delayEl = document.getElementById(`loc-delay-${data.LocationName}`);
+  if (delayEl && data.RunLength != null)
+    delayEl.textContent = (Number(data.RunLength) / 1000).toFixed(2) + 's';
+  const updEl = document.getElementById(`loc-updated-${data.LocationName}`);
+  if (updEl) updEl.textContent = new Date().toLocaleTimeString();
 });
 
 connection.on("ReceiveJobUpdate", (subject, data) => {
@@ -128,7 +146,7 @@ setInterval(async () => {
 
 async function handleJobUpdateData(internalJobNameUpdate) {
   var getCurrentData = globalThis.jobData;
-  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name);
+  var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name === internalJobNameUpdate);
   let lastUpdatedTxt = "";
   let delayTxt = "";
   let delayTxtUnit = "";
@@ -147,7 +165,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   const type = getCurrentData.jobType;
 
   function formatTime(ms) {
-    if (ms == undefined) return "";
+    if (ms == undefined || isNaN(ms)) return "";
 
     let seconds = ms / 1000;
     if (seconds < 60) {
@@ -258,9 +276,9 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     job.currentRunStatus == "API_Error" &&
     job.lastRunStatus == "API_Error"
   ) {
-    delayTxt = "Bunny API Error";
+    delayTxt = "CF API Error";
     delayTxtUnit = "";
-    pending.textContent = "Bunny API Error";
+    pending.textContent = "CF API Error";
     pending.className = "highlightRed  text-center mb-2 h-4";
   } else {
     [delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
@@ -294,12 +312,18 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     ).innerText = `${lastUpdatedTxt}`;
   }
 
-  document.getElementById(
-    `delayNumber${job.internalJobName}`
-  ).innerText = `${delayTxt}`;
+  const delayNumberEl = document.getElementById(`delayNumber${job.internalJobName}`);
+  delayNumberEl.innerText = `${delayTxt}`;
+  const hasIncident = (globalThis.incidents || []).some(
+    (i) => i.target === job.internalJobName && i.active
+  );
+  applyHealthClass(delayNumberEl, job, hasIncident);
   document.getElementById(
     `delayUnit${job.internalJobName}`
   ).innerText = `${delayTxtUnit}`;
+
+  const el1d = document.getElementById(`median1d${job.internalJobName}`);
+  if (el1d && dailyMedian) el1d.innerText = dailyMedian;
 }
 
 start();

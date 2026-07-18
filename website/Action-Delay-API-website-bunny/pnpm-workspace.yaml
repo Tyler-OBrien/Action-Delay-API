@@ -1,0 +1,7 @@
+allowBuilds:
+  esbuild: true
+  sharp: true
+minimumReleaseAgeExclude:
+  - astro@6.4.7
+patchedDependencies:
+  '@deno/astro-adapter@0.5.2': patches/@deno__astro-adapter@0.5.2.patch

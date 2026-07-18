@@ -1,0 +1,133 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import type { LocationInfo } from '../../models/cloudflare/locationinfo';
+
+const locResp = await fetch('https://delay.cloudflare.chaika.me/v2/locations');
+
+let locations: LocationInfo[] = [];
+if (locResp.ok) {
+	const json = await locResp.json();
+	locations = json.data ?? [];
+}
+
+// friendlyRegionName is the meaningful grouping key (EU, NA, AS, OC, SA, AF, ME)
+// region is the LB region code (weur, enam, apac, …) — not useful for display
+const REGION_ORDER = ['NA', 'EU', 'AS', 'OC', 'SA', 'AF', 'ME'];
+
+const REGION_NAMES: Record<string, string> = {
+	NA: 'North America',
+	EU: 'Europe',
+	AS: 'Asia-Pacific',
+	OC: 'Oceania',
+	SA: 'South America',
+	AF: 'Africa',
+	ME: 'Middle East',
+};
+
+locations.sort((a, b) => {
+	const ra = a.friendlyRegionName ?? '';
+	const rb = b.friendlyRegionName ?? '';
+	const ri = REGION_ORDER.indexOf(ra) === -1 ? 99 : REGION_ORDER.indexOf(ra);
+	const rj = REGION_ORDER.indexOf(rb) === -1 ? 99 : REGION_ORDER.indexOf(rb);
+	if (ri !== rj) return ri - rj;
+	// Within region: sort by provider, then locationName
+	const pa = (a.provider ?? '').toLowerCase();
+	const pb = (b.provider ?? '').toLowerCase();
+	if (pa < pb) return -1;
+	if (pa > pb) return 1;
+	if (a.locationName < b.locationName) return -1;
+	if (a.locationName > b.locationName) return 1;
+	return 0;
+});
+
+const regionCount = new Set(locations.map(l => l.friendlyRegionName)).size;
+
+// Group by friendlyRegionName
+const grouped = new Map<string, LocationInfo[]>();
+for (const loc of locations) {
+	const key = loc.friendlyRegionName ?? 'Other';
+	if (!grouped.has(key)) grouped.set(key, []);
+	grouped.get(key)!.push(loc);
+}
+
+const orderedGroups = [...grouped.entries()].sort(([a], [b]) => {
+	const ai = REGION_ORDER.indexOf(a) === -1 ? 99 : REGION_ORDER.indexOf(a);
+	const bi = REGION_ORDER.indexOf(b) === -1 ? 99 : REGION_ORDER.indexOf(b);
+	return ai - bi;
+});
+---
+
+<BaseLayout title="Locations" description="Edge agent locations used for Bunny propagation delay and performance monitoring">
+	<div class="wrapper stack gap-8">
+		<header>
+			<h1 class="text-3xl font-bold">Locations</h1>
+			<p class="text-gray-500 mt-1">{locations.length} monitoring agents across {regionCount} regions</p>
+			<p class="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-2xl">
+				These are the distributed monitoring agents used for Bunny propagation-delay and performance
+				monitoring. Each agent polls from its location to detect when a change — such as an Edge Script
+				deployment or DNS update — becomes visible at that edge.
+			</p>
+		</header>
+
+		<div class="mb-2">
+			<input
+				id="location-filter"
+				type="text"
+				placeholder="Filter locations..."
+				class="w-full max-w-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-sm"
+			/>
+		</div>
+
+		<div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+			<table class="w-full text-sm border-collapse">
+				<thead>
+					<tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+						<th class="py-2.5 px-3">IATA</th>
+						<th class="py-2.5 px-3">Location</th>
+						<th class="py-2.5 px-3">Provider</th>
+						<th class="py-2.5 px-3">Active</th>
+					</tr>
+				</thead>
+				<tbody>
+					{orderedGroups.flatMap(([region, locs]) => [
+						<tr class="region-header bg-gray-100 dark:bg-gray-800">
+							<td colspan="4" class="py-1.5 px-3 text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+								{REGION_NAMES[region] ?? region} <span class="font-normal normal-case opacity-60">({region})</span> &mdash; {locs.length} location{locs.length !== 1 ? 's' : ''}
+							</td>
+						</tr>,
+						...locs.map(loc => (
+							<tr id={`${loc.iata}-row`} class={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors${!loc.enabled ? ' opacity-40' : ''}`}>
+								<td class="py-2 px-3">
+									<span class="font-mono font-bold text-sm">{loc.iata}</span>
+								</td>
+								<td class="py-2 px-3">
+									{loc.friendlyLocationName ?? loc.locationName}
+								</td>
+								<td class="py-2 px-3 text-gray-500 dark:text-gray-400">
+									{loc.provider}
+								</td>
+								<td class="py-2 px-3">
+									{loc.enabled
+										? <span class="text-green-600 dark:text-green-400 font-semibold">✓</span>
+										: <span class="text-gray-400">✗</span>
+									}
+								</td>
+							</tr>
+						))
+					])}
+				</tbody>
+			</table>
+		</div>
+	</div>
+</BaseLayout>
+
+<script>
+	const input = document.getElementById('location-filter') as HTMLInputElement;
+	input?.addEventListener('input', () => {
+		const query = input.value.toLowerCase();
+		document.querySelectorAll<HTMLTableRowElement>('tr[id$="-row"]').forEach(row => {
+			const visible = !query || (row.textContent?.toLowerCase().includes(query) ?? true);
+			row.hidden = !visible;
+		});
+	});
+</script>

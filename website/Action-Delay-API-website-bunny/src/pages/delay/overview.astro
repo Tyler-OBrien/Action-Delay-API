@@ -23,8 +23,9 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       >
             <a href="/delay">Delay Jobs</a>
       </Hero>
-			<SmartGraph endpoint=`/v2/jobs/analytics/type/BunnyDelay` label=`Overall Bunny Delay API Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
-			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/BunnyDelay` label=`Overall Bunny Delay API Errors` options={["AvgApiResponseLatency" ]} client:only="preact"/> 
+			<SmartGraph endpoint="/v2/jobs/analytics/type/BunnyDelay" label="Overall Bunny Propagation Delay" options={["MedianRunLength", "AvgRunLength", "MinRunLength", "MaxRunLength"]} defaultOption="MedianRunLength" client:only="preact"/>
+		<SmartGraph endpoint=`/v2/jobs/analytics/type/BunnyDelay` label=`Overall Bunny Delay API Response Time`  options={["AvgApiResponseLatency", "MedianApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} client:only="preact"/>
+			<ErrorGraph endpoint=`/v2/jobs/erroranalytics/type/BunnyDelay` label=`Overall Bunny Delay API Errors` client:only="preact"/>
     </main>
   </div>
 </BaseLayout>

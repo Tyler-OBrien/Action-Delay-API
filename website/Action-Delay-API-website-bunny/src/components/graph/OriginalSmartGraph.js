@@ -297,7 +297,7 @@ async function fetchData(endpoint, start, end, displayOption) {
   if (new Date(end) > datetimeNow)
     endParam = datetimeNow.toISOString();
 
-  const response = await fetch(`https://delay.cloudflare.chaika.me/${endpoint}?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${displayOption}`);
+  const response = await fetch(`https://api.bunny.chaika.me/${endpoint}?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${displayOption}`);
   const json = await response.json();
   const pointsList = [];
   // hacky :(

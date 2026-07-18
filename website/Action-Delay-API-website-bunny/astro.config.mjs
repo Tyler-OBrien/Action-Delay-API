@@ -14,12 +14,18 @@ export default defineConfig({
   prefetch: {
     prefetchAll: true
   },
+  // Bunny's Edge Scripting runtime (Deno-based) does not provide `node:child_process`,
+  // which Astro's default `sharp` image service imports (libvips arch detection via spawnSync).
+  // Use the no-op/passthrough image service so sharp is never bundled into the SSR output.
+  image: {
+    service: { entrypoint: 'astro/assets/services/noop' },
+  },
   vite: {
     ssr: {
-      noExternal: 'plotly.js-basic-dist-min'
+      noExternal: ['plotly.js-basic-dist-min', 'plotly.js-geo-dist-min']
     },
     build: {
-      noExternal: 'plotly.js-basic-dist-min'
+      noExternal: ['plotly.js-basic-dist-min', 'plotly.js-geo-dist-min']
     }
   }, 
   output: "server",
