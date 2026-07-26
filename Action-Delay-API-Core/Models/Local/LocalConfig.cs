@@ -57,6 +57,7 @@ namespace Action_Delay_API_Core.Models.Local
         public BunnyEdgeScriptDelayJobConfig? BunnyEdgeScriptJob { get; set; }
         public BunnyEdgeRuleDelayJobConfig? BunnyEdgeRuleJob { get; set; }
         public BunnyUploadReplicationDelayJobConfig? BunnyUploadReplicationJob { get; set; }
+        public BunnyCacheDelayJobConfig? BunnyCacheJob { get; set; }
 
 
         public CustomRuleUpdateConfig? WAFJob { get; set; }
@@ -387,6 +388,13 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string ProxyAPIKey { get; set; }
 
+    }
+
+    public class BunnyCacheDelayJobConfig : BaseConfig
+    {
+        public string API_Key { get; set; }
+
+        public string URL { get; set; }
     }
 
     public class BaseConfig
