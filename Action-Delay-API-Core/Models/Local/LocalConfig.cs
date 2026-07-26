@@ -54,6 +54,7 @@ namespace Action_Delay_API_Core.Models.Local
         public DNSDelayJobConfig? DNSJobFree { get; set; }
 
         public DNSDelayJobConfig? BunnyDNSJob { get; set; }
+        public GoogleCloudDNSDelayJobConfig? GoogleCloudDNSJob { get; set; }
         public BunnyEdgeScriptDelayJobConfig? BunnyEdgeScriptJob { get; set; }
         public BunnyEdgeRuleDelayJobConfig? BunnyEdgeRuleJob { get; set; }
         public BunnyUploadReplicationDelayJobConfig? BunnyUploadReplicationJob { get; set; }

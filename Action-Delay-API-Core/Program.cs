@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Broker.Bunny;
+using Action_Delay_API_Core.Broker.Google;
 using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Jobs.AI;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -172,6 +173,23 @@ public class Program
                     })
                     .SetHandlerLifetime(TimeSpan.FromMinutes(5))
                     .AddPolicyHandler(GetRetryPolicy());
+
+                services.AddHttpClient<IGoogleCloudAPIBroker, GoogleCloudAPIBroker>()
+                    .ConfigureHttpClient(httpClient =>
+                    {
+                        httpClient.DefaultRequestVersion = HttpVersion.Version10;
+                        httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+                        httpClient.DefaultRequestHeaders.ConnectionClose = false;
+                    })
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler(GetRetryPolicy());
+
+                // Named client used by the token provider to hit Google's OAuth2 token endpoint.
+                services.AddHttpClient(nameof(GoogleServiceAccountTokenProvider))
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler(GetRetryPolicy());
+                // Singleton so the minted access token is cached across concurrent per-location broker calls.
+                services.AddSingleton<IGoogleServiceAccountTokenProvider, GoogleServiceAccountTokenProvider>();
 
                 services.AddHttpClient<IColoDataBroker, ColoDataBroker>()
                     .ConfigureHttpClient(httpClient =>
