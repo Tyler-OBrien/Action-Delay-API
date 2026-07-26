@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker.ColoData;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Services;
@@ -16,7 +17,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob.Bunny
     {
         private readonly IColoDataBroker _apiBroker;
 
-        public BunnyLogForwarderDelayJob(IOptions<LocalConfig> config, ILogger<BunnyLogForwarderDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, IColoDataBroker coloDataBroker) : base(config, logger, clickHouse, dbContext, queue)
+        public BunnyLogForwarderDelayJob(IOptions<LocalConfig> config, ILogger<BunnyLogForwarderDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, IColoDataBroker coloDataBroker, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             _apiBroker = coloDataBroker;
         }

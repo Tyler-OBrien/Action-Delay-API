@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Models.Local;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -31,7 +32,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         protected Dictionary<Location, bool> FinishedLocationStatus { get; set; } = new Dictionary<Location, bool>();
         protected Dictionary<Location, JobDataLocation> RunningLocationsData { get; set; } = new Dictionary<Location, JobDataLocation>();
 
-        protected BasePropagationJob(IOptions<LocalConfig> config, ILogger<BasePropagationJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService, context, queue)
+        protected BasePropagationJob(IOptions<LocalConfig> config, ILogger<BasePropagationJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, ILocationProvider locationProvider) : base(config, logger, clickhouseService, context, queue, locationProvider)
         {
 
         }
@@ -46,7 +47,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             try
             {
                 Dictionary<Location, Task> preInitWarmTasks = new();
-                foreach (var location in _config.Locations.Where(location => location.Disabled == false))
+                foreach (var location in RunLocations)
                 {
                     preInitWarmTasks.Add(location, PreWarmRunLocation(location));
                 }
@@ -89,6 +90,10 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 
         public override async Task BaseRun()
         {
+            // Everything below - pre-warm, the JobLocations rows, the fan-out and the completion
+            // thresholds - must agree on one roster for the whole run.
+            CaptureLocationSnapshot();
+
             using var scope = _logger.BeginScope(Name);
             using var sentryScope = SentrySdk.PushScope();
             var transaction = SentrySdk.StartTransaction(Name, "Job");
@@ -138,7 +143,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 
                 var jobLocs = await _dbContext.JobLocations.AsNoTracking().Where(job => job.InternalJobName == InternalName).ToListAsync();
 
-                foreach (var location in _config.Locations.Where(location => location.Disabled == false))
+                foreach (var location in RunLocations)
                 {
                     var tryFindLocation = jobLocs.FirstOrDefault(dbLocation =>
                         dbLocation.InternalJobName == InternalName && dbLocation.LocationName == location.Name);
@@ -203,7 +208,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 var backgroundRepeatableActionRun = RunRepeatableActionBackground(cancellationTokenSource.Token);
 
                 // Start monitoring on each Location
-                foreach (var location in _config.Locations.Where(location => location.Disabled == false))
+                foreach (var location in RunLocations)
                 {
                     var task = BaseRunLocation(location, cancellationTokenSource.Token);
                     RunningLocations[location] = task;
@@ -251,7 +256,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                             //  if more then 80% are done, we just say the entire job is.
 
                             if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                _config.Locations.Count(location => location.Disabled == false) * 0.80 ||
+                                RunLocationCount * 0.80 ||
                                 RunningLocations.Count <= 0)
                             {
                                 if (JobData.CurrentRunStatus.Equals(Status.STATUS_UNDEPLOYED,
@@ -259,7 +264,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                                 {
                                     // Success, at least 75% are success
                                     if (FinishedLocationStatus.Count(kvp => kvp.Value) >=
-                                        _config.Locations.Count(location => location.Disabled == false) * 0.75)
+                                        RunLocationCount * 0.75)
                                     {
                                         _logger.LogInformation(
                                             $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");

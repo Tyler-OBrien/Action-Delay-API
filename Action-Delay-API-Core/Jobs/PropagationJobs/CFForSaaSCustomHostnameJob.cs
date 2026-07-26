@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Jobs;
@@ -30,7 +31,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
         public override bool Enabled => _config.CustomHostnamesDelayJob != null && (_config.CustomHostnamesDelayJob.Enabled.HasValue == false || _config.CustomHostnamesDelayJob is { Enabled: true });
 
 
-        public CFForSaaSCustomHostnameJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CFForSaaSCustomHostnameJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public CFForSaaSCustomHostnameJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CFForSaaSCustomHostnameJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             _apiBroker = apiBroker;
         }

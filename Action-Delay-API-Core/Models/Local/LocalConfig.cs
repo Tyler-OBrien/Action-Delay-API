@@ -42,7 +42,10 @@ namespace Action_Delay_API_Core.Models.Local
 
         public List<Location> Locations { get; set; }
 
+        /// <summary>Floor on how small the roster service is allowed to shrink the fleet. 0 disables the check.</summary>
         public int Min_Locations { get; set; }
+
+        public LocationRosterConfig? LocationRoster { get; set; }
 
         public WorkerDelayJobConfig? DelayJob { get; set; }
         public WorkerDelayJobConfig? WorkerDelayJobTesting { get; set; }
@@ -359,11 +362,21 @@ namespace Action_Delay_API_Core.Models.Local
     {
         public string API_Key { get; set; }
         public string ZoneId { get; set; }
-        
+
         public string RecordId { get; set; }
         public string Name { get; set; }
         public string NameServers { get; set; }
 
+    }
+
+    public class GoogleCloudDNSDelayJobConfig : BaseConfig
+    {
+        // Service-account JSON key (inline). Used to mint an OAuth2 bearer token for DNS record writes.
+        public string ServiceAccountJson { get; set; }
+        public string ProjectId { get; set; }
+        public string ZoneName { get; set; }
+        public string RecordName { get; set; }
+        public string NameServers { get; set; }
     }
 
     public class CustomRuleUpdateConfig : BaseConfig

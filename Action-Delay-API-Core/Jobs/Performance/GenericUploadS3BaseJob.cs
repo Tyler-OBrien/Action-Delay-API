@@ -1,3 +1,4 @@
+using Action_Delay_API_Core.Services.Locations;
 using Action_Delay_API_Core.Extensions;
 using Action_Delay_API_Core.Helpers;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
@@ -25,8 +26,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         public GenericUploadS3BaseJob(IOptions<LocalConfig> config,
             ILogger<GenericUploadS3BaseJob> logger, IClickHouseService clickhouseService,
-            ActionDelayDatabaseContext context, IQueue queue, IHttpClientFactory clientFactory) : base(config, logger, clickhouseService,
-            context, queue)
+            ActionDelayDatabaseContext context, IQueue queue, IHttpClientFactory clientFactory, ILocationProvider locationProvider) : base(config, logger, clickhouseService,
+            context, queue, locationProvider)
         {
             _clientFactory = clientFactory;
             _httpClient = _clientFactory.CreateClient("CustomClient");
@@ -53,6 +54,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         public override async Task BaseRun()
         {
+            CaptureLocationSnapshot();
+
             using var scope = _logger.BeginScope(Name);
             using var sentryScope = SentrySdk.PushScope();
             SentrySdk.AddBreadcrumb($"Starting Job {Name}");
@@ -175,7 +178,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public async Task RunSpecificJob(UploadS3Job s3Job)
         {
             var allowedLocsHashset = new HashSet<string>(s3Job.AllowedEdgeLocations, StringComparer.OrdinalIgnoreCase);
-            var locationsToUse = _config.Locations.Where(location =>
+            var locationsToUse = RunLocations.Where(location =>
                 location.Disabled == false && allowedLocsHashset.Contains(location.Name)).ToList();
             var name = s3Job.Name;
             var cancellationTokenSource = new CancellationTokenSource();

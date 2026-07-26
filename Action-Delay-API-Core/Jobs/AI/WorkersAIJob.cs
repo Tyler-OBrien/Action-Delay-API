@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -53,7 +54,7 @@ namespace Action_Delay_API_Core.Jobs.AI
     {
         private readonly ICloudflareAPIBroker _apiBroker;
         private readonly IAIJobConfigs _jobConfigs;
-        public WorkersAIJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkersAIJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, IAIJobConfigs aiJobConfigs) : base(config, logger, clickhouseService, context, queue)
+        public WorkersAIJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WorkersAIJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, IAIJobConfigs aiJobConfigs, ILocationProvider locationProvider) : base(config, logger, clickhouseService, context, queue, locationProvider)
         {
             _jobConfigs = aiJobConfigs;
             _apiBroker = apiBroker;
@@ -72,6 +73,8 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         public override async Task BaseRun()
         {
+            CaptureLocationSnapshot();
+
             List<AIGetModelsResponse.AIGetModelsResponseDTO> models = null;
             var tryFindData = await _dbContext.GenericJobData.FirstOrDefaultAsync(data => data.JobName == InternalName);
             var prefetchJobData = await _dbContext.JobData.AsTracking().Where(job => job.JobType == JobType).ToListAsync();
@@ -166,7 +169,7 @@ namespace Action_Delay_API_Core.Jobs.AI
             });
 
             var locationsEnabled = new HashSet<string>(_config.AI.Locations, StringComparer.OrdinalIgnoreCase);
-            var getUsableLocations = _config.Locations.Where(location =>
+            var getUsableLocations = RunLocations.Where(location =>
                 location.Disabled == false && locationsEnabled.Contains(location.Name)).DistinctBy(loc => loc.Name).ToList();
             if (getUsableLocations.Any() == false)
             {

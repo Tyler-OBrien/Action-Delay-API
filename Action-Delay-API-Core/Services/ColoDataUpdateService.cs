@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker.ColoData;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS;
@@ -22,14 +23,17 @@ namespace Action_Delay_API_Core.Services
 
 
 
-        public ColoDataUpdateService(LocalConfig baseConfigurationOptions, ILogger<ColoDataUpdateService> logger, ActionDelayDatabaseContext context, IColoDataBroker coloDataBroker, IQueue queue)
+        public ColoDataUpdateService(LocalConfig baseConfigurationOptions, ILogger<ColoDataUpdateService> logger, ActionDelayDatabaseContext context, IColoDataBroker coloDataBroker, IQueue queue, ILocationProvider locationProvider)
         {
             _config = baseConfigurationOptions;
             _logger = logger;
             _context = context;
             _coloData = coloDataBroker;
             _queue = queue;
+            _locationProvider = locationProvider;
         }
+
+        private readonly ILocationProvider _locationProvider;
 
         public async Task Run()
         {
@@ -51,10 +55,14 @@ namespace Action_Delay_API_Core.Services
             {
                 _logger.LogError(ex, "Error updating local metal data db");
             }
+            // One snapshot for the whole reconcile, so the enabled and disabled passes below can't
+            // disagree and leave a location missing from LocationData entirely.
+            var roster = _locationProvider.GetAllLocations();
+
             var getAllCurrentColos = await _context.ColoData.ToListAsync();
             var getCurrentLocationData = await _context.LocationData.ToListAsync();
             _logger.LogInformation($"We got current location data: {String.Join(", ",getCurrentLocationData.Select(loc => loc.LocationName))}");
-            foreach (var location in _config.Locations.Where(location => location.Disabled == false))
+            foreach (var location in roster.Where(location => location.Disabled == false))
             {
                var tryGetColoId = await RunLocation(location, CancellationToken.None);
                var tryGetLatency = await RunLatency(location, CancellationToken.None, "cloudflare.com");
@@ -114,7 +122,7 @@ namespace Action_Delay_API_Core.Services
                
             }
 
-            foreach (var location in _config.Locations.Where(location => location.Disabled))
+            foreach (var location in roster.Where(location => location.Disabled))
             {
                 var tryGetCurrentLocationData =
                     getCurrentLocationData.FirstOrDefault(dbLocation => location.Name == dbLocation.LocationName);
@@ -246,6 +254,10 @@ namespace Action_Delay_API_Core.Services
             }
 
             var getColoData = getData.Value;
+
+            // One snapshot for the whole reconcile, so the enabled and disabled passes below can't
+            // disagree and leave a location missing from LocationData entirely.
+            var roster = _locationProvider.GetAllLocations();
 
             var getAllCurrentColos = await _context.ColoData.ToListAsync();
 

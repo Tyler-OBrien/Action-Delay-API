@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Models.Database.Clickhouse;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
 using Action_Delay_API_Core.Models.Local;
@@ -21,7 +22,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
     {
 
 
-        public GenericDownloadBaseJob(IOptions<LocalConfig> config, ILogger<GenericDownloadBaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService, context, queue)
+        public GenericDownloadBaseJob(IOptions<LocalConfig> config, ILogger<GenericDownloadBaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, ILocationProvider locationProvider) : base(config, logger, clickhouseService, context, queue, locationProvider)
         {
         }
 
@@ -39,6 +40,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         public override async Task BaseRun()
         {
+            CaptureLocationSnapshot();
+
             using var scope = _logger.BeginScope(Name);
             using var sentryScope = SentrySdk.PushScope();
             SentrySdk.AddBreadcrumb($"Starting Job {Name}");
@@ -57,7 +60,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
             foreach (var downloadTask in getDownloadTasks)
             {
                 var allowedLocsHashset = new HashSet<string>(downloadTask.AllowedEdgeLocations ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-                var locationsToUse = _config.Locations.Count(location => location.Disabled == false &&
+                var locationsToUse = RunLocations.Count(location => location.Disabled == false &&
                                                                          (allowedLocsHashset.Any() == false || allowedLocsHashset.Contains(location.Name)));
                 var totalLocationRequests = locationsToUse * (downloadTask.CountOfRequests ?? 1);
 
@@ -203,7 +206,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public async Task RunSpecificJob(DownloadJobGeneric downloadJobConfig)
         {
             var allowedLocsHashset = new HashSet<string>(downloadJobConfig.AllowedEdgeLocations ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-            var locationsToUse = _config.Locations.Where(location =>
+            var locationsToUse = RunLocations.Where(location =>
                 location.Disabled == false && (allowedLocsHashset.Any() == false || allowedLocsHashset.Contains(location.Name) ) ).ToList();
 
             var name = downloadJobConfig.Name;

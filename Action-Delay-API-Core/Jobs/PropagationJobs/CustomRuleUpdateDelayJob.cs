@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.CloudflareAPI.WAF;
@@ -25,7 +26,7 @@ namespace Action_Delay_API_Core.Jobs
         private int _repeatedRunCount = 1;
         private string _specialPath;
 
-        public CustomRuleUpdateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CustomRuleUpdateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public CustomRuleUpdateDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CustomRuleUpdateDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             _apiBroker = apiBroker;
         }

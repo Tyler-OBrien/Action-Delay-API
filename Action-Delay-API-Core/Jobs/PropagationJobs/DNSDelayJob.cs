@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Models.Jobs;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.NATS.Requests;
 using FluentResults;
 using Action_Delay_API_Core.Models.NATS.Responses;
@@ -22,7 +23,7 @@ namespace Action_Delay_API_Core.Jobs
         internal string _valueToLookFor;
         private int _repeatedRunCount = 1;
 
-        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue )
+        public DNSDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<DNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue , locationProvider)
         {
             if (_jobConfig == null)
                 _jobConfig = _config.DNSJob;

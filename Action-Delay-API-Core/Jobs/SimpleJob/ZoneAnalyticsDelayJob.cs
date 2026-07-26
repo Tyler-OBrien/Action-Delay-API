@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Services;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,7 @@ public class ZoneAnalyticsDelayJob : BaseJob
 {
     private readonly ICloudflareAPIBroker _apiBroker;
 
-    public ZoneAnalyticsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<ZoneAnalyticsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+    public ZoneAnalyticsDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<ZoneAnalyticsDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
     {
         _apiBroker = apiBroker;
     }

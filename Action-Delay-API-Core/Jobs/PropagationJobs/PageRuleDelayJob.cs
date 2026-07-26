@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System.Net;
 using Action_Delay_API_Core;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
@@ -23,7 +24,7 @@ public class PageRuleDelayJob : BasePropagationJob
 
     public PageRuleDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config,
         ILogger<PageRuleDelayJob> logger, IQueue queue, IClickHouseService clickHouse,
-        ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
     {
         _apiBroker = apiBroker;
     }

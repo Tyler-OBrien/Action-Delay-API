@@ -18,6 +18,7 @@ using Action_Delay_API_Core.Models.Local;
 using Action_Delay_API_Core.Models.NATS;
 using Action_Delay_API_Core.Models.Services;
 using Action_Delay_API_Core.Services;
+using Action_Delay_API_Core.Services.Locations;
 using DnsClient;
 using DnsClient.Protocol;
 using Microsoft.EntityFrameworkCore;
@@ -139,6 +140,18 @@ public class Program
                 var baseConfiguration = configuration.Get<LocalConfig>();
                 services.Configure<LocalConfig>(configuration);
                 services.AddSingleton<LocalConfig>(baseConfiguration);
+
+                // Registered ahead of the job scheduler: hosted services start in registration order,
+                // so this guarantees no job ever sees an unpopulated provider.
+                // NOT "CustomClient" - its ConnectCallback does a DnsClient lookup, which fails on a
+                // literal 127.0.0.1.
+                services.AddHttpClient(LocationProviderService.HttpClientName)
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler(GetRetryPolicy());
+                services.AddSingleton<LocationProviderService>();
+                services.AddSingleton<ILocationProvider>(provider =>
+                    provider.GetRequiredService<LocationProviderService>());
+                services.AddHostedService(provider => provider.GetRequiredService<LocationProviderService>());
 
                 SENTRY_DSN = baseConfiguration.SENTRY_DSN;
 

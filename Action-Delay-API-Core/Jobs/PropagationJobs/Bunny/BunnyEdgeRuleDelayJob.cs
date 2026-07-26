@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System;
 using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Broker.Bunny;
@@ -25,7 +26,7 @@ namespace Action_Delay_API_Core.Jobs
         private string _valueToLookFor;
         private int _repeatedRunCount = 1;
 
-        public BunnyEdgeRuleDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyEdgeRuleDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public BunnyEdgeRuleDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyEdgeRuleDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
 
         {
             _apiBroker = apiBroker;

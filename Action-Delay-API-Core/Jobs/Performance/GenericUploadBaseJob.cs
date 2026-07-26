@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System.Net;
 using System.Security.Cryptography;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -20,8 +21,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
     {
         public GenericUploadBaseJob(IOptions<LocalConfig> config,
             ILogger<GenericUploadBaseJob> logger, IClickHouseService clickhouseService,
-            ActionDelayDatabaseContext context, IQueue queue) : base(config, logger, clickhouseService,
-            context, queue)
+            ActionDelayDatabaseContext context, IQueue queue, ILocationProvider locationProvider) : base(config, logger, clickhouseService,
+            context, queue, locationProvider)
         {
         }
 
@@ -42,6 +43,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
 
         public override async Task BaseRun()
         {
+            CaptureLocationSnapshot();
+
             using var scope = _logger.BeginScope(Name);
             using var sentryScope = SentrySdk.PushScope();
             SentrySdk.AddBreadcrumb($"Starting Job {Name}");
@@ -163,7 +166,7 @@ namespace Action_Delay_API_Core.Jobs.Performance
         public async Task RunSpecificJob(UploadJobGeneric job)
         {
             var allowedLocsHashset = new HashSet<string>(job.AllowedEdgeLocations, StringComparer.OrdinalIgnoreCase);
-            var locationsToUse = _config.Locations.Where(location =>
+            var locationsToUse = RunLocations.Where(location =>
                 location.Disabled == false && allowedLocsHashset.Contains(location.Name)).ToList();
             var name = job.Name;
             var cancellationTokenSource = new CancellationTokenSource();

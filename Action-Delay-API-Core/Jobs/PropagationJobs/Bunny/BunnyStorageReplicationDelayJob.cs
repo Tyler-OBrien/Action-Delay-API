@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Broker.Bunny;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
@@ -32,7 +33,7 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public BunnyStorageReplicationDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyStorageReplicationDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public BunnyStorageReplicationDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyStorageReplicationDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             if (_jobConfig == null)
                 _jobConfig = _config.BunnyUploadReplicationJob;

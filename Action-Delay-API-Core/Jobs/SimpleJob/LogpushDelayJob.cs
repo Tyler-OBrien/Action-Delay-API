@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Broker.ColoData;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -17,7 +18,7 @@ namespace Action_Delay_API_Core.Jobs.SimpleJob
     {
         private readonly IColoDataBroker _apiBroker;
 
-        public LogpushDelayJob(IOptions<LocalConfig> config, ILogger<LogpushDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, IColoDataBroker coloDataBroker) : base(config, logger, clickHouse, dbContext, queue)
+        public LogpushDelayJob(IOptions<LocalConfig> config, ILogger<LogpushDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, IColoDataBroker coloDataBroker, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             _apiBroker = coloDataBroker;
         }

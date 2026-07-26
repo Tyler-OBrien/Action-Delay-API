@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Action_Delay_API_Core.Services;
+using Action_Delay_API_Core.Services.Locations;
 using Polly;
 
 
@@ -33,16 +34,33 @@ public abstract class BaseJob
     internal readonly IClickHouseService _clickHouseService;
     internal readonly ActionDelayDatabaseContext _dbContext;
     internal readonly IQueue _queue;
+    internal readonly ILocationProvider _locationProvider;
 
 
 
-    protected BaseJob(IOptions<LocalConfig> config, ILogger<BaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue)
+    protected BaseJob(IOptions<LocalConfig> config, ILogger<BaseJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, ILocationProvider locationProvider)
     {
         _config = config.Value;
         _logger = logger;
         _clickHouseService = clickhouseService;
         _dbContext = context;
         _queue = queue;
+        _locationProvider = locationProvider;
+    }
+
+    /// <summary>
+    /// The roster this run is working against. Captured once per run so a mid-run refresh cannot swap
+    /// Location instances underneath BasePropagationJob's dictionaries, which key on object identity,
+    /// or move the completion thresholds after locations have already reported.
+    /// </summary>
+    protected IReadOnlyList<Location> RunLocations { get; private set; } = Array.Empty<Location>();
+
+    protected int RunLocationCount { get; private set; }
+
+    protected void CaptureLocationSnapshot()
+    {
+        RunLocations = _locationProvider.GetEnabledLocations();
+        RunLocationCount = RunLocations.Count;
     }
 
     public DateTime ConfirmedUpdateUtc { get; set; }

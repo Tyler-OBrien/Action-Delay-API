@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Jobs;
 using Action_Delay_API_Core.Models.Local;
@@ -24,7 +25,7 @@ namespace Action_Delay_API_Core.Jobs
 
 
 
-        public CacheDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CacheDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public CacheDelayJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<CacheDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             _apiBroker = apiBroker;
         }
@@ -58,7 +59,7 @@ namespace Action_Delay_API_Core.Jobs
 
         public override async Task RunAction()
         {
-            foreach (var location in _config.Locations.Where(location => location.Disabled == false))
+            foreach (var location in RunLocations)
             {
                 int retries = 5;
                 try

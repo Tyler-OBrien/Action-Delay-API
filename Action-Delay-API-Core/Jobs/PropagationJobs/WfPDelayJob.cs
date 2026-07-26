@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using Action_Delay_API_Core.Services.Locations;
+using System.Net;
 using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.Database.Postgres;
@@ -28,7 +29,7 @@ namespace Action_Delay_API_Core.Jobs
         public override bool Enabled => _config.WfPJob != null && (_config.WfPJob.Enabled.HasValue == false || _config.WfPJob is { Enabled: true });
 
 
-        public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public WfPJob(ICloudflareAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<WfPJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             _apiBroker = apiBroker;
         }

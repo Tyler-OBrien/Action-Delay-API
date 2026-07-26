@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Broker;
+﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Broker;
 using Action_Delay_API_Core.Models.CloudflareAPI.DNS;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -28,7 +29,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Bunny
         internal string _valueToLookFor;
         private int _repeatedRunCount = 1;
 
-        public BunnyDNSDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyDNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext) : base(config, logger, clickHouse, dbContext, queue)
+        public BunnyDNSDelayJob(IBunnyAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<BunnyDNSDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
         {
             if (_jobConfig == null)
                 _jobConfig = _config.BunnyDNSJob;
