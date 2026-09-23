@@ -1,0 +1,25 @@
+.performance-explorer { min-width: 0; }
+.performance-explorer :is(button,select,summary,a,[tabindex]):focus-visible,
+.compare-tooltip-trigger:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+.performance-explorer :is(summary,button,select) { touch-action: manipulation; }
+.performance-explorer summary { padding-block: .35rem; }
+.performance-explorer #compare-detail > :is(section,details) { margin-top: 1rem; padding-top: .75rem; }
+.performance-explorer :is(td,th) { overflow-wrap: anywhere; }
+.performance-explorer .compare-summary-card { height: 100%; }
+.performance-explorer .compare-summary-card h3 { line-height: 1.4; }
+.performance-explorer .compare-summary-status { min-height: 1rem; }
+.performance-explorer .compare-chart { height: 480px; width: 100%; min-width: 0; }
+.performance-explorer .compare-chart-fullscreen { height: 700px; }
+.compare-tooltip-trigger { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.compare-tooltip { position: fixed; z-index: 10000; max-width: min(320px,calc(100vw - 16px)); padding: .5rem .65rem; border-radius: .35rem; background: #111827; color: #fff; font: 12px/1.45 system-ui,sans-serif; overflow-wrap: anywhere; pointer-events: none; box-shadow: 0 2px 8px #0003; }
+.performance-explorer [role="status"] { min-height: 1.5rem; font-size: .875rem; margin-top: .5rem; }
+.performance-explorer .compare-secondary-loading { min-height: 5rem; }
+@media (max-width: 639px) {
+  .performance-explorer .compare-chart { height: 320px; }
+  .performance-explorer :is(button,select) { min-height: 40px; }
+  .performance-explorer summary { min-height: 40px; padding-block: .55rem; }
+  .performance-explorer .compare-summary-card summary { min-height: 36px; }
+}
+@supports (grid-template-rows: subgrid) {
+  .performance-explorer .compare-summary-card { display: grid; grid-template-rows: subgrid; grid-row: span 4; row-gap: 0; }
+}

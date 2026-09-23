@@ -1,3 +1,4 @@
+import { statusDuration as runLengthDisplayFormat } from '../lib/duration';
 const connection = new signalR.HubConnectionBuilder()
   .withUrl("https://delay.cloudflare.chaika.me/v2/jobs/signalr", {
     transport: signalR.HttpTransportType.WebSockets,
@@ -14,7 +15,7 @@ async function start() {
     await connection.start();
     console.log("SignalR Connected " + connection.state);
     console.log(connection);
-    connStatus.innerText = "Connected: Live Updates";
+    connStatus.innerText = "Live updates: connected";
     connStatus.classList.add("websocket-connected");
     await connection.invoke("SubscribeToType", "CloudflareDelay");
   } catch (err) {
@@ -31,13 +32,13 @@ connection.onreconnecting((error) => {
 });
 
 connection.onclose(async () => {
-  connStatus.innerText = "Disconnected: Not Live";
+  connStatus.innerText = "Live updates: disconnected";
   connStatus.classList.remove("websocket-connected");
   await start();
 });
 
 connection.on("ReceiveJobUpdate", (subject, data) => {
-  connStatus.innerText = `Connected: Live Updates - Last Update: ${new Date().toLocaleTimeString()}`;
+  connStatus.innerText = `Live updates: connected - Last Update: ${new Date().toLocaleTimeString()}`;
 
   var getCurrentData = globalThis.jobData.find(
     (job) => job.internalJobName == data.JobName
@@ -377,27 +378,7 @@ function getItemStatus(jobName) {
   };
 }
 
-function runLengthDisplayFormat(jobName, ms) {
 
-  if (jobName == "cron") {
-    if (ms) ms -= 60_000;
-  }
-
-  if (ms == undefined) return "";
-
-  let seconds = ms / 1000;
-  if (seconds < 60) {
-    return seconds.toFixed(2) + ' second(s)';
-  }
-
-  let minutes = seconds / 60;
-  if (minutes < 60) {
-    return minutes.toFixed(2) + ' minute(s)';
-  }
-
-  let hours = minutes / 60;
-  return hours.toFixed(2) + ' hour(s)';
-}
 function formatTime(date) {
   if (!date) return '';
   return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

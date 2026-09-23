@@ -1,21 +1,23 @@
+import { formatDuration as formatTime } from '../../lib/duration';
 import { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min'
 import { isDarkMode, themeColors, baseLayout, axis, themeRelayout, REGION_COLORS } from './chartTheme';
+import { seriesFromResponse } from './analytics';
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 12 * 60 * 60 * 1000, label: 'Last 12 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 72 * 60 * 60 * 1000, label: 'Last 72 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 Days' },
-  { value: 21 * 24 * 60 * 60 * 1000, label: 'Last 21 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
-  { value: 3 * 30 * 24 * 60 * 60 * 1000, label: 'Last 3 Months' },
-  { value: 6 * 30 * 24 * 60 * 60 * 1000, label: 'Last 6 Months' },
-  { value: 12 * 30 * 24 * 60 * 60 * 1000, label: 'Last Year' },
-  { value: Number.MAX_VALUE, label: 'All Data' },
+  { value: 30 * 60 * 1000, label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 12 * 60 * 60 * 1000, label: 'Last 12 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 72 * 60 * 60 * 1000, label: 'Last 72 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 days' },
+  { value: 21 * 24 * 60 * 60 * 1000, label: 'Last 21 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
+  { value: 3 * 30 * 24 * 60 * 60 * 1000, label: 'Last 3 months' },
+  { value: 6 * 30 * 24 * 60 * 60 * 1000, label: 'Last 6 months' },
+  { value: 12 * 30 * 24 * 60 * 60 * 1000, label: 'Last year' },
+  { value: Number.MAX_VALUE, label: 'All data' },
 ];
 
 const SELECT_DISPLAY_OPTIONS = [
@@ -27,15 +29,7 @@ const SELECT_DISPLAY_OPTIONS = [
 
 const REGIONS = ['NA', 'EU', 'AS', 'OC', 'SA'];
 
-function formatTime(ms) {
-  if (typeof ms !== 'number' || !isFinite(ms)) return ms;
-  if (ms < 1000) return ms.toFixed(0) + ' ms';
-  let seconds = ms / 1000;
-  if (seconds < 60) return seconds.toFixed(2) + ' s';
-  let minutes = seconds / 60;
-  if (minutes < 60) return minutes.toFixed(2) + ' min';
-  return (minutes / 60).toFixed(2) + ' h';
-}
+
 
 async function fetchRegionData(jobName, region, start, end, metric) {
   const datetimeNow = new Date(Date.now());
@@ -45,26 +39,29 @@ async function fetchRegionData(jobName, region, start, end, metric) {
 
   const url = `https://delay.cloudflare.chaika.me/v2/jobs/${jobName}/locations/region/${region}/analytics` +
     `?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${metric}`;
-  try {
+  {
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Chart request failed (${resp.status})`);
     const json = await resp.json();
-    return (json.data?.points ?? []).map(point => ({
-      x: new Date(point.timePeriod).getTime(),
-      y: point[metric] ?? point[metric.charAt(0).toLowerCase() + metric.slice(1)] ?? 0,
-    }));
-  } catch {
-    return [];
+    return seriesFromResponse(
+      json.data,
+      metric,
+      new Date(startParam).getTime(),
+      new Date(endParam).getTime()
+    );
   }
 }
 
 const RegionGraph = (props) => {
   const { jobName, label, defaultMetric = 'MedianRunLength' } = props;
   const plotRef = useRef(null);
+  const [hidden, setHidden] = useState(new Set());
 
   const defaultOptionObj = SELECT_DISPLAY_OPTIONS.find(o => o.value === defaultMetric) ?? SELECT_DISPLAY_OPTIONS[0];
 
   const [regionData, setRegionData] = useState({ NA: [], EU: [], AS: [], OC: [], SA: [] });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState(24 * 60 * 60 * 1000);
   const [customTimeRange, setCustomTimeRange] = useState(null);
   const [customTimeRangeObj, setCustomTimeRangeObj] = useState(null);
@@ -81,17 +78,21 @@ const RegionGraph = (props) => {
       startDate = timeRange === Number.MAX_VALUE ? null : endDate - timeRange;
     }
 
+    let active = true;
+    setLoadError(false);
     setIsLoading(true);
     setRegionData({ NA: [], EU: [], AS: [], OC: [], SA: [] });
 
     Promise.all(REGIONS.map(region => fetchRegionData(jobName, region, startDate, endDate, displayOption)))
       .then(results => {
+        if (!active) return;
         const data = {};
         REGIONS.forEach((region, i) => { data[region] = results[i]; });
         setRegionData(data);
         setIsLoading(false);
       })
-      .catch(() => setIsLoading(false));
+      .catch(() => { if (active) { setLoadError(true); setIsLoading(false); } });
+    return () => { active = false; };
   }, [timeRange, displayOption, customTimeRangeObj, jobName]);
 
   useEffect(() => {
@@ -116,10 +117,11 @@ const RegionGraph = (props) => {
         type: 'scatter',
         mode: 'lines+markers',
         name: region,
+        visible: hidden.has(region) ? 'legendonly' : true,
         line: { shape: 'spline', width: 2, color: REGION_COLORS[region] },
         marker: { size: 4, color: REGION_COLORS[region] },
         connectgaps: true,
-        hovertemplate: `<b>${region}</b><br>Time: %{x}<br>Duration: %{customdata}<extra></extra>`,
+        hovertemplate: `<b>${region}</b><br>Time: %{x}<br>Duration: %{customdata}<br>Raw: %{y:,.3f} ms<extra></extra>`,
         customdata: y.map(v => formatTime(v)),
       };
     });
@@ -150,8 +152,9 @@ const RegionGraph = (props) => {
 
     const layout = {
       ...baseLayout(isDark),
+      showlegend: false,
       title: {
-        text: `${label} - By Region (${displayOptionLabel})`,
+        text: '',
         font: { size: 16, color: themeColors(isDark).textStrong }
       },
       xaxis: axis(isDark, { title: 'Time', type: 'date', range: xRange }),
@@ -170,8 +173,13 @@ const RegionGraph = (props) => {
       displaylogo: false
     };
 
-    Plotly.newPlot(plotRef.current, traces, layout, config).then(() => {
-      plotRef.current.on('plotly_relayout', (eventData) => {
+    const node = plotRef.current;
+    let disposed = false;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    Plotly.newPlot(node, traces, layout, config).then(() => {
+      if (disposed) return;
+      node.on('plotly_relayout', (eventData) => {
         if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
           const minDate = new Date(eventData['xaxis.range[0]']);
           const maxDate = new Date(eventData['xaxis.range[1]']);
@@ -188,7 +196,8 @@ const RegionGraph = (props) => {
         }
       });
     });
-  }, [regionData, displayOptionLabel, label, timeRange, customTimeRangeObj]);
+    return () => { disposed = true; observer.disconnect(); Plotly.purge(node); };
+  }, [hidden, regionData, displayOptionLabel, label, timeRange, customTimeRangeObj]);
 
   useEffect(() => {
     function handleThemeChange() {
@@ -201,8 +210,9 @@ const RegionGraph = (props) => {
 
   return (
     <div className="w-full">
+      <h3 className="text-base font-semibold mb-3">{displayOptionLabel}</h3>
       <div className="flex gap-2 mb-4">
-        <select
+        <select aria-label="Time range"
           value={timeRange}
           onChange={event => {
             setCustomTimeRange(null);
@@ -219,7 +229,7 @@ const RegionGraph = (props) => {
           )}
         </select>
 
-        <select
+        <select aria-label="Metric"
           value={displayOption}
           onChange={event => {
             setDisplayOption(event.target.value);
@@ -233,17 +243,15 @@ const RegionGraph = (props) => {
         </select>
       </div>
 
-      {isLoading && REGIONS.every(r => regionData[r].length === 0) ? (
-        <div
-          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
-          style={{ height: '450px' }}
-        />
-      ) : (
-        <div
-          ref={plotRef}
-          style={{ height: '450px', width: '100%' }}
-        />
-      )}
+      <ul className="chart-legend" aria-label="Chart series">
+        {REGIONS.filter(region => (regionData[region] ?? []).length).map(region => <li key={region}>
+          <button type="button" aria-pressed={!hidden.has(region)} onClick={() => setHidden(previous => { const next = new Set(previous); next.has(region) ? next.delete(region) : next.add(region); return next; })}>
+            <span aria-hidden="true" style={{backgroundColor: REGION_COLORS[region]}} />{region}
+          </button>
+        </li>)}
+      </ul>
+      <div role="status" className="chart-state">{isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : REGIONS.every(r => regionData[r].length === 0) ? 'No readings in this period.' : null}</div>
+      <div ref={plotRef} aria-busy={isLoading} style={{ height: 'var(--monitor-chart-height)', width: '100%' }} />
     </div>
   );
 };

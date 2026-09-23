@@ -4,7 +4,7 @@ import Hero from '../../components/Hero.astro';
 import Icon from '../../components/Icon.astro';
 import type { Job } from '../../../models/cloudflare/job';
 import SmartGraph from '../../components/graph/SmartGraph.js';
-import ErrorGraph from '../../components/graph/ErrorGraph';
+import ErrorGraphLazy from '../../components/graph/ErrorGraphLazy.js';
 import SuccessRateGraphLazy from '../../components/graph/SuccessRateGraphLazy.js';
 import JobDetailHeader from '../../components/JobDetailHeader.astro';
 import JobLocationsTable from '../../components/JobLocationsTable.astro';
@@ -46,23 +46,24 @@ try {
 ---
 
 <BaseLayout title={job?.jobName ?? ""} description={job?.jobDescription ?? ""}>
-	<div class="stack gap-8">
+	<main id="main-content" tabindex="-1" class="stack gap-6">
 		<header class="wrapper stack gap-3">
-			<a class="back-link" href="/ai/"><Icon icon="arrow-left" />All Jobs</a>
+			<a class="back-link" href="/ai/"><Icon icon="arrow-left" />AI Models</a>
 			<Hero title={job?.jobName} align="start">
 				<p>{job?.jobDescription}</p>
 			</Hero>
 			<JobDetailHeader job={job} stats={quickAnalyticsData} type="ai" successRate={successRate} />
 		</header>
 
-		<main class="wrapper stack gap-6">
+		<div class="wrapper stack gap-6">
 			<div class="surface p-4">
 				<SmartGraph endpoint={`v2/jobs/${enc}/analytics`} label={job.jobName} options={["MedianApiResponseLatency", "AvgApiResponseLatency", "MinApiResponseLatency", "MaxApiResponseLatency"]} defaultOption="MedianApiResponseLatency" client:only="preact"/>
 			</div>
 
-			<div class="surface p-2">
-				<ErrorGraph endpoint={`v2/jobs/${enc}/erroranalytics`} label={job.jobName} client:only="preact"/>
-			</div>
+			<details id="error-history" class="surface p-4">
+                <summary class="cursor-pointer font-semibold text-lg">Error history</summary>
+				<ErrorGraphLazy detailsId="error-history" endpoint={`v2/jobs/${enc}/erroranalytics`} label={job.jobName} client:only="preact"/>
+			</details>
 
 			<details id="success-rate" class="surface p-4" open>
 				<summary class="cursor-pointer font-semibold text-lg">Success Rate</summary>
@@ -70,13 +71,15 @@ try {
 			</details>
 
 			<JobLocationsTable jobName={job.internalJobName} />
-		</main>
-	</div>
+		</div>
+	</main>
 </BaseLayout>
 
 <style>
 	.back-link {
-		display: none;
+		display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
 	}
 
 	@media (min-width: 50em) {

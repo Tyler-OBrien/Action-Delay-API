@@ -2,7 +2,9 @@
 import Hero from '../components/Hero.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-
-<BaseLayout title="Not Found" description="404 Error — this page was not found">
-	<Hero title="Page Not Found" tagline="Not found" />
+<BaseLayout title="Page Not Found | Action-Delay-API">
+    <main id="main-content" tabindex="-1" class="wrapper stack gap-6">
+        <Hero title="Page not found" tagline="This page may have moved or no longer exists." />
+        <p>Go to <a href="/">Status</a> or explore <a href="/perf/">Performance</a>.</p>
+    </main>
 </BaseLayout>

@@ -33,16 +33,16 @@ const groups = groupJobs(activeJobs, 'ai');
 	description="See Cloudflare AI Monitoring Jobs"
 >
 	<div class="stack gap-20">
-		<main class="wrapper stack gap-8">
+		<main id="main-content" tabindex="-1" class="wrapper stack gap-8">
 			<Hero
-				title="Cloudflare AI Jobs"
+				title="AI Models"
 				tagline="Monitoring the performance and errors of various Cloudflare Models. The inputs are random to avoid caching but roughly the same and we limit text LLMs to 100 output tokens. More data to be exposed in the future (like TPS)."
 				align="start"
 			>
 				<a href="/ai/overview">Overview</a>
 			</Hero>
 			<input
-				id="job-filter"
+				id="job-filter" aria-label="Filter jobs"
 				type="text"
 				placeholder="Filter jobs..."
 				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"

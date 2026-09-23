@@ -3,13 +3,13 @@ import RouteGraph from './RouteGraph';
 import LocationMap from './LocationMap';
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
-  { value: 90 * 24 * 60 * 60 * 1000, label: 'Last 90 Days' },
-  { value: 365 * 24 * 60 * 60 * 1000, label: 'Last Year' },
+  { value: 30 * 60 * 1000, label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
+  { value: 90 * 24 * 60 * 60 * 1000, label: 'Last 90 days' },
+  { value: 365 * 24 * 60 * 60 * 1000, label: 'Last year' },
 
 ];
 
@@ -325,7 +325,7 @@ const CloudflareRouting = ({ fullscreen = false }) => {
               <RouteGraph
                 endpoint={`v2/jobs/${selectedJob}/locations/region/${region.code}/requestRoutingRegionAnalytics`}
                 label={`${selectedJobLabel} - Requests From ${region.name}`}
-                height={fullscreen ? 600 : 400}
+                height={fullscreen ? 600 : 'var(--monitor-chart-height)'}
                 regionName={region.code}
                 timeRange={timeRange}
                 customRange={customRange}

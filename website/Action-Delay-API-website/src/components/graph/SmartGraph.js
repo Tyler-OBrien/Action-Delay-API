@@ -1,21 +1,23 @@
+import { formatDuration as formatTime } from '../../lib/duration';
 import  { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min'
 import { isDarkMode, themeColors, baseLayout, axis, seriesColor, themeRelayout } from './chartTheme';
+import { seriesFromResponse } from './analytics';
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 12 * 60 * 60 * 1000, label: 'Last 12 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 72 * 60 * 60 * 1000, label: 'Last 72 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 Days' },
-  { value: 21 * 24 * 60 * 60 * 1000, label: 'Last 21 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
-  { value: 3 * 30 * 24 * 60 * 60 * 1000, label: 'Last 3 Months' },
-  { value: 6 * 30 * 24 * 60 * 60 * 1000, label: 'Last 6 Months' },
-  { value: 12 * 30 * 24 * 60 * 60 * 1000, label: 'Last Year' },
-  { value: Number.MAX_VALUE, label: 'All Data' },
+  { value: 30 * 60 * 1000, label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 12 * 60 * 60 * 1000, label: 'Last 12 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 72 * 60 * 60 * 1000, label: 'Last 72 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 days' },
+  { value: 21 * 24 * 60 * 60 * 1000, label: 'Last 21 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
+  { value: 3 * 30 * 24 * 60 * 60 * 1000, label: 'Last 3 months' },
+  { value: 6 * 30 * 24 * 60 * 60 * 1000, label: 'Last 6 months' },
+  { value: 12 * 30 * 24 * 60 * 60 * 1000, label: 'Last year' },
+  { value: Number.MAX_VALUE, label: 'All data' },
 ];
 
 const SELECT_DISPLAY_OPTIONS = [
@@ -33,42 +35,22 @@ const SELECT_DISPLAY_OPTIONS = [
   { value: "MaxEdgeResponseLatency", label: "Max Edge Response Time"},
 ];
 
-function formatTime(ms) {
-   if (typeof ms !== 'number' || !isFinite(ms)) {
-    return ms;
-  }
-  if (ms < 1000) {
-    return ms.toFixed(0) + ' ms';
-  }
-  
-  let seconds = ms / 1000;
-  if (seconds < 60) {
-    return seconds.toFixed(2) + ' s';
-  }
-  
-  let minutes = seconds / 60;
-  if (minutes < 60) {
-    return minutes.toFixed(2) + ' min';
-  }
-  
-  let hours = minutes / 60;
-  return hours.toFixed(2) + ' h';
-}
+
 
 const SmartGraph = (props) => {
   const { endpoint, label, options: propOptions, fullscreen, defaultOption } = props;
   const plotRef = useRef(null);
-  
-  const options = propOptions 
+
+  const requestedOptions = propOptions
     ? SELECT_DISPLAY_OPTIONS.filter(option => propOptions.includes(option.value))
     : SELECT_DISPLAY_OPTIONS;
 
-  const defaultOptionObj = defaultOption 
-    ? options.find(option => option.value === defaultOption)
-    : options[0];
+  const options = requestedOptions.length ? requestedOptions : SELECT_DISPLAY_OPTIONS;
+  const defaultOptionObj = options.find(option => option.value === defaultOption) ?? options[0];
 
   const [dataPoints, setDataPoints] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState(24 * 60 * 60 * 1000);
   const [customTimeRange, setCustomTimeRange] = useState(null);
   const [customTimeRangeObj, setCustomTimeRangeObj] = useState(null);
@@ -78,7 +60,7 @@ const SmartGraph = (props) => {
   useEffect(() => {
     let endDate = Date.now();
     let startDate = null;
-    
+
     if (customTimeRangeObj != null) {
       startDate = customTimeRangeObj.min;
       endDate = customTimeRangeObj.max;
@@ -90,18 +72,24 @@ const SmartGraph = (props) => {
       }
     }
 
+    let active = true;
     setIsLoading(true);
-    setDataPoints([]); 
+    setLoadError(false);
+    setDataPoints([]);
     fetchData(endpoint, startDate, endDate, displayOption)
       .then(response => {
-        setIsLoading(false); 
-        setDataPoints(response); 
+        if (!active) return;
+        setIsLoading(false);
+        setDataPoints(response);
       })
       .catch(error => {
+        if (!active) return;
+        setLoadError(true);
         console.error('Error fetching data:', error);
         setIsLoading(false);
-        setDataPoints([]); 
+        setDataPoints([]);
       });
+    return () => { active = false; };
   }, [timeRange, displayOption, customTimeRangeObj, endpoint]);
 
   useEffect(() => {
@@ -143,7 +131,7 @@ const SmartGraph = (props) => {
     const layout = {
       ...baseLayout(isDark),
       title: {
-        text: `${label} - ${displayOptionLabel}`,
+        text: '',
         font: { size: 16, color: themeColors(isDark).textStrong }
       },
       xaxis: axis(isDark, { title: 'Time', type: 'date', range: xRange }),
@@ -160,7 +148,7 @@ const SmartGraph = (props) => {
     // Custom hover template with time formatting
     data[0].hovertemplate = '<b>%{fullData.name}</b><br>' +
                            'Time: %{x}<br>' +
-                           'Duration: %{customdata}<br>' +
+                           'Duration: %{customdata}<br>Raw: %{y:,.3f} ms<br>' +
                            '<extra></extra>';
     data[0].customdata = y.map(val => formatTime(val));
 
@@ -170,7 +158,7 @@ const SmartGraph = (props) => {
       const maxY = Math.max(...y);
       const range = maxY - minY;
       const numTicks = 8;
-      
+
       // Determine appropriate unit based on data range
       let unit = 'ms';
       let divisor = 1;
@@ -184,7 +172,7 @@ const SmartGraph = (props) => {
         unit = 's';
         divisor = 1000;
       }
-      
+
       layout.yaxis.tickvals = [];
       layout.yaxis.ticktext = [];
       for (let i = 0; i <= numTicks; i++) {
@@ -195,8 +183,13 @@ const SmartGraph = (props) => {
       }
     }
 
-    Plotly.newPlot(plotRef.current, data, layout, config).then(() => {
-      plotRef.current.on('plotly_relayout', (eventData) => {
+    const node = plotRef.current;
+    let disposed = false;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    Plotly.newPlot(node, data, layout, config).then(() => {
+      if (disposed) return;
+      node.on('plotly_relayout', (eventData) => {
         if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
           const minDate = new Date(eventData['xaxis.range[0]']);
           const maxDate = new Date(eventData['xaxis.range[1]']);
@@ -208,23 +201,24 @@ const SmartGraph = (props) => {
           }
 
           setCustomTimeRangeObj({ min: minDate.getTime(), max: maxDate.getTime()});
-          
-          const customTimeString = `${minDate.toLocaleString("default", {month: 'short'})} ${minDate.getDate()} ${minDate.toLocaleTimeString('default', { 
-            hour: "2-digit", 
+
+          const customTimeString = `${minDate.toLocaleString("default", {month: 'short'})} ${minDate.getDate()} ${minDate.toLocaleTimeString('default', {
+            hour: "2-digit",
             minute: "2-digit",
             hour12: navigator.language === 'en-US' || Intl.DateTimeFormat().resolvedOptions().hour12
-          })} → ${maxDate.toLocaleString("default", {month: 'short'})} ${maxDate.getDate()} ${maxDate.toLocaleTimeString('default', { 
-            hour: "2-digit", 
+          })} → ${maxDate.toLocaleString("default", {month: 'short'})} ${maxDate.getDate()} ${maxDate.toLocaleTimeString('default', {
+            hour: "2-digit",
             minute: "2-digit",
             hour12: navigator.language === 'en-US' || Intl.DateTimeFormat().resolvedOptions().hour12
           })}`;
-          
+
           setTimeRange("custom");
           setCustomTimeRange(customTimeString);
         }
       });
     });
 
+    return () => { disposed = true; observer.disconnect(); Plotly.purge(node); };
   }, [dataPoints, displayOptionLabel, label, timeRange, customTimeRangeObj]);
 
   useEffect(() => {
@@ -240,9 +234,10 @@ const SmartGraph = (props) => {
 
   return (
     <div className="w-full">
+      <h3 className="text-base font-semibold mb-3">{displayOptionLabel}</h3>
       <div className="flex gap-2 mb-4">
-        <select 
-          value={timeRange} 
+        <select aria-label="Time range"
+          value={timeRange}
           onChange={event => {
             setCustomTimeRange(null);
             setCustomTimeRangeObj(null);
@@ -257,8 +252,8 @@ const SmartGraph = (props) => {
             <option value="custom">{customTimeRange}</option>
           )}
         </select>
-        
-        <select 
+
+        <select aria-label="Metric"
           value={displayOption}
           onChange={event => {
             setDisplayOption(event.target.value);
@@ -271,7 +266,7 @@ const SmartGraph = (props) => {
           ))}
         </select>
 
-        <a 
+        <a
           href={`/graph?endpoint=${encodeURIComponent(endpoint)}&label=${encodeURIComponent(label)}&options=${encodeURIComponent(propOptions)}`}
           className="inline-flex items-center justify-center ml-2"
         >
@@ -283,20 +278,10 @@ const SmartGraph = (props) => {
         </a>
       </div>
 
-      {isLoading && dataPoints.length === 0 ? (
-        <div
-          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
-          style={{ height: fullscreen ? '700px' : '450px' }}
-        />
-      ) : (
-        <div
-          ref={plotRef}
-          style={{
-            height: fullscreen ? '700px' : '450px',
-            width: '100%'
-          }}
-        />
-      )}
+      <div role="status" className="chart-state">
+        {isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : dataPoints.length === 0 ? 'No readings in this period.' : null}
+      </div>
+      <div ref={plotRef} aria-busy={isLoading} style={{ height: fullscreen ? '700px' : 'var(--monitor-chart-height)', width: '100%' }} />
     </div>
   );
 };
@@ -305,27 +290,23 @@ async function fetchData(endpoint, start, end, displayOption) {
   const datetimeNow = new Date(Date.now());
   const startParam = start ? new Date(start).toISOString() : new Date(2023, 8).toISOString();
   let endParam = end ? new Date(end).toISOString() : datetimeNow.toISOString();
-  
+
   if (new Date(end) > datetimeNow) {
     endParam = datetimeNow.toISOString();
   }
 
   const response = await fetch(`https://delay.cloudflare.chaika.me/${endpoint}?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${displayOption}`);
+  if (!response.ok) throw new Error(`Chart request failed (${response.status})`);
   const json = await response.json();
-  
-  return json.data.points.map(point => {
-    let y = 0;
-    for (const property in point) {
-      if (property !== "timePeriod") {
-        y = point[property];
-        break;
-      }
-    }
-    return { 
-      x: new Date(point.timePeriod).getTime(),
-      y 
-    };
-  });
+
+  // Filter against the window we actually asked for, not the caller's raw args — endParam
+  // is clamped to now and startParam has a floor for the "All Data" option.
+  return seriesFromResponse(
+    json.data,
+    displayOption,
+    new Date(startParam).getTime(),
+    new Date(endParam).getTime()
+  );
 }
 
 export default SmartGraph;

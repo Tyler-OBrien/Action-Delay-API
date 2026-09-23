@@ -13,10 +13,17 @@ const { variant } = Astro.props;
 <style>
 	.grid {
 		display: grid;
-		grid-auto-rows: 1fr;
+		grid-auto-rows: auto;
+		grid-template-columns: minmax(0, 1fr);
 		gap: 1rem;
 		list-style: none;
+		margin: 0;
 		padding: 0;
+	}
+
+	.grid > :global(li) {
+		display: flex;
+		min-width: 0;
 	}
 
 	.grid.small {
@@ -29,10 +36,19 @@ const { variant } = Astro.props;
 		grid-column: 1 / 3;
 	}
 
+	@media (min-width: 48em) {
+		.grid:not(.small):not(.offset) {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
 	@media (min-width: 75em) {
 		.grid {
-			grid-template-columns: 1fr 1fr 1fr;
-			gap: 4rem;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+
+		.grid:not(.small):not(.offset) {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 
 		.grid.offset {

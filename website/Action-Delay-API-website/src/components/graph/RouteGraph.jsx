@@ -3,11 +3,11 @@ import * as Plotly from 'plotly.js-basic-dist-min'
 import { isDarkMode, themeColors, baseLayout, axis } from './chartTheme';
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' }
+  { value: 30 * 60 * 1000, label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' }
 ];
 const processRouteData = (points, primaryRegion, showPercentage = false) => {
   const regionMap = new Map();
@@ -19,7 +19,7 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
   points.forEach(point => {
     const timestamp = new Date(point.timePeriod).getTime();
     regions.add(point.region);
-    
+
     if (!regionMap.has(timestamp)) {
       regionMap.set(timestamp, new Map());
     }
@@ -32,12 +32,12 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
 
   // Separate primary region from others
   const otherRegions = Array.from(regions).filter(region => region.toUpperCase() !== primaryRegion.toUpperCase());
-  
+
   // Sort other regions by predefined order, with unknown regions at the end
   const sortedOtherRegions = otherRegions.sort((a, b) => {
     const indexA = regionOrder.indexOf(a);
     const indexB = regionOrder.indexOf(b);
-    
+
     // If both regions are in the predefined order, sort by their position
     if (indexA !== -1 && indexB !== -1) {
       return indexA - indexB;
@@ -51,13 +51,13 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
 
   // Primary region first (bottom of stack), then other regions
   const finalRegionOrder = [];
-  
+
   // Add primary region first if it exists in the data
   const primaryRegionInData = Array.from(regions).find(region => region.toUpperCase() === primaryRegion.toUpperCase());
   if (primaryRegionInData) {
     finalRegionOrder.push(primaryRegionInData);
   }
-  
+
   // Add other regions
   finalRegionOrder.push(...sortedOtherRegions);
 
@@ -76,13 +76,13 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
     const data = allTimestamps.map(timestamp => {
       const regionCount = regionMap.get(timestamp)?.get(region) || 0;
       let value = regionCount;
-      
+
       if (showPercentage) {
         // Always calculate percentage, even for 0 values
         const total = timestampTotals.get(timestamp) || 0;
         value = total > 0 ? (regionCount / total) * 100 : 100;
       }
-      
+
       return {
         x: timestamp,
         y: value,
@@ -100,8 +100,8 @@ const processRouteData = (points, primaryRegion, showPercentage = false) => {
 
 const TimeRangeSelector = ({ value, onChange, customLabel }) => {
   return (
-    <select 
-      value={value} 
+    <select
+      value={value}
       onChange={onChange}
       className="bg-gray-50 dark:bg-slate-800 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 mr-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     >
@@ -125,13 +125,13 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
     if (!chartRef.current || !data.length) return;
 
     const endDate = Date.now();
-    const startDate = customRange?.min ?? 
+    const startDate = customRange?.min ??
       (endDate - timeRange);
 
     // Define colors for each region
     const regionColors = {
       'NA': '#3B82F6',    // Blue
-      'EU': '#10B981',    // Green  
+      'EU': '#10B981',    // Green
       'APAC': '#F59E0B',  // Amber
       'OC': '#EF4444',    // Red
       'ENAM': '#8B5CF6',  // Violet
@@ -156,7 +156,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
           rawCount: d.rawCount,
           percentage: d.rawCount > 0 && showPercentage ? d.y : null
         })),
-        hovertemplate: showPercentage 
+        hovertemplate: showPercentage
           ? `<b>%{fullData.name}</b><br>` +
             `Date: %{x|%b %d, %Y %H:%M}<br>` +
             `Percentage: %{y:.1f}%<br>` +
@@ -170,7 +170,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
     });
 
     const yAxisTitle = showPercentage ? 'Percentage (%)' : 'Request Count';
-    const chartTitle = showPercentage 
+    const chartTitle = showPercentage
       ? `${label} - Request Percentage by Executing Region`
       : `${label} - Request Count by Executing Region`;
 
@@ -188,7 +188,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
         ...(showPercentage && { range: [0, 100], ticksuffix: '%' })
       }),
       barmode: 'stack',
-      height: height,
+      height: typeof height === 'number' ? height : undefined,
       showlegend: true,
     };
 
@@ -199,7 +199,9 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
       responsive: true
     };
 
-    Plotly.newPlot(chartRef.current, plotlyData, layout, config).then(() => {
+    const node = chartRef.current;
+    Plotly.newPlot(node, plotlyData, layout, config).then(() => {
+      if (chartRef.current !== node) return;
       const handleRelayout = (eventData) => {
         if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
           const minDate = new Date(eventData['xaxis.range[0]']);
@@ -215,9 +217,17 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
         }
       };
 
-      chartRef.current.on('plotly_relayout', handleRelayout);
+      node.on('plotly_relayout', handleRelayout);
     });
   }, [data, timeRange, customRange, label, height, isDark, regionName, showPercentage]);
+
+  useEffect(() => {
+    const node = chartRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    return () => { observer.disconnect(); Plotly.purge(node); };
+  }, []);
 
   // Cleanup event listeners
   useEffect(() => {
@@ -253,23 +263,28 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom, regi
           No routing data available in selected time frame
         </div>
       ) : (
-        <div ref={chartRef} style={{ width: '100%', height: `${height}px` }} />
+        <div ref={chartRef} style={{ width: '100%', height: typeof height === 'number' ? `${height}px` : height }} />
       )}
     </div>
   );
 };
 
-const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName, timeRange, customRange, customLabel, onTimeRangeChange, onZoom, showPercentage = false }) => {
+const RouteGraph = ({ endpoint, label = 'Route Graph', height = 'var(--monitor-chart-height)', regionName, timeRange, customRange, customLabel, onTimeRangeChange, onZoom, showPercentage = false }) => {
   const [data, setData] = useState([]);
   const lastFetchRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchData = useCallback(async () => {
-    const fetchId = Date.now();
+    const fetchId = Symbol();
     lastFetchRef.current = fetchId;
+    setIsLoading(true);
+    setLoadError(false);
+    setData([]);
 
     try {
       const endDateFetch = Date.now();
-      const startDateFetch = customRange?.min ?? 
+      const startDateFetch = customRange?.min ??
         (endDateFetch - timeRange);
 
       const response = await fetch(
@@ -279,6 +294,7 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
         `Metrics=MedianEdgeResponseLatency`
       );
 
+      if (!response.ok) throw new Error(`Chart request failed (${response.status})`);
       const responseJson = await response.json();
 
       // Only update if this is still the latest fetch
@@ -287,23 +303,17 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
         const points = responseJson?.data?.points || responseJson?.points || [];
         const processedData = processRouteData(points, regionName, showPercentage);
         setData(processedData);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error fetching routing data:', error);
-      console.log('Response status:', response?.status);
-      console.log('Response text:', await response?.text?.().catch(() => 'Unable to get response text'));
       if (lastFetchRef.current === fetchId) {
         setData([]);
+        setLoadError(true);
+        setIsLoading(false);
       }
     }
-  }, [endpoint, timeRange, customRange, showPercentage]);
-
-  const handleTimeRangeChange = (event) => {
-    const value = Number(event.target.value);
-    setTimeRange(value);
-    setCustomRange(null);
-    setCustomLabel(null);
-  };
+  }, [endpoint, timeRange, customRange, showPercentage, regionName]);
 
   const handleZoomed = (range) => {
     onZoom(range);
@@ -312,12 +322,14 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
   // Fetch data when dependencies change
   useEffect(() => {
     fetchData();
+    return () => { lastFetchRef.current = null; };
   }, [fetchData]);
 
   return (
     <div className="w-full">
+      <div role="status" className="chart-state">{isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : data.length === 0 ? 'No readings in this period.' : null}</div>
       <div className="w-full">
-        <PlotlyChart 
+        {!isLoading && !loadError && data.length > 0 && <PlotlyChart
           data={data}
           timeRange={timeRange}
           customRange={customRange}
@@ -326,7 +338,7 @@ const RouteGraph = ({ endpoint, label = 'Route Graph', height = 400, regionName,
           onZoom={handleZoomed}
           regionName={regionName}
           showPercentage={showPercentage}
-        />
+        />}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 ---
+import { formatDuration as formatTime, durationParts as formatTimeReturnUnit, rawDuration } from '../lib/duration';
 import type { Job } from '../../models/cloudflare/job';
 import { jobHealth, dotClass } from '../data/jobHealth';
 import Sparkline from './graph/Sparkline.jsx';
@@ -12,26 +13,10 @@ interface Props {
 
 const { job, stats, type, successRate = null } = Astro.props;
 
-function formatTime(ms: number | undefined): string {
-	if (ms == undefined || isNaN(ms)) return "";
-	let seconds = ms / 1000;
-	if (seconds < 60) return seconds.toFixed(2) + ' second(s)';
-	let minutes = seconds / 60;
-	if (minutes < 60) return minutes.toFixed(2) + ' minute(s)';
-	let hours = minutes / 60;
-	return hours.toFixed(2) + ' hour(s)';
-}
-function formatTimeReturnUnit(ms: number | undefined): string[] {
-	if (ms == undefined) return ['', ''];
-	let seconds = ms / 1000;
-	if (seconds < 60) return [seconds.toFixed(2), `second(s)`];
-	let minutes = seconds / 60;
-	if (minutes < 60) return [minutes.toFixed(2), `minute(s)`];
-	let hours = minutes / 60;
-	return [hours.toFixed(2), `hour(s)`];
-}
+
 
 let delayTxt = "";
+let displayedMs: number | undefined;
 let delayTxtUnit = "";
 let pending = { className: "", textContent: "" };
 
@@ -61,12 +46,12 @@ if (job.currentRunStatus === "Deployed" || job.currentRunStatus === "Success") {
 	if (job.internalJobName === "cron") {
 		delayTxtUnit = "Last Event: " + formatTime(new Date().getTime() - new Date(job.currentRunTime).getTime()) + " ago";
 	} else {
-		[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
+		[delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.currentRunLengthMs);
 	}
 	pending.className = '';
 	pending.textContent = '';
 } else if (job.currentRunStatus === "Undeployed" && ((!getJobMedian || (job.currentRunLengthMs ?? 0) > getJobMedian * 1.2) && (job.currentRunLengthMs ?? 0) > 5000)) {
-	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
+	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.currentRunLengthMs);
 	if ((!getJobMedian || ((job.currentRunLengthMs ?? 0) * 3) > getJobMedian) && (job.currentRunLengthMs ?? 0) > 30000) {
 		pending.textContent = 'IN PROGRESS';
 		pending.className = 'highlightRed';
@@ -85,7 +70,7 @@ if (job.currentRunStatus === "Deployed" || job.currentRunStatus === "Success") {
 	pending.textContent = 'Error';
 	pending.className = 'highlightRed';
 } else {
-	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
+	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.lastRunLengthMs);
 	pending.className = '';
 	pending.textContent = '';
 	runTimeToUse = job.lastRunTime;
@@ -110,7 +95,7 @@ const predicted = job.predictedDelayLengthMs && job.predictedDelayLengthMs > 0
 		<span class={`shrink-0 w-3 h-3 rounded-full ${dot}`} title={health}></span>
 		<div class="min-w-0">
 			<div id={`delayNumberOuter${job.internalJobName}`} class="leading-none">
-				<span class="text-3xl md:text-4xl font-bold" id={`delayNumber${job.internalJobName}`}>{delayTxt}</span>
+				<span class="text-2xl md:text-3xl font-bold" tabindex="0" data-raw={displayedMs == null ? undefined : rawDuration(displayedMs)} id={`delayNumber${job.internalJobName}`}>{delayTxt}</span>
 				<span class="text-base text-gray" id={`delayUnit${job.internalJobName}`}>{delayTxtUnit}</span>
 				{type === "ai" && (
 					<span class="inline-flex items-center justify-center w-4 h-4 ml-1 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] align-middle cursor-help" title="For 100 output tokens">?</span>

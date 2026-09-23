@@ -155,3 +155,42 @@ export function regionColor(region, index = 0) {
   }
   return REGION_FALLBACK[index % REGION_FALLBACK.length];
 }
+
+// --- Comparison series ------------------------------------------------------
+
+// Distinct hues for arbitrary comparison series (jobs, providers, models). The
+// semantic palette above keys off the *metric*, which is the wrong axis here: a
+// comparison chart shows one metric across several subjects, so every line would
+// come out the same color.
+export const COMPARE_COLORS = [
+  "#3b82f6",
+  "#f59e0b",
+  "#10b981",
+  "#ec4899",
+  "#8b5cf6",
+  "#14b8a6",
+  "#ef4444",
+  "#6366f1",
+  "#84cc16",
+  "#f97316",
+];
+
+// Region series arrive labeled with their display name, so map back to the code
+// REGION_COLORS is keyed by. Keeps a comparison chart's regional colors matching
+// the ones RegionGraph already uses.
+const REGION_CODE_BY_NAME = {
+  "north america": "NA",
+  europe: "EU",
+  "asia-pacific": "AS",
+  oceania: "OC",
+  "south america": "SA",
+  africa: "AF",
+  "middle east": "ME",
+};
+
+export function compareColor(label, index = 0) {
+  const key = String(label ?? "").trim();
+  const code = REGION_CODE_BY_NAME[key.toLowerCase()] ?? key.toUpperCase();
+  if (REGION_COLORS[code]) return REGION_COLORS[code];
+  return COMPARE_COLORS[index % COMPARE_COLORS.length];
+}

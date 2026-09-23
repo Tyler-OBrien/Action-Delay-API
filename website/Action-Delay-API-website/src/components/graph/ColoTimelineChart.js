@@ -19,21 +19,22 @@ const JOB_OPTIONS = [
 ];
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000,           label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000,       label: 'Last 6 Hours' },
-  { value: 12 * 60 * 60 * 1000,      label: 'Last 12 Hours' },
-  { value: 24 * 60 * 60 * 1000,      label: 'Last 24 Hours' },
-  { value: 72 * 60 * 60 * 1000,      label: 'Last 72 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000,  label: 'Last 7 Days' },
-  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
+  { value: 30 * 60 * 1000,           label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000,       label: 'Last 6 hours' },
+  { value: 12 * 60 * 60 * 1000,      label: 'Last 12 hours' },
+  { value: 24 * 60 * 60 * 1000,      label: 'Last 24 hours' },
+  { value: 72 * 60 * 60 * 1000,      label: 'Last 72 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000,  label: 'Last 7 days' },
+  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
 ];
 
 const ColoTimelineChart = ({ locationName }) => {
   const plotRef = useRef(null);
   const [selectedJob, setSelectedJob] = useState('cloudflare-worker-uncached-10kb-free-plan');
   const [timeRange, setTimeRange] = useState(7 * 24 * 60 * 60 * 1000);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [coloMap, setColoMap] = useState({});
   const [niceNameMap, setNiceNameMap] = useState({});
@@ -68,7 +69,10 @@ const ColoTimelineChart = ({ locationName }) => {
   // Effect 2: fetch analytics — does NOT depend on coloMap
   useEffect(() => {
     if (!locationName) return;
+    let active = true;
     setIsLoading(true);
+    setLoadError(false);
+    setPoints([]);
 
     let startDate, endDate;
     if (customTimeRangeObj) {
@@ -82,13 +86,16 @@ const ColoTimelineChart = ({ locationName }) => {
     const end = endDate.toISOString();
 
     fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${encodeURIComponent(selectedJob)}/locations/${encodeURIComponent(locationName)}/coloanalytics?StartDateTime=${start}&EndDateTime=${end}&MaxPoints=200`)
-      .then(r => r.json())
-      .then(data => setPoints(data?.data?.points ?? []))
+      .then(r => { if (!r.ok) throw new Error(`Chart request failed (${r.status})`); return r.json(); })
+      .then(data => { if (active) setPoints(data?.data?.points ?? []); })
       .catch(err => {
+        if (!active) return;
+        setLoadError(true);
         console.error('ColoTimelineChart fetch error:', err);
         setPoints([]);
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
   }, [locationName, selectedJob, timeRange, customTimeRangeObj]);
 
   // Effect 3: render plot — pure derivation, no fetch
@@ -151,16 +158,21 @@ const ColoTimelineChart = ({ locationName }) => {
 
     const layout = {
       ...baseLayout(isDark),
-      height: 300,
+
       margin: { l: 60, r: 20, t: 10, b: 50 },
       xaxis: axis(isDark, { type: 'date' }),
       yaxis: axis(isDark, { title: { text: 'Latency (ms)', font: { size: 11 } }, ticksuffix: ' ms' }),
       showlegend: true,
     };
 
-    Plotly.newPlot(plotRef.current, traces, layout, { responsive: true, displayModeBar: false, scrollZoom: true })
+    const node = plotRef.current;
+    let disposed = false;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    Plotly.newPlot(node, traces, layout, { responsive: true, displayModeBar: false, scrollZoom: true })
       .then(() => {
-        plotRef.current.on('plotly_relayout', (eventData) => {
+        if (disposed) return;
+        node.on('plotly_relayout', (eventData) => {
           if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
             const minDate = new Date(eventData['xaxis.range[0]']);
             const maxDate = new Date(eventData['xaxis.range[1]']);
@@ -176,12 +188,13 @@ const ColoTimelineChart = ({ locationName }) => {
           }
         });
       });
+    return () => { disposed = true; observer.disconnect(); Plotly.purge(node); };
   }, [points, coloMap, niceNameMap, isDark]);
 
   return (
     <div class="w-full">
       <div class="flex items-center gap-3 mb-2 flex-wrap">
-        <select
+        <select aria-label="Zone plan"
           value={selectedJob}
           onChange={(e) => setSelectedJob(e.target.value)}
           class="bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded p-1.5"
@@ -190,7 +203,7 @@ const ColoTimelineChart = ({ locationName }) => {
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
-        <select
+        <select aria-label="Time range"
           value={timeRange}
           onChange={(e) => {
             setCustomTimeRange(null);
@@ -206,9 +219,10 @@ const ColoTimelineChart = ({ locationName }) => {
             <option value="custom">{customTimeRange}</option>
           )}
         </select>
-        {isLoading && <span class="text-xs text-gray-400 animate-pulse">Loading...</span>}
+
       </div>
-      <div ref={plotRef} style={{ width: '100%', height: '300px' }} />
+      <div role="status" className="chart-state">{isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : points.length === 0 ? 'No readings in this period.' : null}</div>
+      <div ref={plotRef} style={{ width: '100%', height: 'var(--monitor-chart-height)' }} />
     </div>
   );
 };

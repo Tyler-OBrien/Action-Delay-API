@@ -20,6 +20,7 @@ const { title, description } = Astro.props;
 		<MainHead title={title} description={description} />
 	</head>
 	<body>
+		<a class="skip-link" href="#main-content">Skip to content</a>
 		<div class="stack backgrounds">
 			<Nav />
 			<slot />
@@ -27,6 +28,17 @@ const { title, description } = Astro.props;
 		</div>
 
 		<script>
+			document.querySelectorAll('iframe[data-src]').forEach((frame) => {
+                const details = frame.closest('details');
+                const load = () => {
+                    if (details?.open && frame instanceof HTMLIFrameElement && frame.dataset.src) {
+                        frame.src = frame.dataset.src;
+                        delete frame.dataset.src;
+                    }
+                };
+                details?.addEventListener('toggle', load);
+                load();
+            });
 			// Add “loaded” class once the document has completely loaded.
 			addEventListener('load', () => document.documentElement.classList.add('loaded'));
 		</script>

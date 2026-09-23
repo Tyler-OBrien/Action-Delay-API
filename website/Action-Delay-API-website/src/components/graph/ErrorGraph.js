@@ -1,24 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as Plotly from 'plotly.js-basic-dist-min'
 import { isDarkMode, themeColors, baseLayout, axis, ERROR_COLORS } from './chartTheme';
+import { completeBuckets } from './analytics';
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
-  { value: Number.MAX_VALUE, label: 'All Data' }
+  { value: 30 * 60 * 1000, label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
+  { value: Number.MAX_VALUE, label: 'All data' }
 ];
 
-const processErrorData = (points) => {
+const processErrorData = (data, start, end) => {
   const errorMap = new Map();
   const errorTypes = new Set();
 
-  points.forEach(point => {
+  completeBuckets(data, start, end).forEach(point => {
     const timestamp = new Date(point.timePeriod).getTime();
     errorTypes.add(point.error);
-    
+
     if (!errorMap.has(timestamp)) {
       errorMap.set(timestamp, new Map());
     }
@@ -39,8 +40,8 @@ const processErrorData = (points) => {
 
 const TimeRangeSelector = ({ value, onChange, customLabel }) => {
   return (
-    <select 
-      value={value} 
+    <select aria-label="Time range"
+      value={value}
       onChange={onChange}
       className="bg-gray-50 dark:bg-slate-800 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 mr-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
     >
@@ -64,7 +65,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
     if (!chartRef.current || !data.length) return;
 
     const endDate = Date.now();
-    const startDate = customRange?.min ?? 
+    const startDate = customRange?.min ??
       (timeRange === Number.MAX_VALUE ? new Date(2023, 8).getTime() : endDate - timeRange);
 
 
@@ -97,7 +98,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
       xaxis: axis(isDark, { title: 'Date', type: 'date', range: [new Date(startDate), new Date(endDate)] }),
       yaxis: axis(isDark, { title: 'Error Count', fixedrange: true }),
       barmode: 'stack',
-      height: height,
+      height: typeof height === 'number' ? height : undefined,
       showlegend: true,
     };
 
@@ -108,7 +109,9 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
       responsive: true
     };
 
-    Plotly.newPlot(chartRef.current, plotlyData, layout, config).then(() => {
+    const node = chartRef.current;
+    Plotly.newPlot(node, plotlyData, layout, config).then(() => {
+      if (chartRef.current !== node) return;
       const handleRelayout = (eventData) => {
         if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
           const minDate = new Date(eventData['xaxis.range[0]']);
@@ -124,9 +127,17 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
         }
       };
 
-      chartRef.current.on('plotly_relayout', handleRelayout);
+      node.on('plotly_relayout', handleRelayout);
     });
   }, [data, timeRange, customRange, label, height, isDark]);
+
+  useEffect(() => {
+    const node = chartRef.current;
+    if (!node) return;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    return () => { observer.disconnect(); Plotly.purge(node); };
+  }, []);
 
   // Cleanup event listeners
   useEffect(() => {
@@ -162,7 +173,7 @@ const PlotlyChart = ({ data, timeRange, customRange, label, height, onZoom }) =>
           No error data available in selected time frame
         </div>
       ) : (
-        <div ref={chartRef} style={{ width: '100%', height: `${height}px` }} />
+        <div ref={chartRef} style={{ width: '100%', height: typeof height === 'number' ? `${height}px` : height }} />
       )}
     </div>
   );
@@ -173,13 +184,16 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
   const [customRange, setCustomRange] = useState(null);
   const [customLabel, setCustomLabel] = useState(null);
   const [data, setData] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const lastFetchRef = useRef(null);
 
   const fetchData = useCallback(async () => {
-    const fetchId = Date.now();
+    const fetchId = Symbol();
     lastFetchRef.current = fetchId;
     setIsLoading(true);
+    setLoadError(false);
+    setData([]);
 
     try {
       const endDateFetch = Date.now();
@@ -193,15 +207,18 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
         `Metrics=AvgRunLength`
       );
 
+      if (!response.ok) throw new Error(`Chart request failed (${response.status})`);
       const { data: responseData } = await response.json();
 
       // Only update if this is still the latest fetch
       if (lastFetchRef.current === fetchId) {
-        const processedData = processErrorData(responseData.points);
+        const processedData = processErrorData(responseData, startDateFetch, endDateFetch);
         setData(processedData);
         setIsLoading(false);
       }
     } catch (error) {
+      if (lastFetchRef.current !== fetchId) return;
+      setLoadError(true);
       console.error('Error fetching data:', error);
       setIsLoading(false);
     }
@@ -218,7 +235,7 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
     const minDate = new Date(range.min);
     const maxDate = new Date(range.max);
     const monthDay = new Intl.DateTimeFormat('default', { month: 'short', day: 'numeric' });
-    
+
     setTimeRange('custom');
     setCustomRange({ min: range.min, max: range.max });
     setCustomLabel(`${monthDay.format(minDate)} -> ${monthDay.format(maxDate)}`);
@@ -227,31 +244,33 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
   // Fetch data when dependencies change
   useEffect(() => {
     fetchData();
+    return () => { lastFetchRef.current = null; };
   }, [fetchData]);
 
   return (
     <div className="w-full p-4">
       <div className="mb-4">
-        <TimeRangeSelector 
+        <TimeRangeSelector
           value={timeRange}
           onChange={handleTimeRangeChange}
           customLabel={customLabel}
         />
       </div>
 
+      <div role="status" className="chart-state">{isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : data.length === 0 ? 'No recorded errors in this period.' : null}</div>
       <div className="w-full">
         {isLoading && data.length === 0 ? (
           <div
             className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
-            style={{ height: fullscreen ? '800px' : '700px' }}
+            style={{ height: fullscreen ? '800px' : 'var(--monitor-chart-height)' }}
           />
-        ) : (
+        ) : loadError || data.length === 0 ? null : (
           <PlotlyChart
             data={data}
             timeRange={timeRange}
             customRange={customRange}
             label={label}
-            height={fullscreen ? 800 : 700}
+            height={fullscreen ? 800 : 'var(--monitor-chart-height)'}
             onZoom={handleZoomed}
           />
         )}

@@ -1,4 +1,5 @@
 ---
+import { formatDuration } from '../lib/duration';
 import type { JobLocation } from '../../models/cloudflare/location';
 
 interface Props {
@@ -29,10 +30,7 @@ const statusClass = (s: string) =>
 const delayTxt = (loc: JobLocation) => {
 	const cur = loc.currentRunStatus === "Deployed" || loc.currentRunStatus === "Success";
 	const ms = cur ? loc.currentRunLengthMs : loc.lastRunLengthMs;
-	if (ms == null || isNaN(ms)) return "—";
-	if (ms < 1000) return Math.round(ms) + " ms";
-	if (ms < 60000) return (ms / 1000).toFixed(2) + " s";
-	return (ms / 60000).toFixed(2) + " min";
+	return formatDuration(ms);
 };
 const updatedTxt = (loc: JobLocation) => {
 	const t = loc.responseTimeUtc || loc.currentRunTime || loc.lastRunTime;
@@ -48,7 +46,7 @@ const filterId = `${tableId}-filter`;
 	<div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
 		<h3 class="font-semibold text-lg">Locations <span class="text-gray text-sm">({locations.length})</span></h3>
 		<input
-			id={filterId}
+			id={filterId} aria-label="Filter locations"
 			type="text"
 			placeholder="Filter locations..."
 			class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"

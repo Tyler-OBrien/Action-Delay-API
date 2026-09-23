@@ -1,4 +1,5 @@
 ---
+import { statusDuration as runLengthDisplayFormat } from '../lib/duration';
 import type { Job } from "../../models/cloudflare/job";
 import type { Incident } from "../../models/types";
 import Sparkline from "./graph/Sparkline.jsx";
@@ -6,7 +7,7 @@ import { statusConfig as config } from "../data/jobCategories";
 import { jobHealth, dotClass, type Health } from "../data/jobHealth";
 
 /**
- * Self-contained Cloudflare status dashboard. Rendered on both `/` and `/status`.
+ * Self-contained Cloudflare status dashboard. Rendered on `/`; `/status` redirects here.
  *
  * NOTE: the DOM ids below (item-{job}-*, grp-{group}-*, details-{job},
  * websocket-conn-status) and the globalThis.{jobData,config,incidents} wiring are
@@ -99,26 +100,7 @@ function getGroupStatus(groupItems: any[]) {
     : { status: "Normal", color: "bg-green-500" };
 }
 
-function runLengthDisplayFormat(jobName: string, ms: number | undefined): string {
-  if (jobName == "cron") {
-    if (ms) ms -= 60_000;
-  }
 
-  if (ms == undefined) return "";
-
-  let seconds = ms / 1000;
-  if (seconds < 60) {
-    return seconds.toFixed(2) + " second(s)";
-  }
-
-  let minutes = seconds / 60;
-  if (minutes < 60) {
-    return minutes.toFixed(2) + " minute(s)";
-  }
-
-  let hours = minutes / 60;
-  return hours.toFixed(2) + " hour(s)";
-}
 
 function formatTime(date: Date | null) {
   if (!date) return "";
@@ -195,9 +177,9 @@ const summary = buildSummary();
         </p>
       </div>
     </div>
-    <a id="websocket-conn-status" class="websocket-conn-pill self-start sm:self-auto">
+    <span role="status" id="websocket-conn-status" class="websocket-conn-pill self-start sm:self-auto">
       Connecting to Live Updates…
-    </a>
+    </span>
   </div>
 
   <div class="flex flex-wrap gap-2 mt-4">

@@ -1,3 +1,4 @@
+import { formatDuration as formatTime, durationParts as formatTimeReturnUnit, rawDuration } from '../lib/duration';
 // Strip any stale value-good|elevated|bad class — the value text is no longer color-coded.
 function applyHealthClass(el) {
   if (!el) return;
@@ -20,7 +21,7 @@ async function start() {
     await connection.start();
     console.log("SignalR Connected " + connection.state);
     console.log(connection);
-    connStatus.innerText = "Connected: Live Updates";
+    connStatus.innerText = "Live updates: connected";
     connStatus.classList = ["websocket-connected"];
     await connection.invoke("SubscribeToJob", globalThis.jobName);
   } catch (err) {
@@ -36,13 +37,13 @@ connection.onreconnecting((error) => {
 });
 
 connection.onclose(async () => {
-  connStatus.innerText = "Disconnected: Not Live";
+  connStatus.innerText = "Live updates: disconnected";
   connStatus.classList = [];
   await start();
 });
 
 connection.on("receivelocationupdate", (subject, data) => {
-  connStatus.innerText = `Connected: Live Updates`;
+  connStatus.innerText = `Live updates: connected`;
   try {
     var tryGetJobMapIframe = document.getElementById("jobmapiframe");
     if (tryGetJobMapIframe) {
@@ -64,13 +65,13 @@ connection.on("receivelocationupdate", (subject, data) => {
   }
   const delayEl = document.getElementById(`loc-delay-${data.LocationName}`);
   if (delayEl && data.RunLength != null)
-    delayEl.textContent = (Number(data.RunLength) / 1000).toFixed(2) + 's';
+    delayEl.textContent = formatTime(Number(data.RunLength));
   const updEl = document.getElementById(`loc-updated-${data.LocationName}`);
   if (updEl) updEl.textContent = new Date().toLocaleTimeString();
 });
 
 connection.on("ReceiveJobUpdate", (subject, data) => {
-  connStatus.innerText = `Connected: Live Updates`;
+  connStatus.innerText = `Live updates: connected`;
 
   try {
     var tryGetJobMapIframe = document.getElementById("jobmapiframe");
@@ -149,6 +150,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
   var tryGetAnalytics = globalThis.jobStats.filter((job) => job.job_name === internalJobNameUpdate);
   let lastUpdatedTxt = "";
   let delayTxt = "";
+  let displayedMs;
   let delayTxtUnit = "";
   if (!getCurrentData) {
     console.log(
@@ -164,39 +166,8 @@ async function handleJobUpdateData(internalJobNameUpdate) {
 
   const type = getCurrentData.jobType;
 
-  function formatTime(ms) {
-    if (ms == undefined || isNaN(ms)) return "";
 
-    let seconds = ms / 1000;
-    if (seconds < 60) {
-      return seconds.toFixed(2) + " second(s)";
-    }
 
-    let minutes = seconds / 60;
-    if (minutes < 60) {
-      return minutes.toFixed(2) + " minute(s)";
-    }
-
-    let hours = minutes / 60;
-    return hours.toFixed(2) + " hour(s)";
-  }
-  function formatTimeReturnUnit(ms) {
-    if (ms == undefined) return ["", ""];
-
-    let seconds = ms / 1000;
-    if (seconds < 60) {
-      return [seconds.toFixed(2), `second(s)`];
-    }
-
-    let minutes = seconds / 60;
-    if (minutes < 60) {
-      return [minutes.toFixed(2), `minute(s)`];
-    }
-
-    let hours = minutes / 60;
-
-    return [hours.toFixed(2), `hour(s)`];
-  }
 
   // Parsing quickanalytics and updating the HTML
   let peakPeriod,
@@ -252,7 +223,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
         }
 		*/
     } else {
-      [delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
+      [delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.currentRunLengthMs);
     }
     pending.className = "text-center mb-2 h-4";
     pending.textContent = "";
@@ -261,7 +232,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     (!getJobMedian || job.currentRunLengthMs > getJobMedian * 1.2) &&
     job.currentRunLengthMs > 5000
   ) {
-    [delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
+    [delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.currentRunLengthMs);
     if (
       (!getJobMedian || job.currentRunLengthMs * 3 > getJobMedian) &&
       job.currentRunLengthMs > 30000
@@ -281,7 +252,7 @@ async function handleJobUpdateData(internalJobNameUpdate) {
     pending.textContent = "CF API Error";
     pending.className = "highlightRed  text-center mb-2 h-4";
   } else {
-    [delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
+    [delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.lastRunLengthMs);
     pending.className = "text-center mb-2 h-4";
     pending.textContent = "";
     runTimeToUse = job.lastRunTime;
@@ -314,6 +285,9 @@ async function handleJobUpdateData(internalJobNameUpdate) {
 
   const delayNumberEl = document.getElementById(`delayNumber${job.internalJobName}`);
   delayNumberEl.innerText = `${delayTxt}`;
+  const raw = displayedMs == null ? undefined : rawDuration(displayedMs);
+  if (raw) delayNumberEl.dataset.raw = raw;
+  else delete delayNumberEl.dataset.raw;
   const hasIncident = (globalThis.incidents || []).some(
     (i) => i.target === job.internalJobName && i.active
   );

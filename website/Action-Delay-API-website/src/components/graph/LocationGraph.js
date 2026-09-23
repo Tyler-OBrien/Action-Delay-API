@@ -1,6 +1,8 @@
+import { formatDuration as formatTime } from '../../lib/duration';
 import { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min'
 import { isDarkMode, themeColors, baseLayout, axis, themeRelayout } from './chartTheme';
+import { seriesFromResponse } from './analytics';
 
 // Per-location multi-line latency graph. Like RegionGraph, but one line per edge
 // location (PoP) instead of per region — used on AI job detail pages, where a job
@@ -8,16 +10,16 @@ import { isDarkMode, themeColors, baseLayout, axis, themeRelayout } from './char
 // location list, then a time-series per location, and drops locations with no data.
 
 const SELECT_OPTIONS = [
-  { value: 30 * 60 * 1000, label: 'Last 30 Minutes' },
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 12 * 60 * 60 * 1000, label: 'Last 12 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 72 * 60 * 60 * 1000, label: 'Last 72 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
-  { value: 3 * 30 * 24 * 60 * 60 * 1000, label: 'Last 3 Months' },
-  { value: Number.MAX_VALUE, label: 'All Data' },
+  { value: 30 * 60 * 1000, label: 'Last 30 minutes' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 12 * 60 * 60 * 1000, label: 'Last 12 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 72 * 60 * 60 * 1000, label: 'Last 72 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
+  { value: 3 * 30 * 24 * 60 * 60 * 1000, label: 'Last 3 months' },
+  { value: Number.MAX_VALUE, label: 'All data' },
 ];
 
 const SELECT_DISPLAY_OPTIONS = [
@@ -30,24 +32,15 @@ const SELECT_DISPLAY_OPTIONS = [
 // Distinct line colors, assigned by location index.
 const LOCATION_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
-function formatTime(ms) {
-  if (typeof ms !== 'number' || !isFinite(ms)) return ms;
-  if (ms < 1000) return ms.toFixed(0) + ' ms';
-  let seconds = ms / 1000;
-  if (seconds < 60) return seconds.toFixed(2) + ' s';
-  let minutes = seconds / 60;
-  if (minutes < 60) return minutes.toFixed(2) + ' min';
-  return (minutes / 60).toFixed(2) + ' h';
-}
+
 
 async function fetchLocations(jobName) {
   const encJob = jobName.replaceAll('/', '%2F');
-  try {
+  {
     const resp = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${encJob}/locations`);
+    if (!resp.ok) throw new Error(`Chart request failed (${resp.status})`);
     const json = await resp.json();
     return (json.data ?? []).map(l => l.locationName).filter(Boolean);
-  } catch {
-    return [];
   }
 }
 
@@ -60,27 +53,30 @@ async function fetchLocationData(jobName, location, start, end, metric) {
   const encJob = jobName.replaceAll('/', '%2F');
   const url = `https://delay.cloudflare.chaika.me/v2/jobs/${encJob}/locations/${location}/analytics` +
     `?StartDateTime=${startParam}&EndDateTime=${endParam}&Metrics=${metric}`;
-  try {
+  {
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Chart request failed (${resp.status})`);
     const json = await resp.json();
-    return (json.data?.points ?? []).map(point => ({
-      x: new Date(point.timePeriod).getTime(),
-      y: point[metric] ?? point[metric.charAt(0).toLowerCase() + metric.slice(1)] ?? 0,
-    }));
-  } catch {
-    return [];
+    return seriesFromResponse(
+      json.data,
+      metric,
+      new Date(startParam).getTime(),
+      new Date(endParam).getTime()
+    );
   }
 }
 
 const LocationGraph = (props) => {
   const { jobName, label, defaultMetric = 'MedianApiResponseLatency' } = props;
   const plotRef = useRef(null);
+  const [hidden, setHidden] = useState(new Set());
 
   const defaultOptionObj = SELECT_DISPLAY_OPTIONS.find(o => o.value === defaultMetric) ?? SELECT_DISPLAY_OPTIONS[0];
 
   const [locations, setLocations] = useState([]);
   const [locData, setLocData] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState(7 * 24 * 60 * 60 * 1000);
   const [customTimeRange, setCustomTimeRange] = useState(null);
   const [customTimeRangeObj, setCustomTimeRangeObj] = useState(null);
@@ -90,13 +86,18 @@ const LocationGraph = (props) => {
   // Fetch the job's location list once.
   useEffect(() => {
     let alive = true;
-    fetchLocations(jobName).then(locs => { if (alive) setLocations(locs); });
+    setIsLoading(true);
+    setLoadError(false);
+    setLocations([]);
+    setLocData({});
+    fetchLocations(jobName).then(locs => { if (alive) { setLocations(locs); if (!locs.length) setIsLoading(false); } }).catch(() => { if (alive) { setLoadError(true); setIsLoading(false); } });
     return () => { alive = false; };
   }, [jobName]);
 
   // Fetch per-location time-series whenever range / metric / locations change.
   useEffect(() => {
     if (locations.length === 0) return;
+    let active = true;
     let endDate = Date.now();
     let startDate = null;
     if (customTimeRangeObj != null) {
@@ -107,14 +108,18 @@ const LocationGraph = (props) => {
     }
 
     setIsLoading(true);
+    setLoadError(false);
+    setLocData({});
     Promise.all(locations.map(loc => fetchLocationData(jobName, loc, startDate, endDate, displayOption)))
       .then(results => {
+        if (!active) return;
         const data = {};
         locations.forEach((loc, i) => { data[loc] = results[i]; });
         setLocData(data);
         setIsLoading(false);
       })
-      .catch(() => setIsLoading(false));
+      .catch(() => { if (active) { setLoadError(true); setIsLoading(false); } });
+    return () => { active = false; };
   }, [locations, timeRange, displayOption, customTimeRangeObj, jobName]);
 
   useEffect(() => {
@@ -142,10 +147,11 @@ const LocationGraph = (props) => {
         type: 'scatter',
         mode: 'lines+markers',
         name: loc,
+        visible: hidden.has(loc) ? 'legendonly' : true,
         line: { shape: 'spline', width: 2, color },
         marker: { size: 4, color },
         connectgaps: true,
-        hovertemplate: `<b>${loc}</b><br>Time: %{x}<br>Latency: %{customdata}<extra></extra>`,
+        hovertemplate: `<b>${loc}</b><br>Time: %{x}<br>Latency: %{customdata}<br>Raw: %{y:,.3f} ms<extra></extra>`,
         customdata: y.map(v => formatTime(v)),
       };
     });
@@ -175,8 +181,9 @@ const LocationGraph = (props) => {
 
     const layout = {
       ...baseLayout(isDark),
+      showlegend: false,
       title: {
-        text: `${label} - By Location (${displayOptionLabel})`,
+        text: '',
         font: { size: 16, color: themeColors(isDark).textStrong }
       },
       xaxis: axis(isDark, { title: 'Time', type: 'date', range: xRange }),
@@ -195,8 +202,13 @@ const LocationGraph = (props) => {
       displaylogo: false
     };
 
-    Plotly.newPlot(plotRef.current, traces, layout, config).then(() => {
-      plotRef.current.on('plotly_relayout', (eventData) => {
+    const node = plotRef.current;
+    let disposed = false;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    Plotly.newPlot(node, traces, layout, config).then(() => {
+      if (disposed) return;
+      node.on('plotly_relayout', (eventData) => {
         if (eventData['xaxis.range[0]'] && eventData['xaxis.range[1]']) {
           const minDate = new Date(eventData['xaxis.range[0]']);
           const maxDate = new Date(eventData['xaxis.range[1]']);
@@ -213,7 +225,8 @@ const LocationGraph = (props) => {
         }
       });
     });
-  }, [locData, locations, displayOptionLabel, label, timeRange, customTimeRangeObj]);
+    return () => { disposed = true; observer.disconnect(); Plotly.purge(node); };
+  }, [hidden, locData, locations, displayOptionLabel, label, timeRange, customTimeRangeObj]);
 
   useEffect(() => {
     function handleThemeChange() {
@@ -226,8 +239,9 @@ const LocationGraph = (props) => {
 
   return (
     <div className="w-full">
+      <h3 className="text-base font-semibold mb-3">{displayOptionLabel}</h3>
       <div className="flex gap-2 mb-4">
-        <select
+        <select aria-label="Time range"
           value={timeRange}
           onChange={event => {
             setCustomTimeRange(null);
@@ -244,7 +258,7 @@ const LocationGraph = (props) => {
           )}
         </select>
 
-        <select
+        <select aria-label="Metric"
           value={displayOption}
           onChange={event => {
             setDisplayOption(event.target.value);
@@ -258,17 +272,15 @@ const LocationGraph = (props) => {
         </select>
       </div>
 
-      {isLoading && Object.keys(locData).length === 0 ? (
-        <div
-          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
-          style={{ height: '450px' }}
-        />
-      ) : (
-        <div
-          ref={plotRef}
-          style={{ height: '450px', width: '100%' }}
-        />
-      )}
+      <ul className="chart-legend" aria-label="Chart series">
+        {locations.filter(loc => (locData[loc] ?? []).length).map(loc => <li key={loc}>
+          <button type="button" aria-pressed={!hidden.has(loc)} onClick={() => setHidden(previous => { const next = new Set(previous); next.has(loc) ? next.delete(loc) : next.add(loc); return next; })}>
+            <span aria-hidden="true" style={{backgroundColor: LOCATION_COLORS[locations.indexOf(loc) % LOCATION_COLORS.length]}} />{loc}
+          </button>
+        </li>)}
+      </ul>
+      <div role="status" className="chart-state">{isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : !Object.values(locData).some(points => points.some(p => p.y != null)) ? 'No readings in this period.' : null}</div>
+      <div ref={plotRef} aria-busy={isLoading} style={{ height: 'var(--monitor-chart-height)', width: '100%' }} />
     </div>
   );
 };

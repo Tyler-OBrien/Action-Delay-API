@@ -22,5 +22,7 @@ export default defineConfig({
     }
   },
   output: "server",
-  adapter: cloudflare()
+  adapter: cloudflare(process.env.ADP_LOCAL_BUILD === "1"
+    ? { remoteBindings: false, inspectorPort: false, prerenderEnvironment: "node" }
+    : {})
 });

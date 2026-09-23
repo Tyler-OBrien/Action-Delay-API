@@ -1,4 +1,5 @@
 ---
+import Hero from '../components/Hero.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import type { LocationInfo } from '../../models/cloudflare/locationinfo';
 import type { ColoInfo } from '../../models/cloudflare/colo';
@@ -86,9 +87,9 @@ function pathBg(path: string): string {
 ---
 
 <BaseLayout title="Locations" description="Edge agent locations used for propagation delay monitoring">
-	<div class="wrapper stack gap-8">
+	<main id="main-content" tabindex="-1" class="wrapper stack gap-8">
 		<header>
-			<h1 class="text-3xl font-bold">Locations</h1>
+			<Hero title="Locations" />
 			<p class="text-gray-500 mt-1">{locations.length} monitoring agents across {regionCount} regions</p>
 			<p class="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-2xl">
 				These are the distributed monitoring agents used to measure propagation delay of Cloudflare
@@ -100,7 +101,7 @@ function pathBg(path: string): string {
 
 		<div class="mb-2">
 			<input
-				id="location-filter"
+				id="location-filter" aria-label="Filter locations"
 				type="text"
 				placeholder="Filter locations..."
 				class="w-full max-w-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-sm"
@@ -180,7 +181,7 @@ function pathBg(path: string): string {
 				</tbody>
 			</table>
 		</div>
-	</div>
+	</main>
 </BaseLayout>
 
 <script>

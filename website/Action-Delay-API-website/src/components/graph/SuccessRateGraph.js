@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Plotly from 'plotly.js-basic-dist-min'
 import { isDarkMode, themeColors, baseLayout, axis, themeRelayout } from './chartTheme';
+import { completeBuckets } from './analytics';
 
 // Success-rate-over-time graph for a single job (used on AI job detail pages).
 // Fetches the /successrate endpoint and plots % successful runs per bucket on a
@@ -8,12 +9,12 @@ import { isDarkMode, themeColors, baseLayout, axis, themeRelayout } from './char
 // table, so longer ranges are rejected server-side).
 
 const SELECT_OPTIONS = [
-  { value: 6 * 60 * 60 * 1000, label: 'Last 6 Hours' },
-  { value: 24 * 60 * 60 * 1000, label: 'Last 24 Hours' },
-  { value: 72 * 60 * 60 * 1000, label: 'Last 72 Hours' },
-  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 Days' },
-  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 Days' },
-  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 Days' },
+  { value: 6 * 60 * 60 * 1000, label: 'Last 6 hours' },
+  { value: 24 * 60 * 60 * 1000, label: 'Last 24 hours' },
+  { value: 72 * 60 * 60 * 1000, label: 'Last 72 hours' },
+  { value: 7 * 24 * 60 * 60 * 1000, label: 'Last 7 days' },
+  { value: 14 * 24 * 60 * 60 * 1000, label: 'Last 14 days' },
+  { value: 30 * 24 * 60 * 60 * 1000, label: 'Last 30 days' },
 ];
 
 // Threshold band ([line, fill]) for a success-rate value: green >=90, orange <90, red <80.
@@ -33,16 +34,16 @@ async function fetchSuccessRate(jobName, start, end) {
   const encJob = jobName.replaceAll('/', '%2F');
   const url = `https://delay.cloudflare.chaika.me/v2/jobs/${encJob}/successrate` +
     `?StartDateTime=${startParam}&EndDateTime=${endParam}`;
-  try {
+  {
     const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Chart request failed (${resp.status})`);
     const json = await resp.json();
-    return (json.data?.points ?? []).map(point => ({
-      x: new Date(point.timePeriod).getTime(),
-      y: point.successRate,
-      total: point.totalCount,
-    }));
-  } catch {
-    return [];
+    return completeBuckets(json.data, new Date(startParam).getTime(), new Date(endParam).getTime())
+      .map(point => ({
+        x: new Date(point.timePeriod).getTime(),
+        y: point.successRate,
+        total: point.totalCount,
+      }));
   }
 }
 
@@ -51,7 +52,8 @@ const SuccessRateGraph = (props) => {
   const plotRef = useRef(null);
 
   const [points, setPoints] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState(24 * 60 * 60 * 1000);
 
   useEffect(() => {
@@ -59,9 +61,11 @@ const SuccessRateGraph = (props) => {
     const endDate = Date.now();
     const startDate = endDate - timeRange;
     setIsLoading(true);
+    setLoadError(false);
+    setPoints([]);
     fetchSuccessRate(jobName, startDate, endDate)
       .then(data => { if (alive) { setPoints(data); setIsLoading(false); } })
-      .catch(() => { if (alive) setIsLoading(false); });
+      .catch(() => { if (alive) { setLoadError(true); setIsLoading(false); } });
     return () => { alive = false; };
   }, [jobName, timeRange]);
 
@@ -132,7 +136,11 @@ const SuccessRateGraph = (props) => {
       displaylogo: false
     };
 
-    Plotly.newPlot(plotRef.current, [...segments, markerTrace], layout, config);
+    const node = plotRef.current;
+    const observer = new ResizeObserver(() => { if (node._fullLayout) Plotly.Plots.resize(node); });
+    observer.observe(node);
+    Plotly.newPlot(node, [...segments, markerTrace], layout, config);
+    return () => { observer.disconnect(); Plotly.purge(node); };
   }, [points, label, timeRange]);
 
   useEffect(() => {
@@ -147,7 +155,7 @@ const SuccessRateGraph = (props) => {
   return (
     <div className="w-full">
       <div className="flex gap-2 mb-4">
-        <select
+        <select aria-label="Time range"
           value={timeRange}
           onChange={event => setTimeRange(Number(event.target.value))}
           className="bg-gray-50 dark:bg-slate-800 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
@@ -158,17 +166,8 @@ const SuccessRateGraph = (props) => {
         </select>
       </div>
 
-      {isLoading && points.length === 0 ? (
-        <div
-          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
-          style={{ height: '450px' }}
-        />
-      ) : (
-        <div
-          ref={plotRef}
-          style={{ height: '450px', width: '100%' }}
-        />
-      )}
+      <div role="status" className="chart-state">{isLoading ? 'Loading chart…' : loadError ? 'Chart unavailable. Try another range or reload.' : !points.some(p => p.y != null) ? 'No readings in this period.' : null}</div>
+      <div ref={plotRef} aria-busy={isLoading} style={{ height: 'var(--monitor-chart-height)', width: '100%' }} />
     </div>
   );
 };

@@ -1,4 +1,5 @@
 ---
+import { formatDuration as formatTime, durationParts as formatTimeReturnUnit, rawDuration } from '../lib/duration';
 import type { Job } from '../../models/cloudflare/job';
 import type { QuickStats } from '../../models/cloudflare/quickstat';
 import { jobHealth, dotClass } from '../data/jobHealth';
@@ -13,6 +14,7 @@ interface Props {
 
 let lastUpdatedTxt = "";
 let delayTxt = "";
+let displayedMs: number | undefined;
 let delayTxtUnit = "";
 let pending = { className: "", textContent: ""}
 
@@ -21,46 +23,11 @@ const job = Astro.props.job;
 const type = Astro.props.type;
 
 
-function formatTime(ms: number | undefined): string {
 
-	if (ms == undefined || isNaN(ms)) return "";
-
-let seconds = ms / 1000;
-if (seconds < 60) {
-return seconds.toFixed(2) + ' second(s)';
-}
-
-let minutes = seconds / 60;
-if (minutes < 60) {
-return minutes.toFixed(2) + ' minute(s)';
-}
-
-let hours = minutes / 60;
-return hours.toFixed(2) + ' hour(s)';
-}
-function formatTimeReturnUnit(ms: number | undefined): string[] {
-
-if (ms == undefined) return ['', ''];
-
-let seconds = ms / 1000;
-if (seconds < 60) {
-return [seconds.toFixed(2), `second(s)`];
-}
-
-let minutes = seconds / 60;
-if (minutes < 60) {
-	return [minutes.toFixed(2), `minute(s)`];
-}
-
-let hours = minutes / 60;
-
-return [hours.toFixed(2), `hour(s)`];
-}
 
 let quickAnalyticsData = Astro.props.stats;
 // Parsing quickanalytics and updating the HTML
 let peakPeriod, dailyMedian, getJobMedian, monthlyMedian, peakPeriodTxt, quarterlyMedian;
-
 
 quickAnalyticsData?.forEach((item) => {
 switch (item.period) {
@@ -98,12 +65,12 @@ if (job.currentRunStatus === "Deployed" || job.currentRunStatus === "Success") {
 		*/
     }
     else {
-		[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
+		[delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.currentRunLengthMs);
     }
     pending.className = '';
     pending.textContent = '';
 } else if (job.currentRunStatus === "Undeployed" && ((!getJobMedian || (job.currentRunLengthMs ?? 0) > getJobMedian * 1.2) && (job.currentRunLengthMs ?? 0) > 5000)) {
-	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.currentRunLengthMs);
+	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.currentRunLengthMs);
     if ((!getJobMedian || ((job.currentRunLengthMs ?? 0) * 3) > getJobMedian) && (job.currentRunLengthMs ?? 0) > 30000)
     {
         pending.textContent = 'IN PROGRESS';
@@ -128,7 +95,7 @@ else if (job.currentRunStatus === "Failure") {
 }
 else
 {
-	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(job.lastRunLengthMs);
+	[delayTxt, delayTxtUnit] = formatTimeReturnUnit(displayedMs = job.lastRunLengthMs);
     pending.className = '';
     pending.textContent = '';
     runTimeToUse = job.lastRunTime;
@@ -153,12 +120,12 @@ const sparkMetric = type === "perf" || type === "ai" ? "MedianApiResponseLatency
 const sparkErrorEndpoint = type === "ai" ? `v2/jobs/${sparkEnc}/erroranalytics` : undefined;
 ---
 
-<div class="relative w-full min-w-0 min-h-80 surface surface-hover p-6 flex flex-col" id=`${job.internalJobName}grid`>
+<div class="relative w-full min-w-0 surface surface-hover p-4 flex flex-col" id=`${job.internalJobName}grid`>
     {hasIncident && (
       <div class="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">Incident</div>
     )}
 
-    <div class="flex items-center justify-between gap-2 mb-4">
+    <div class="flex items-center justify-between gap-2 mb-3">
         <span class="flex items-center gap-1.5 min-w-0">
             <a href=`/${type}/${job.internalJobName}` class="text-lg font-semibold text-[var(--accent-regular)] hover:underline break-words leading-tight">{job.jobName.replaceAll("Job", "").trimEnd()}</a>
             {job.jobDescription && (
@@ -168,7 +135,7 @@ const sparkErrorEndpoint = type === "ai" ? `v2/jobs/${sparkEnc}/erroranalytics` 
         <span class={`shrink-0 w-2.5 h-2.5 rounded-full ${dot}`} title={health}></span>
     </div>
 
-    <div class="text-5xl font-bold text-center mb-1" id=`delayNumberOuter${job.internalJobName}`><span class="text-5xl font-bold text-center" id=`delayNumber${job.internalJobName}`>{delayTxt}</span> <span class="text-lg" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span>{type === "ai" && (<span class="inline-flex items-center justify-center w-4 h-4 ml-1 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] align-middle cursor-help" title="For 100 output tokens">?</span>)}</div>
+    <div class="text-3xl font-bold text-center mb-1" id=`delayNumberOuter${job.internalJobName}`><span class="text-3xl font-bold text-center" tabindex="0" data-raw={displayedMs == null ? undefined : rawDuration(displayedMs)} id=`delayNumber${job.internalJobName}`>{delayTxt}</span> <span class="text-lg" id=`delayUnit${job.internalJobName}`>{delayTxtUnit}</span>{type === "ai" && (<span class="inline-flex items-center justify-center w-4 h-4 ml-1 rounded-full border border-gray-400 text-gray-500 dark:text-gray-400 text-[10px] align-middle cursor-help" title="For 100 output tokens">?</span>)}</div>
 	<div class=`${pending.className} text-center mb-1 h-4` id=`pending${job.internalJobName}`>{pending.textContent}</div>
 	{noLastUpdate ? null : (<div class="text-gray text-xs text-center mb-3" id=`lastUpdate${job.internalJobName}`>Last Update: {lastUpdatedTxt}</div>)}
 
@@ -211,7 +178,6 @@ const sparkErrorEndpoint = type === "ai" ? `v2/jobs/${sparkEnc}/erroranalytics` 
       </div>
     )}
 </div>
-
 
 <style>
 	.card {

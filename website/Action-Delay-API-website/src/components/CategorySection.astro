@@ -15,7 +15,7 @@ interface Props {
   bodyClass?: string;
 }
 
-const { name, count, statusColor, open = false, bodyClass = "pt-5 pb-2" } = Astro.props;
+const { name, count, statusColor, open = false, bodyClass = "pt-3 pb-2" } = Astro.props;
 ---
 
 <details class="category-section" data-category open={open}>
@@ -51,6 +51,9 @@ const { name, count, statusColor, open = false, bodyClass = "pt-5 pb-2" } = Astr
 <style>
   .category-section {
     margin-block: 0;
+  }
+  .category-section[open] > summary {
+    margin-bottom: 0;
   }
   .category-section[open] > summary .chevron {
     transform: rotate(180deg);

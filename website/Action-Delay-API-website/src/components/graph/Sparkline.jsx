@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { completeBuckets, seriesFromResponse } from "./analytics";
 
 // A tiny, dependency-free inline-SVG sparkline for the job cards. Deliberately
 // NOT Plotly (one Plotly instance per card would be far too heavy). Mounted with
@@ -55,21 +56,7 @@ async function fetchSeries(endpoint, metric, days) {
     `&Metrics=${metric}`;
   const res = await fetch(url);
   const json = await res.json();
-  const points = json?.data?.points ?? [];
-  // Same value extraction as SmartGraph: the first non-timePeriod property is the value.
-  return points
-    .map((p) => {
-      const x = p.timePeriod ? new Date(p.timePeriod).getTime() : null;
-      let y = null;
-      for (const k in p) {
-        if (k !== "timePeriod") {
-          y = Number(p[k]);
-          break;
-        }
-      }
-      return { x, y };
-    })
-    .filter((p) => p.x != null && p.y != null && isFinite(p.y));
+  return seriesFromResponse(json?.data, metric, start, end);
 }
 
 // Error occurrences: sum `count` across error types per timePeriod -> [{x, total}].
@@ -83,9 +70,8 @@ async function fetchErrors(errorEndpoint, days) {
     `&Metrics=AvgRunLength`;
   const res = await fetch(url);
   const json = await res.json();
-  const points = json?.data?.points ?? [];
   const byTime = new Map();
-  for (const p of points) {
+  for (const p of completeBuckets(json?.data, start, end)) {
     if (!p.timePeriod) continue;
     const x = new Date(p.timePeriod).getTime();
     byTime.set(x, (byTime.get(x) || 0) + (Number(p.count) || 0));

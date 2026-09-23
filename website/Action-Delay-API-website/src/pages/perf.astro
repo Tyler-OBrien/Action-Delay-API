@@ -1,53 +1,131 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Hero from "../components/Hero.astro";
+import CompareExplorer from "../components/graph/CompareExplorer";
+import { FAMILIES, LIMITS, REGION_NAMES, REGION_ORDER } from "../lib/compare/catalog";
+import { buildCuratedPresets, buildPresets, curatedMetrics, groupLocationsByRegion } from "../lib/compare/presets";
+import { CURATED, discoveryQuery, discoveryResult } from "../lib/compare/curated";
+import { graphqlEndpoint } from "../lib/compare/runtime";
+import type { Job } from "../../models/cloudflare/job";
+import type { LocationInfo } from "../../models/cloudflare/locationinfo";
 
-import PerfTable from '../components/PerfTable.astro';
-import Hero from '../components/Hero.astro';
-import type { QuickStats } from '../../models/cloudflare/quickstat';
-import type { Job } from '../../models/cloudflare/job';
-import { groupJobs } from '../data/jobCategories';
+const API_BASE = "https://delay.cloudflare.chaika.me";
 
-const getJobs = async () => {
-	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/Perf")).json()).data
+// The job and location catalogs come from the REST API, which is the site's
+// existing source for them. The GraphQL endpoint serves time series and has no
+// discovery query, so this is not a redundant call.
+async function jobs(type: string): Promise<Job[]> {
+	try {
+		const resp = await fetch(`${API_BASE}/v2/jobs/type/${type}`);
+		if (!resp.ok) return [];
+		const json = await resp.json();
+		return json.data ?? [];
+	} catch {
+		return [];
+	}
 }
-var getJobsTask = getJobs()
 
-const getAnalytics = async () => {
-	return (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/Perf")).json());
+const [cloudflareJobs, googleJobs, perfJobs, aiJobs, locResp] = await Promise.all([
+	jobs("CloudflareDelay"),
+	jobs("GoogleDelay"),
+	jobs("Perf"),
+	jobs("ai"),
+	fetch(`${API_BASE}/v2/locations`).catch(() => null),
+]);
+
+const delayJobs = [...new Map([...cloudflareJobs, ...googleJobs].map(job => [job.internalJobName, job])).values()];
+
+let locations: LocationInfo[] = [];
+if (locResp?.ok) {
+	const json = await locResp.json();
+	locations = json.data ?? [];
 }
-var getAnalyticsTask = getAnalytics()
 
-const jobs: Job[] = await getJobsTask;
-const stats: QuickStats[] = await getAnalyticsTask;
+const locationsByRegion = groupLocationsByRegion(locations);
 
-const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+// Curated sets name their sources literally, so check them against what the
+// data actually has before offering them. One bucket over the whole window
+// returns one row per distinct source, which is the cheapest discovery the
+// endpoint allows — it has no introspection for dimension *values*.
+let availableByFamily = new Map<string, Set<string>>();
+try {
+	const q = discoveryQuery(CURATED);
+	if (q) {
+		// Called straight from the Worker. A relative fetch would not resolve
+		// during SSR, and there is no reason to bounce through /api/compare when
+		// this page is already running server-side.
+		const resp = await fetch(graphqlEndpoint(), {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ query: q }),
+		});
+		if (resp.ok) {
+			const body = await resp.json();
+			availableByFamily = discoveryResult(body.data ?? {}, CURATED);
+		}
+	}
+} catch {
+	// Discovery is an improvement, not a precondition: fall through with an
+	// empty map and offer every curated set unfiltered.
+}
 
-const activeJobs = jobs.filter(job => new Date(job.predictedRunTime) >= oneWeekAgo);
-const groups = groupJobs(activeJobs, 'perf');
+const presets = [
+	...buildPresets({ delayJobs, perfJobs, aiJobs, locationsByRegion }),
+	...buildCuratedPresets(availableByFamily),
+];
+const curated = curatedMetrics();
+
+// Regions in the site's usual order, carrying the location list each one covers.
+// The list travels to the client because a region series *is* that list — the
+// query filters on it, and the merge into a single regional number happens in
+// ClickHouse rather than in the browser.
+const regions = REGION_ORDER.filter((code) => (locationsByRegion.get(code)?.length ?? 0) > 0).map(
+	(code) => ({
+		code,
+		name: REGION_NAMES[code] ?? code,
+		locations: locationsByRegion.get(code)!,
+	})
+);
+
+const jobsByType = {
+	delay: delayJobs.map((j) => j.internalJobName),
+	perf: perfJobs.map((j) => j.internalJobName),
+	ai: aiJobs.map((j) => j.internalJobName),
+};
+
+// Only the parts of the catalog the picker renders; the validation copy stays
+// server-side.
+const families = FAMILIES.map((f) => ({
+	id: f.id,
+	label: f.label,
+	metrics: f.metrics.map((m) => ({ id: m.id, label: m.label, fields: m.fields })),
+	dimensions: f.dimensions.map((d) => ({ id: d.id, label: d.label })),
+}));
 ---
 
 <BaseLayout
-	title="Cloudflare Performance Monitoring"
-	description="See Performance Monitoring Jobs, Cloudflare and non-Cloudflare."
+	title="Performance"
+	description="Compare propagation delay, performance and AI jobs side by side"
 >
 	<div class="stack gap-20">
-		<main class="wrapper stack gap-8">
+		<main id="main-content" tabindex="-1" class="wrapper stack gap-8">
 			<Hero
-				title="Performance Jobs"
-				tagline="Compare the performance of Cloudflare and non-Cloudflare services, measured from 50+ locations worldwide. Jobs are grouped by workload — Compute, Object Storage, Key-Value and SQL — so you can line providers up side by side. Each service shows its median; expand it to see per-region and per-size variants. Sort any column, or click a job for its description and a per-location latency map."
+				title="Performance"
+				tagline="Explore performance experiments across providers, workloads, and probe locations."
 				align="start"
 			>
+				<a href="/delay">Delay Jobs</a>
 			</Hero>
-			<input
-				id="job-filter"
-				type="text"
-				placeholder="Filter jobs..."
-				class="w-full max-w-sm px-4 py-2 border border-gray-300 rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+
+			<CompareExplorer
+				presets={presets}
+				families={families}
+				jobsByType={jobsByType}
+				regions={regions}
+				curated={curated}
+				limits={{ maxRootFields: LIMITS.maxRootFields }}
+				client:only="preact"
 			/>
-			<div class="stack gap-4">
-				<PerfTable groups={groups} stats={stats} />
-			</div>
-			<script src="../scripts/perf-table.js"></script>
 		</main>
 	</div>
 </BaseLayout>

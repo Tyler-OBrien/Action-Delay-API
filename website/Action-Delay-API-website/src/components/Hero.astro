@@ -5,7 +5,7 @@ interface Props {
 	align?: 'start' | 'center';
 }
 
-const { align = 'center', tagline, title } = Astro.props;
+const { align = 'start', tagline, title } = Astro.props;
 ---
 
 <div class:list={['hero stack gap-4', align]}>
@@ -19,22 +19,23 @@ const { align = 'center', tagline, title } = Astro.props;
 <style>
 	.hero {
 		font-size: var(--text-lg);
-		text-align: center;
+		text-align: start;
 	}
 
 	.title,
 	.tagline {
-		margin-inline: auto;
+		margin-inline: 0;
 	}
 
+	.tagline, .hero :global(p) { max-width: 72ch; }
 	.title {
-		font-size: var(--text-3xl);
+		font-size: 1.75rem;
 		color: var(--gray-0);
 	}
 
 	@media (min-width: 50em) {
 		.hero {
-			font-size: var(--text-xl);
+			font-size: var(--text-lg);
 		}
 
 		.start {
@@ -47,7 +48,7 @@ const { align = 'center', tagline, title } = Astro.props;
 		}
 
 		.title {
-			font-size: var(--text-5xl);
+			font-size: 2.25rem;
 		}
 	}
 </style>

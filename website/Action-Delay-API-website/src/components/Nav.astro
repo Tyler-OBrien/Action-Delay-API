@@ -7,12 +7,18 @@ import type { iconPaths } from './IconPaths';
 const textLinks: { label: string; href: string }[] = [
 	{ label: 'Status', href: '/' },
 	{ label: 'Cloudflare Delay', href: '/delay/' },
-	{ label: 'AI Monitoring', href: '/ai/' },
-	{ label: 'Performance Monitoring', href: '/perf/' },
+	{ label: 'AI Models', href: '/ai/' },
+	{ label: 'Performance', href: '/perf/' },
 		{ label: 'Routing', href: '/routing/' },
 	{ label: 'Locations', href: '/locations/' },
 	{ label: 'About', href: '/about/' },
 ];
+
+const currentPath = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isActive = (href: string) => {
+    const path = href.replace(/\/$/, '') || '/';
+    return currentPath === path || (path !== '/' && currentPath.startsWith(path + '/')) || (path === '/delay' && currentPath.startsWith('/job/'));
+};
 
 const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[] = [
 	{ label: 'GitHub', href: 'https://github.com/Tyler-OBrien/Action-Delay-API', icon: 'github-logo' },
@@ -20,15 +26,15 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 ];
 ---
 
-<nav>
+<nav aria-label="Main navigation">
 	<div class="menu-header">
 		<a href="/" class="site-title">
-			<img src="/favicon-animated.svg" style="width: 4.0em" />
+			<img src="/favicon-animated.svg" style="width: 2.25em" alt="" />
 			Action-Delay-API
 		</a>
 		<menu-button>
 			<template>
-				<button class="menu-button" aria-expanded="false">
+				<button class="menu-button" aria-expanded="false" aria-controls="menu-content">
 					<span class="sr-only">Menu</span>
 					<Icon icon="list" />
 				</button>
@@ -41,13 +47,12 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 				textLinks.map(({ label, href }) => (
 					<li>
 						<a
-							aria-current={Astro.url.pathname === href}
+							aria-current={isActive(href) ? 'page' : undefined}
 							class:list={[
 								'link',
 								{
 									active:
-										Astro.url.pathname === href ||
-										(href !== '/' && Astro.url.pathname.startsWith(href)),
+										isActive(href),
 								},
 							]}
 							href={href}
@@ -79,13 +84,12 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 				textLinks.map(({ label, href }) => (
 					<li>
 						<a
-							aria-current={Astro.url.pathname === href}
+							aria-current={isActive(href) ? 'page' : undefined}
 							class:list={[
 								'link',
 								{
 									active:
-										Astro.url.pathname === href ||
-										(href !== '/' && Astro.url.pathname.startsWith(href)),
+										isActive(href),
 								},
 							]}
 							href={href}
@@ -138,13 +142,19 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 
 			// Toggle menu visibility when the menu button is clicked.
 			btn.addEventListener('click', () => setExpanded(menu.hidden));
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !btn.hidden && !menu.hidden) {
+                    setExpanded(false);
+                    btn.focus();
+                }
+            });
 
 			// Hide menu button for large screens.
 			const handleViewports = (e: MediaQueryList | MediaQueryListEvent) => {
 				setExpanded(e.matches);
 				btn.hidden = e.matches;
 			};
-			const mediaQueries = window.matchMedia('(min-width: 50em)');
+			const mediaQueries = window.matchMedia('(min-width: 75em)');
 			handleViewports(mediaQueries);
 			mediaQueries.addEventListener('change', handleViewports);
 		}
@@ -156,16 +166,19 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 	nav {
 		z-index: 9999;
 		position: relative;
+		width: 100%;
+		max-width: 83rem;
+		margin-inline: auto;
 		font-family: var(--font-brand);
 		font-weight: 500;
-		margin-bottom: 3.5rem;
+		margin-bottom: 1.5rem;
 	}
 
 	.menu-header {
 		display: flex;
 		justify-content: space-between;
 		gap: 0.5rem;
-		padding: 1.5rem;
+		padding: 1rem 1.5rem;
 	}
 
 	.site-title {
@@ -276,17 +289,18 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 		height: calc(var(--icon-size) + 2 * var(--icon-padding));
 	}
 
-	@media (min-width: 50em) {
+	@media (min-width: 75em) {
 		nav {
 			display: grid;
-			grid-template-columns: 1fr auto 1fr;
+			grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
 			align-items: center;
-			padding: 2.5rem 5rem;
+			padding: 1rem 1.5rem;
 			gap: 1rem;
 		}
 
 		.menu-header {
 			padding: 0;
+			justify-self: start;
 		}
 
 		.site-title {
@@ -299,11 +313,14 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 
 		.nav-items {
 			position: relative;
+			width: max-content;
+			justify-self: center;
 			flex-direction: row;
+			gap: 0.125rem;
 			font-size: var(--text-sm);
 			border-radius: 999rem;
 			border: 0;
-			padding: 0.5rem 0.5625rem;
+			padding: 0.375rem;
 			background: radial-gradient(var(--gray-900), var(--gray-800) 150%);
 			box-shadow: var(--shadow-md);
 		}
@@ -318,7 +335,7 @@ const iconLinks: { label: string; href: string; icon: keyof typeof iconPaths }[]
 		}
 
 		.link {
-			padding: 0.5rem 1rem;
+			padding: 0.5rem 0.75rem;
 			border-radius: 999rem;
 			transition:
 				color var(--theme-transition),
