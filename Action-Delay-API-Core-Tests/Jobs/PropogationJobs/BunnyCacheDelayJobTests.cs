@@ -92,7 +92,8 @@ public class BunnyCacheDelayJobTests : IDisposable
             });
 
         var job = new BunnyCacheDelayJob(_brokerMock.Object, _configMock.Object, _loggerMock.Object,
-            _queueMock.Object, _clickhouseMock.Object, _context, StaticLocationProvider.From(_configMock.Object));
+            _queueMock.Object, _clickhouseMock.Object, _context, StaticLocationProvider.From(_configMock.Object),
+            LocalContextFactory());
 
         // Act
         await job.BaseRun();
@@ -111,6 +112,126 @@ public class BunnyCacheDelayJobTests : IDisposable
         Assert.NotNull(jobData);
         Assert.Equal(Status.STATUS_DEPLOYED, jobData!.CurrentRunStatus);
     }
+
+    // Bunny sends no standard Age header - freshness arrives as an absolute CDN-CacheDat timestamp,
+    // so the warm loop derives the age itself. These pin that derivation down.
+
+    [Fact]
+    public void TryGetCacheAgeSeconds_CdnCacheDat_ReturnsAgeAgainstResponseTime()
+    {
+        var responseUtc = new DateTime(2026, 7, 28, 1, 9, 50, DateTimeKind.Utc);
+        var response = ResponseWithHeaders(responseUtc, new Dictionary<string, string>
+        {
+            ["cdn-cache"] = "HIT",
+            ["cdn-cachedat"] = "07/28/2026 01:09:24",
+        });
+
+        Assert.True(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out var ageSeconds));
+        Assert.Equal(26, ageSeconds, 3);
+    }
+
+    [Fact]
+    public void TryGetCacheAgeSeconds_FreshlyCachedObject_IsBelowWarmThreshold()
+    {
+        var responseUtc = DateTime.UtcNow;
+        var response = ResponseWithHeaders(responseUtc, new Dictionary<string, string>
+        {
+            ["cdn-cache"] = "HIT",
+            ["cdn-cachedat"] = responseUtc.AddSeconds(-2).ToString("MM/dd/yyyy HH:mm:ss"),
+        });
+
+        Assert.True(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out var ageSeconds));
+        Assert.InRange(ageSeconds, 1, 3);
+    }
+
+    // Any Age on a Bunny response came from the origin and is replayed frozen, so it says nothing
+    // about how long this edge held the object. CDN-CacheDat is the only source consulted.
+    [Fact]
+    public void TryGetCacheAgeSeconds_IgnoresOriginSuppliedAge()
+    {
+        var responseUtc = new DateTime(2026, 7, 28, 1, 9, 50, DateTimeKind.Utc);
+        var response = ResponseWithHeaders(responseUtc, new Dictionary<string, string>
+        {
+            ["age"] = "60",
+            ["cdn-cachedat"] = "07/28/2026 01:09:48",
+        });
+
+        Assert.True(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out var ageSeconds));
+        Assert.Equal(2, ageSeconds, 3);
+    }
+
+    [Fact]
+    public void TryGetCacheAgeSeconds_AgeWithoutCacheDat_ReturnsFalse()
+    {
+        var response = ResponseWithHeaders(DateTime.UtcNow, new Dictionary<string, string>
+        {
+            ["cdn-cache"] = "HIT",
+            ["age"] = "30",
+        });
+
+        Assert.False(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out _));
+    }
+
+    [Fact]
+    public void TryGetCacheAgeSeconds_ClockSkewedFutureTimestamp_ClampsToZero()
+    {
+        var responseUtc = new DateTime(2026, 7, 28, 1, 9, 50, DateTimeKind.Utc);
+        var response = ResponseWithHeaders(responseUtc, new Dictionary<string, string>
+        {
+            ["cdn-cache"] = "HIT",
+            ["cdn-cachedat"] = "07/28/2026 01:10:20",
+        });
+
+        Assert.True(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out var ageSeconds));
+        Assert.Equal(0, ageSeconds);
+    }
+
+    [Theory]
+    [InlineData("not-a-date")]
+    [InlineData("")]
+    public void TryGetCacheAgeSeconds_UnparseableCacheDat_ReturnsFalse(string cachedAt)
+    {
+        var response = ResponseWithHeaders(DateTime.UtcNow, new Dictionary<string, string>
+        {
+            ["cdn-cache"] = "HIT",
+            ["cdn-cachedat"] = cachedAt,
+        });
+
+        Assert.False(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out _));
+    }
+
+    [Fact]
+    public void TryGetCacheAgeSeconds_NoCacheHeaders_ReturnsFalse()
+    {
+        var response = ResponseWithHeaders(DateTime.UtcNow, new Dictionary<string, string>());
+
+        Assert.False(BunnyCacheDelayJob.TryGetCacheAgeSeconds(response, out _));
+    }
+
+    // The test config leaves PostgresConnectionStringLocal blank, so the job never asks this for a
+    // context; it only has to satisfy the constructor.
+    private static IDbContextFactory<LocalActionDelayDatabaseContext> LocalContextFactory() =>
+        new InMemoryLocalContextFactory();
+
+    private sealed class InMemoryLocalContextFactory : IDbContextFactory<LocalActionDelayDatabaseContext>
+    {
+        public LocalActionDelayDatabaseContext CreateDbContext() =>
+            new LocalActionDelayDatabaseContext(
+                new DbContextOptionsBuilder<LocalActionDelayDatabaseContext>()
+                    .UseInMemoryDatabase($"BunnyCacheLocalDb_{Guid.NewGuid()}")
+                    .Options);
+    }
+
+    private static SerializableHttpResponse ResponseWithHeaders(DateTime responseUtc, Dictionary<string, string> headers) =>
+        new SerializableHttpResponse
+        {
+            WasSuccess = true,
+            StatusCode = HttpStatusCode.OK,
+            Headers = headers,
+            Body = "",
+            ResponseUTC = responseUtc,
+            ResponseTimeMs = 10,
+        };
 
     public void Dispose()
     {

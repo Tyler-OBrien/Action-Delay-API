@@ -57,72 +57,106 @@ namespace Action_Delay_API_Core.Jobs
             await SendRequest(location, CancellationToken.None);
         }
 
-        public override async Task RunAction()
+        private const int WarmRetries = 5;
+
+        /// <summary>How settled the cached copy has to be before we consider a location warmed.</summary>
+        private static readonly TimeSpan WarmMinCacheAge = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// Waited out between attempts when the edge holds the object but it is younger than
+        /// <see cref="WarmMinCacheAge"/> - back-to-back requests could never age it past the bar.
+        /// </summary>
+        private static readonly TimeSpan WarmRetryDelay = TimeSpan.FromSeconds(3);
+
+        private static readonly TimeSpan WarmTimeout = TimeSpan.FromSeconds(45);
+
+        /// <summary>
+        /// Fetches the endpoint from <paramref name="location"/> until the edge reports a settled
+        /// cached copy, so that the purge which follows has something to purge. Never throws: a
+        /// location we cannot warm is logged and left behind rather than holding up the purge.
+        /// </summary>
+        private async Task WarmLocation(Location location, CancellationToken token)
         {
-            foreach (var location in RunLocations)
+            try
             {
-                int retries = 5;
-                try
+                for (int i = 0; i < WarmRetries; i++)
                 {
-                    for (int i = 0; i < retries; i++)
+                    token.ThrowIfCancellationRequested();
+
+                    var tryGetResult = await SendRequest(location, token);
+                    if (tryGetResult.IsFailed)
                     {
-                        var tryGetResult = await SendRequest(location, CancellationToken.None);
-                        if (tryGetResult.IsFailed)
+                        _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, retrying..");
+                        continue;
+                    }
+
+                    string tryGetCacheStatus = "";
+
+                    var result = tryGetResult.Value;
+
+                    var tryGetCacheStatusHeader = result.Headers.FirstOrDefault(header => header.Key.Equals(
+                        String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
+                            ? "Proxy-CF-Cache-Status"
+                            : "CF-Cache-Status", StringComparison.OrdinalIgnoreCase));
+
+                    if (String.IsNullOrWhiteSpace(tryGetCacheStatusHeader.Key) == false)
+                    {
+                        tryGetCacheStatus = tryGetCacheStatusHeader.Value;
+                    }
+
+                    var tryGetCacheAgeHeader = result.Headers.FirstOrDefault(header => header.Key.Equals(
+                        String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
+                            ? "Proxy-Age"
+                            : "Age", StringComparison.OrdinalIgnoreCase));
+
+                    if (String.IsNullOrWhiteSpace(tryGetCacheAgeHeader.Key) == false)
+                    {
+                        var cacheAge = tryGetCacheAgeHeader.Value;
+                        if (String.IsNullOrEmpty(cacheAge) || int.TryParse(cacheAge, out var cacheAgeInt) == false || cacheAgeInt < WarmMinCacheAge.TotalSeconds)
                         {
-                            _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, retrying..");
+                            if (RateLimitedEventLogger.ShouldLog())
+                                _logger.LogInformation($"Error, cache is too new or missing, cache value {cacheAge}, Cache Status: {tryGetCacheStatus}, location: {location.Name}");
+                            // Retrying immediately could never age the copy past the bar.
+                            await Task.Delay(WarmRetryDelay, token);
                             continue;
-                        }
-
-                        string tryGetCacheStatus = "";
-
-
-
-                        var result = tryGetResult.Value;
-
-                        var tryGetCacheStatusHeader = result.Headers.FirstOrDefault(header => header.Key.Equals(
-                            String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
-                                ? "Proxy-CF-Cache-Status"
-                                : "CF-Cache-Status", StringComparison.OrdinalIgnoreCase));
-
-                        if (String.IsNullOrWhiteSpace(tryGetCacheStatusHeader.Key) == false)
-                        {
-                            tryGetCacheStatus = tryGetCacheStatusHeader.Value;
-                        }
-
-                        var tryGetCacheAgeHeader = result.Headers.FirstOrDefault(header => header.Key.Equals(
-                            String.IsNullOrEmpty(_config.CacheJob.ProxyURL) == false
-                                ? "Proxy-Age"
-                                : "Age", StringComparison.OrdinalIgnoreCase));
-
-                        if (String.IsNullOrWhiteSpace(tryGetCacheAgeHeader.Key) == false)
-                        {
-                            var cacheAge = tryGetCacheAgeHeader.Value;
-                            if (String.IsNullOrEmpty(cacheAge) || int.TryParse(cacheAge, out var cacheAgeInt) == false || cacheAgeInt < 10)
-                            {
-                                if (RateLimitedEventLogger.ShouldLog())
-                                    _logger.LogInformation($"Error, cache is too new or missing, cache value {cacheAge}, Cache Status: {tryGetCacheStatus}, location: {location.Name}");
-                                continue;
-                            }
-                            else
-                            {
-                                if (RateLimitedEventLogger.ShouldLog())
-                                    _logger.LogInformation($"{location.Name} pre-warmed, cache age: {cacheAge}, Cache Status: {tryGetCacheStatus}");
-                                break;
-                            }
                         }
                         else
                         {
                             if (RateLimitedEventLogger.ShouldLog())
-                                _logger.LogInformation($"Error, cache is missing, Cache Status: {tryGetCacheStatus}, location: {location.Name}, http status: {result.StatusCode}");
-                            continue;
+                                _logger.LogInformation($"{location.Name} pre-warmed, cache age: {cacheAge}, Cache Status: {tryGetCacheStatus}");
+                            return;
                         }
                     }
+                    else
+                    {
+                        if (RateLimitedEventLogger.ShouldLog())
+                            _logger.LogInformation($"Error, cache is missing, Cache Status: {tryGetCacheStatus}, location: {location.Name}, http status: {result.StatusCode}, headers: {DescribeHeaders(result)}");
+                        continue;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation($"Gave up warming location {location.Name} after {WarmTimeout.TotalSeconds} seconds, purging anyway");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, $"Failure warming location {location.Name}");
+            }
+        }
 
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogCritical(ex, $"Failure warming location {location.Name}");
-                }
+        private static string DescribeHeaders(SerializableHttpResponse response) =>
+            response.Headers == null || response.Headers.Count == 0
+                ? "none"
+                : String.Join(" | ", response.Headers.Select(header => $"{header.Key}: {header.Value}"));
+
+        public override async Task RunAction()
+        {
+            // Bounded: an unreachable location can burn a full timeout plus a retry delay on every
+            // attempt, and the purge has to fire whether or not every edge came up warm.
+            using (var warmCancellation = new CancellationTokenSource(WarmTimeout))
+            {
+                await Task.WhenAll(RunLocations.Select(location => WarmLocation(location, warmCancellation.Token)));
             }
 
             try
@@ -223,7 +257,7 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, aborting location..");
-                return new RunLocationResult("Queue Error", null, -1);
+                return RunLocationResult.TransportFailure(tryGetResult.Errors, null, -1);
             }
             var getResponse = tryGetResult.Value;
 
@@ -242,10 +276,10 @@ namespace Action_Delay_API_Core.Jobs
             {
                 if (RateLimitedEventLogger.ShouldLog())
                     _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} sees {getResponse.Body} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of 200 / OK!");
-                if (getResponse is { WasSuccess: false, ProxyFailure: true})
+                if (getResponse is { WasSuccess: false } && getResponse.IsProbeAbort())
                 {
                     _logger.LogInformation($"{location.Name}:{getResponse.GetColoId()} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {String.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
-                    return new RunLocationResult("Proxy Error", null, getResponse.GetColoId());
+                    return RunLocationResult.FromProbe(getResponse, null, getResponse.GetColoId());
                 }
                 return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs, getResponse.GetColoId());
             }
