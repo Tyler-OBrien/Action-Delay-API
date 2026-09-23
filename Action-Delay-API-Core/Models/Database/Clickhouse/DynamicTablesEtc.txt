@@ -14,12 +14,20 @@ CREATE TABLE yabs_results
     `iorw` UInt32,
     `geekbenchsingle` UInt32,
     `geekbenchmulti` UInt32,
+    `geekbench7single` UInt32 DEFAULT 0,
+    `geekbench7multi` UInt32 DEFAULT 0,
     `startdelay` UInt32,
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(timestamp)
 PRIMARY KEY (timestamp, source)
 ORDER BY (timestamp, source);
+
+-- geekbenchsingle/geekbenchmulti are Geekbench 6; geekbench7* were added alongside them
+-- for the GB6 -> GB7 overlap. Migration for already-created tables:
+ALTER TABLE yabs_results
+    ADD COLUMN IF NOT EXISTS `geekbench7single` UInt32 DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS `geekbench7multi` UInt32 DEFAULT 0;
 
 
 
