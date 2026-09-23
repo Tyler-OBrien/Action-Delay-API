@@ -229,6 +229,9 @@ public class Program
 
         app.MapControllers();
 
+        // Liveness probe for Blue/Green cutover (bluegreen.sh curls this on the dark slot).
+        app.MapGet("/health", () => Results.Ok("healthy")).AllowAnonymous();
+
         app.MapHub<JobSignalRHub>("/v2/jobs/signalr", options =>
         {
             options.Transports = HttpTransportType.WebSockets;
