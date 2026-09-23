@@ -416,6 +416,7 @@ namespace Action_Delay_API_Worker
                         QueryType = "Unknown",
                         QueryName = "Unknown",
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Info = "Failed due to Null Request"
                     }, cancellationToken: stoppingToken);
@@ -454,6 +455,7 @@ namespace Action_Delay_API_Worker
                         QueryType = "Unknown",
                         QueryName = "Unknown",
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Info = "Failed due to Null/unparsable Request"
                     }, cancellationToken: stoppingToken);
@@ -473,6 +475,7 @@ namespace Action_Delay_API_Worker
                     QueryType = "Unknown",
                     QueryName = "Unknown",
                     ProxyFailure = true,
+                    FailureKind = ProbeFailureKind.Internal,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
@@ -496,6 +499,7 @@ namespace Action_Delay_API_Worker
                         Body = string.Empty,
                         WasSuccess = false,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         Headers = new Dictionary<string, string>(),
                         StatusCode = HttpStatusCode.BadGateway,
                         Info = "Failed due to Null Request/unparsable"
@@ -536,6 +540,7 @@ namespace Action_Delay_API_Worker
                         Headers = new Dictionary<string, string>(),
                         StatusCode = HttpStatusCode.BadGateway,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         Info = "Failed due to Null Request/unparsable"
                     }, cancellationToken: stoppingToken);
                     return;
@@ -555,6 +560,7 @@ namespace Action_Delay_API_Worker
                     Info = "An Error occured",
                     StatusCode = HttpStatusCode.BadGateway,
                     ProxyFailure = true,
+                    FailureKind = ProbeFailureKind.Internal,
                     WasSuccess = false
                 }, cancellationToken: stoppingToken);
             }
@@ -572,6 +578,7 @@ namespace Action_Delay_API_Worker
                     await ReplyAsync(pingRequest, new SerializablePingResponse()
                     {
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         Info = "Failed due to Null Request"
                     }, cancellationToken: stoppingToken);
                     return;
@@ -606,6 +613,7 @@ namespace Action_Delay_API_Worker
                     await ReplyAsync(pingRequest, new SerializablePingResponse()
                     {
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         Info = "Failed due to Null/unparsable Request"
                     }, cancellationToken: stoppingToken);
                     return;
@@ -621,6 +629,7 @@ namespace Action_Delay_API_Worker
                 await ReplyAsync(pingRequest, new SerializablePingResponse()
                 {
                     ProxyFailure = true,
+                    FailureKind = ProbeFailureKind.Internal,
                     Info = "An error occured"
                 }, cancellationToken: stoppingToken);
             }

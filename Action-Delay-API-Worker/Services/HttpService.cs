@@ -192,7 +192,9 @@ namespace Action_Delay_API_Worker.Services;
                                     incomingRequest.CustomDNSServerOverride);
                             using var listener = new HttpEventListener();
                             var response = await newClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                            var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token);
+                            bool needsBufferedBody = wantsBody || wantsBodyHash ||
+                                (wantsBodyOnError && !response.IsSuccessStatusCode);
+                            var responseContent = await ReadResponseWithLimit(response, newCancellationToken.Token, needsBufferedBody);
                             var responseContentHeaders = response.Content?.Headers;
 
                             long dnsResolveLatency = -1;
@@ -214,21 +216,27 @@ namespace Action_Delay_API_Worker.Services;
                             bool deCompressedResponse = false;
                             if (couldGetBody)
                             {
-                                if (incomingRequest.DisableAutomaticResponseDecompression.HasValue == false || incomingRequest.DisableAutomaticResponseDecompression == false)
+                                if (responseContent.memStream != null)
                                 {
-
-                                    var tryDecomp =
-                                        ResolveStreamContentAutomaticCompression(responseContent.memStream, response);
-                                    response.Content = tryDecomp.content;
-                                    borrowedCompToReturn = tryDecomp.borrowDecompressor;
-                                    if (String.IsNullOrWhiteSpace(tryDecomp.compressionResolved) == false)
-                                        deCompressedResponse = true;
+                                    if (incomingRequest.DisableAutomaticResponseDecompression.HasValue == false || incomingRequest.DisableAutomaticResponseDecompression == false)
+                                    {
+                                        var tryDecomp =
+                                            ResolveStreamContentAutomaticCompression(responseContent.memStream, response);
+                                        response.Content = tryDecomp.content;
+                                        borrowedCompToReturn = tryDecomp.borrowDecompressor;
+                                        if (String.IsNullOrWhiteSpace(tryDecomp.compressionResolved) == false)
+                                            deCompressedResponse = true;
+                                    }
+                                    else
+                                    {
+                                        response.Content = new StreamContent(responseContent.memStream);
+                                    }
                                 }
                                 else
                                 {
-                                    response.Content = new StreamContent(responseContent.memStream);
+                                    // Body was drained to Stream.Null — caller didn't need it
+                                    response.Content = null;
                                 }
-
                             }
                             else
                                 response.Content = null;
@@ -295,6 +303,7 @@ namespace Action_Delay_API_Worker.Services;
                         WasSuccess = false,
                         StatusCode = HttpStatusCode.BadGateway,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.BodyTooLarge,
                         Headers = ResolveHeaders(response.Headers, response.Content?.Headers, false, incomingRequest),
                         Body = string.Empty,
                         Info = $"The Response Body was too large",
@@ -350,6 +359,9 @@ namespace Action_Delay_API_Worker.Services;
                     WasSuccess = false,
                     StatusCode = ex.StatusCode ?? HttpStatusCode.BadGateway,
                     ProxyFailure = ex.StatusCode == null,
+                    // A real status code is an answer from the target, so there is no probe failure to
+                    // report. Only classify when we never got one.
+                    FailureKind = ex.StatusCode == null ? ClassifyRequestError(ex.HttpRequestError) : null,
                     Headers = new Dictionary<string, string>(),
                     Body = string.Empty,
                     Info = $"Http Request Error: {ex.HttpRequestError}, {ex.Message}"
@@ -365,8 +377,13 @@ namespace Action_Delay_API_Worker.Services;
                 return new SerializableHttpResponse
                 {
                     WasSuccess = false,
-                    StatusCode = HttpStatusCode.BadGateway,
-                    ProxyFailure = true,
+                    // 504 rather than the 502 this used to fabricate: the target did not answer in
+                    // time, which is a measurement of the target. ProxyFailure stays false for the
+                    // same reason - flagging it lost the timeout entirely, because the Perf jobs
+                    // only record an error when ProxyFailure is false.
+                    StatusCode = HttpStatusCode.GatewayTimeout,
+                    ProxyFailure = false,
+                    FailureKind = ProbeFailureKind.Timeout,
                     Headers = new Dictionary<string, string>(),
                     Body = string.Empty,
                     Info = $"Timeout of {incomingRequest.TimeoutMs} :("
@@ -383,6 +400,7 @@ namespace Action_Delay_API_Worker.Services;
                     WasSuccess = false,
                     StatusCode = HttpStatusCode.BadGateway,
                     ProxyFailure = true,
+                    FailureKind = ProbeFailureKind.Internal,
                     Headers = new Dictionary<string, string>(),
                     Body = string.Empty,
                     Info = "Unhandled Exception :("
@@ -455,6 +473,29 @@ namespace Action_Delay_API_Worker.Services;
             newRandom.NextBytes(randomBytes);
             return randomBytes;
         }
+        /// <summary>
+        /// Maps an <see cref="HttpRequestError"/> onto a <see cref="ProbeFailureKind"/>, for the case
+        /// where the request died before the target gave us a status code.
+        /// </summary>
+        /// <remarks>
+        /// Every branch here still reports a probe failure - Core attributes none of these to the
+        /// target. The distinction is kept anyway because it is the difference between "this location
+        /// cannot resolve DNS" and "this location cannot open sockets", which is what an operator
+        /// actually needs, and because it lets a kind be promoted to upstream evidence later without
+        /// having to re-instrument the fleet.
+        /// </remarks>
+        public static string ClassifyRequestError(HttpRequestError error) => error switch
+        {
+            HttpRequestError.NameResolutionError => ProbeFailureKind.Dns,
+            HttpRequestError.ConnectionError or HttpRequestError.ProxyTunnelError => ProbeFailureKind.Connect,
+            HttpRequestError.SecureConnectionError or HttpRequestError.UserAuthenticationError => ProbeFailureKind.Tls,
+            HttpRequestError.HttpProtocolError or HttpRequestError.InvalidResponse
+                or HttpRequestError.ResponseEnded or HttpRequestError.VersionNegotiationError
+                or HttpRequestError.ExtendedConnectNotSupported => ProbeFailureKind.Protocol,
+            // ConfigurationLimitExceeded and Unknown are ours until proven otherwise.
+            _ => ProbeFailureKind.Internal,
+        };
+
     public Dictionary<string, string> ResolveHeaders(HttpResponseHeaders responseHeaders, HttpContentHeaders? contentHeaders, bool isSuccessCode,
             SerializableHttpRequest req)
     {
@@ -501,9 +542,19 @@ namespace Action_Delay_API_Worker.Services;
         }
 
 
-    public async Task<(MemoryStream? memStream, bool couldRead, long latencyMs)> ReadResponseWithLimit(HttpResponseMessage msg, CancellationToken token)
+    public async Task<(MemoryStream? memStream, bool couldRead, long latencyMs)> ReadResponseWithLimit(HttpResponseMessage msg, CancellationToken token, bool bufferContent = true)
     {
         var stopWatch = Stopwatch.StartNew();
+
+        if (!bufferContent)
+        {
+            // Drain directly to Stream.Null — no memory allocation, no size cap, connection kept alive
+            using var stream = await msg.Content.ReadAsStreamAsync(token);
+            await stream.CopyToAsync(Stream.Null, token);
+            stopWatch.Stop();
+            return (null, true, stopWatch.ElapsedMilliseconds);
+        }
+
             var byteLimit = 10 * 1024 * 1024; // 10 MB
             var totalBytesRead = 0L;
             var memStream = new MemoryStream();

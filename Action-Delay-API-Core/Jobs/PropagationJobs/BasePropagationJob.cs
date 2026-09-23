@@ -7,6 +7,7 @@ using Action_Delay_API_Core.Models.Database.Postgres;
 using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Errors;
 using Exception = System.Exception;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Action_Delay_API_Core.Models.Jobs;
 
@@ -31,6 +32,32 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
 
         protected Dictionary<Location, bool> FinishedLocationStatus { get; set; } = new Dictionary<Location, bool>();
         protected Dictionary<Location, JobDataLocation> RunningLocationsData { get; set; } = new Dictionary<Location, JobDataLocation>();
+
+        /// <summary>
+        /// What this run concluded about each location, and the authoritative record of whether a
+        /// location reported at all.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This exists because <see cref="JobDataLocation.CurrentRunStatus"/> cannot answer either
+        /// question. It is never reset between runs - the run-start block only copies it into
+        /// LastRunStatus - so after a job's first run it is never null. The emission filter that
+        /// tested it for null was therefore dead code, and a location that failed to reach a terminal
+        /// state emitted the *previous* run's status and length stamped with this run's timestamp:
+        /// stale data indistinguishable from a fresh measurement.
+        /// </para>
+        /// <para>
+        /// Kept in memory rather than nulling the database column, because the website's live location
+        /// table reads that column and blanking it mid-run would make the table flicker empty.
+        /// </para>
+        /// <para>
+        /// Concurrent because <see cref="RecordOutcome"/> is called from the location tasks, which run
+        /// in parallel. The neighbouring <see cref="RunningLocationsData"/> gets away with a plain
+        /// dictionary only because those tasks mutate its <em>values</em> and never the dictionary
+        /// itself; this one takes key writes, so it needs the real thing.
+        /// </para>
+        /// </remarks>
+        protected ConcurrentDictionary<Location, RunOutcome> RunningLocationsOutcome { get; set; } = new ConcurrentDictionary<Location, RunOutcome>();
 
         protected BasePropagationJob(IOptions<LocalConfig> config, ILogger<BasePropagationJob> logger, IClickHouseService clickhouseService, ActionDelayDatabaseContext context, IQueue queue, ILocationProvider locationProvider) : base(config, logger, clickhouseService, context, queue, locationProvider)
         {
@@ -167,6 +194,9 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     }
 
                     RunningLocationsData[location] = tryFindLocation;
+                    // None until this run says otherwise. Anything still None at emission never
+                    // reported, and is recorded as no_result rather than inheriting the last run.
+                    RunningLocationsOutcome[location] = RunOutcome.None;
                     tryFindLocation.CurrentRunTime = DateTime.UtcNow;
                 }
                 SentrySdk.AddBreadcrumb($"Set/Got Location Data");
@@ -270,6 +300,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                                             $"{JobData.JobName} is considered done, it has {RunningLocations.Count} running locations: {string.Join(", ", RunningLocations.Select(loc => loc.Key.DisplayName ?? loc.Key.Name))}, setting all other locations to cancel in {CancelAfterIfHalfDone.TotalMinutes} Minutes");
                                         cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
                                         JobData.CurrentRunStatus = Status.STATUS_DEPLOYED;
+                                        JobRunOutcome = RunOutcome.Deployed;
                                         JobData.CurrentRunLengthMs =
                                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
                                         _ = PushJobUpdateEvent();
@@ -282,7 +313,10 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                                         cancellationTokenSource.CancelAfter(CancelAfterIfHalfDone);
                                         JobData.CurrentRunLengthMs =
                                             (ulong?)(endTime - ConfirmedUpdateUtc).TotalMilliseconds;
+                                        // Distinct from "our API call failed" and from "our
+                                        // probes broke", both of which also wrote STATUS_ERRORED.
                                         JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                                        JobRunOutcome = RunOutcome.InsufficientCoverage;
                                         _ = PushJobUpdateEvent();
                                         await TrySave(true);
                                     }
@@ -317,6 +351,26 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     _logger.LogError(ex, "Error handling Completion for job {name}", Name);
                 }
 
+                RefineJobOutcome();
+
+                // Must run *after* RefineJobOutcome, which deliberately ignores locations still
+                // holding None on the grounds that they said nothing either way. Stamping them first
+                // would feed no_result - which IsOurFailure counts - into that tally and let a run
+                // flip to probe_degraded on the strength of locations that never reported.
+                var neverReportedLocations = new HashSet<Location>();
+                foreach (var location in RunningLocationsData.Keys.ToList())
+                {
+                    if (RunningLocationsOutcome.TryGetValue(location, out var recorded) && recorded != RunOutcome.None)
+                        continue;
+                    neverReportedLocations.Add(location);
+                    // Recorded on the entity as well as in memory. The column is what the website's
+                    // live location table reads and it is never reset between runs, so leaving it
+                    // alone would keep showing the previous run's outcome for a location that has
+                    // since gone silent - the same staleness the emission filter below was fixed for.
+                    // Persisted by the TrySave at the end of this method, along with everything else.
+                    RecordOutcome(location, RunOutcome.NoResult, FailureReason.NoResult);
+                }
+
                 try
                 {
                     await _clickHouseService.InsertRun(
@@ -326,19 +380,40 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                             RunStatus = JobData.CurrentRunStatus!,
                             RunLength = JobData.CurrentRunLengthMs!.Value,
                             RunTime = JobData.CurrentRunTime.Value,
-                            ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
+                            ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0),
+                            Outcome = ResolveEmittedOutcome(CompletedRunFallback)
                         }, RunningLocationsData.ToList()
-                            .Where(locDataKv => locDataKv!.Value!.CurrentRunStatus != null).Select(
-                                locationDataKv => new ClickhouseJobLocationRun()
+                            // Every location that was attempted emits exactly one row, including the
+                            // ones that never reported. Filtering on CurrentRunStatus != null used to
+                            // stand in for "did this location report", but that field survives across
+                            // runs, so the filter passed everything and silent locations contributed
+                            // the previous run's numbers under this run's timestamp.
+                            .Select(locationDataKv =>
+                            {
+                                // Every location now carries an outcome: the pass above filled in
+                                // no_result for the ones that never reported.
+                                var neverReported = neverReportedLocations.Contains(locationDataKv.Key);
+                                var outcome = RunningLocationsOutcome.TryGetValue(locationDataKv.Key, out var recorded)
+                                    ? recorded
+                                    : RunOutcome.NoResult;
+
+                                return new ClickhouseJobLocationRun()
                                 {
                                     JobName = locationDataKv.Value.InternalJobName,
-                                    RunStatus = locationDataKv.Value.CurrentRunStatus!,
+                                    // Frozen: a location that never reported has always read as
+                                    // Errored, and eleven dashboards depend on that spelling.
+                                    RunStatus = neverReported
+                                        ? Status.STATUS_ERRORED
+                                        : locationDataKv.Value.CurrentRunStatus!,
                                     LocationName = locationDataKv.Value.LocationName,
-                                    RunLength = locationDataKv.Value.CurrentRunLengthMs!.Value,
+                                    RunLength = neverReported ? 0 : locationDataKv.Value.CurrentRunLengthMs ?? 0,
                                     RunTime = locationDataKv.Value.CurrentRunTime!.Value!,
-                                    ResponseLatency = (uint)(locationDataKv.Value.ResponseTimeUtc ?? 0),
+                                    ResponseLatency = neverReported ? 0 : (uint)(locationDataKv.Value.ResponseTimeUtc ?? 0),
                                     ColoId = locationDataKv.Value.ColoId,
-                                }).ToList(), null);
+                                    Outcome = outcome.ToColumnValue(),
+                                    FailureReason = FailureReason.Sanitize(locationDataKv.Value.FailureReason),
+                                };
+                            }).ToList(), null);
                 }
                 catch (Exception ex)
                 {
@@ -420,7 +495,10 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                         RunStatus = JobData.CurrentRunStatus ?? errorCause,
                         RunLength = JobData.CurrentRunLengthMs ?? 0,
                         RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
-                        ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
+                        ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0),
+                        Outcome = ResolveEmittedOutcome(RunOutcome.JobError)
+                        // No location rows: RunAction failed, so nothing was ever attempted at the
+                        // edge. The job row's outcome is the whole story.
                     }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(InternalName, customApiError));
             }
             catch (Exception ex)
@@ -460,7 +538,10 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     if (response.Errored)
                     {
                         RunningLocationsData[location].CurrentRunLengthMs = 0;
+                        // Status stays "Errored" for every cause - it is the compatibility surface.
+                        // The outcome is what says whether this was the target's fault or ours.
                         RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                        RecordOutcome(location, response.Outcome, response.FailureReasonCode);
                         _ = TrySave();
                         _ = PushJobLocationUpdate(RunningLocationsData[location]);
                         return false;
@@ -511,6 +592,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                     else
                     {
                         RunningLocationsData[location].CurrentRunStatus = Status.STATUS_DEPLOYED;
+                        RecordOutcome(location, RunOutcome.Deployed, FailureReason.None);
                         _ = TrySave();
                         _ = PushJobLocationUpdate(RunningLocationsData[location]);
 
@@ -521,6 +603,11 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             catch (OperationCanceledException ex)
             {
                 RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                // This location was still legitimately propagating when the job stopped waiting,
+                // once 80% of locations were done. A censored observation, not a failure - and the
+                // single biggest source of overstated failure in the old data, because it was
+                // recorded identically to a dead edge worker.
+                RecordOutcome(location, RunOutcome.Cancelled, FailureReason.Cancelled);
                 _ = PushJobLocationUpdate(RunningLocationsData[location]);
                 _logger.LogError(ex, $"Location {location.Name} timed out");
                 return false;
@@ -530,6 +617,7 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
                 try
                 {
                     RunningLocationsData[location].CurrentRunStatus = Status.STATUS_ERRORED;
+                    RecordOutcome(location, RunOutcome.JobError, FailureReason.JobError);
                     _ = PushJobLocationUpdate(RunningLocationsData[location]);
                 }
                 catch (Exception) { /* nom */ }
@@ -539,6 +627,45 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs
             }
         }
 
+
+        /// <summary>
+        /// Separates "the change did not propagate" from "our probes broke" for a run that missed its
+        /// coverage threshold. Both wrote <c>insufficient_coverage</c> before this, which made the
+        /// job-level success rate impossible to correct.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Runs at emission rather than where the threshold is evaluated. That decision is taken as
+        /// soon as 80% of locations have finished, so the remaining ~20% are still <c>None</c> and
+        /// judging there would count locations that had not reported yet as failures.
+        /// </para>
+        /// <para>
+        /// The rule itself lives in <see cref="RunOutcomeExtensions.RefineCoverageOutcome"/>, shared
+        /// with the Perf and AI jobs so that <c>probe_degraded</c> means the same thing in every table
+        /// the success rate can exclude it from.
+        /// </para>
+        /// </remarks>
+        protected void RefineJobOutcome()
+        {
+            if (JobRunOutcome != RunOutcome.InsufficientCoverage) return;
+
+            JobRunOutcome = RunOutcomeExtensions.RefineCoverageOutcome(RunningLocationsOutcome.Values);
+        }
+
+        /// <summary>
+        /// Records what this run concluded about a location, in memory for the ClickHouse row and on
+        /// the entity for the live view. The reason is sanitized here rather than trusted, because
+        /// this is the last point before it reaches a LowCardinality column.
+        /// </summary>
+        protected void RecordOutcome(Location location, RunOutcome outcome, string failureReason)
+        {
+            RunningLocationsOutcome[location] = outcome;
+            if (RunningLocationsData.TryGetValue(location, out var locationData))
+            {
+                locationData.Outcome = outcome.ToColumnValue();
+                locationData.FailureReason = FailureReason.Sanitize(failureReason);
+            }
+        }
 
         private SemaphoreSlim _semaphore = new SemaphoreSlim(1);
 

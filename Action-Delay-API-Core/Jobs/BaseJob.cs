@@ -67,6 +67,37 @@ public abstract class BaseJob
 
     public JobData JobData { get; set; }
 
+    /// <summary>
+    /// What this run concluded, for the <c>outcome</c> column on <c>job_runs</c>.
+    /// </summary>
+    /// <remarks>
+    /// <c>CurrentRunStatus</c> writes "Errored" for three unrelated things: our API call threw, our
+    /// probes broke, and fewer than 75% of locations reported success. This separates them without
+    /// disturbing the status value that the dashboards read.
+    /// </remarks>
+    public RunOutcome JobRunOutcome { get; set; } = RunOutcome.None;
+
+    /// <summary>
+    /// The value for the <c>outcome</c> column: what the run concluded, or <paramref name="fallback"/>
+    /// when nothing assigned one.
+    /// </summary>
+    /// <remarks>
+    /// Four emission sites share this, across this class and <c>BasePropagationJob</c>. They have to
+    /// agree, because <see cref="RunOutcome.Unknown"/> is defined to mean "a call site was missed" -
+    /// a site drifting into emitting it for a run that merely took a path with no outcome assigned
+    /// would report a code defect that is not there.
+    /// </remarks>
+    protected string ResolveEmittedOutcome(RunOutcome fallback) =>
+        (JobRunOutcome == RunOutcome.None ? fallback : JobRunOutcome).ToColumnValue();
+
+    /// <summary>
+    /// The fallback for a run that reached its normal emission point without recording an outcome.
+    /// Only the assignments inside the threshold blocks set one, and those are gated on the run still
+    /// being Undeployed, so a run can legitimately arrive here having skipped them.
+    /// </summary>
+    protected RunOutcome CompletedRunFallback =>
+        JobData.CurrentRunStatus == Status.STATUS_DEPLOYED ? RunOutcome.Deployed : RunOutcome.Unknown;
+
 
     public abstract string Name { get; }
 
@@ -152,12 +183,14 @@ public abstract class BaseJob
             {
                 _logger.LogWarning(ex, "Run for {jobName} failed due to API Issues: {err}", this.Name, ex.Message);
                 this.JobData.CurrentRunStatus = Status.STATUS_API_ERROR;
+                JobRunOutcome = RunOutcome.ApiError;
                 await InsertRunFailure(Status.STATUS_API_ERROR, ex);
                 throw;
             }
             catch (Exception)
             {
                 this.JobData.CurrentRunStatus = Status.STATUS_ERRORED;
+                JobRunOutcome = RunOutcome.JobError;
                 await InsertRunFailure(Status.STATUS_ERRORED, null);
                 throw;
             }
@@ -188,7 +221,8 @@ public abstract class BaseJob
                     RunStatus = JobData.CurrentRunStatus!,
                     RunLength = JobData.CurrentRunLengthMs ?? 0,
                     RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
-                    ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
+                    ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0),
+                    Outcome = ResolveEmittedOutcome(CompletedRunFallback)
                 }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.InternalName, customApiError));
         }
         catch (Exception ex)
@@ -326,7 +360,8 @@ public abstract class BaseJob
                     RunStatus = JobData.CurrentRunStatus ?? errorCause,
                     RunLength = JobData.CurrentRunLengthMs ?? 0,
                     RunTime = JobData.CurrentRunTime ?? DateTime.UtcNow,
-                    ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0)
+                    ResponseLatency = (uint)(JobData.APIResponseTimeUtc ?? 0),
+                    Outcome = ResolveEmittedOutcome(RunOutcome.JobError)
                 }, new List<ClickhouseJobLocationRun>(), ClickhouseAPIError.CreateFromCustomError(this.InternalName, customApiError));
         }
         catch (Exception ex)

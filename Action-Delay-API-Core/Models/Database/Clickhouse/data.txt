@@ -7,6 +7,7 @@ CREATE TABLE job_runs
  `run_status` LowCardinality(String),
  `run_info` LowCardinality(String),
  `response_latency` UInt32,
+ `outcome` LowCardinality(String) DEFAULT '',
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name)
@@ -37,12 +38,25 @@ CREATE TABLE job_runs_locations
  `run_length` UInt64, 
  `run_status` LowCardinality(String),
  `response_latency` UInt32,
- `colo_id` Int32
+ `colo_id` Int32,
+ `outcome` LowCardinality(String) DEFAULT '',
+ `failure_reason` LowCardinality(String) DEFAULT ''
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name, location_name)
 PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
+
+-- run_status only ever answered "was it a success"; outcome says whose fault a failure was, and
+-- failure_reason says why. LowCardinality because FailureReason.Sanitize keeps both bounded, and
+-- DEFAULT '' because rows written before these existed read as empty rather than as a category.
+-- Migration for already-created tables:
+ALTER TABLE job_runs
+    ADD COLUMN IF NOT EXISTS `outcome` LowCardinality(String) DEFAULT '';
+
+ALTER TABLE job_runs_locations
+    ADD COLUMN IF NOT EXISTS `outcome` LowCardinality(String) DEFAULT '',
+    ADD COLUMN IF NOT EXISTS `failure_reason` LowCardinality(String) DEFAULT '';
 
 
 

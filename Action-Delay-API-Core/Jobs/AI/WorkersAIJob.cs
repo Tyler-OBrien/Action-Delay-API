@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Models.Jobs;
+using Action_Delay_API_Core.Services.Locations;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -284,6 +285,12 @@ namespace Action_Delay_API_Core.Jobs.AI
 
         public class AILocationReturn
         {
+            /// <summary>What this run concluded about this location. See <c>RunOutcome</c>.</summary>
+            public RunOutcome Outcome { get; set; } = RunOutcome.None;
+
+            /// <summary>Bounded sub-classification, from <c>FailureReason</c>.</summary>
+            public string FailureReasonCode { get; set; } = Action_Delay_API_Core.Models.Jobs.FailureReason.None;
+
             public AILocationReturn(bool success, uint duration, DateTime responseUtc, int? coloId, int? tokens, uint? bindingDuration)
             {
                 Success = success;
@@ -362,14 +369,26 @@ namespace Action_Delay_API_Core.Jobs.AI
 
                         if (taskResult == null || (taskResult?.IsFailed ?? true) || taskResult.ValueOrDefault == null)
                         {
-                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1, null, null));
+                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, -1, null, null)
+                            {
+                                Outcome = RunOutcome.TransportFailed,
+                                FailureReasonCode = FailureReason.FromQueueErrorKind(
+                                    QueueError.KindOf(taskResult?.Errors) ?? QueueErrorKind.Connection),
+                            });
                             continue;
                         }
                         var tryGetValue = taskResult!.Value!;
+                        var probeVerdict = RunLocationResult.FromProbe(tryGetValue, tryGetValue.ResponseTimeMs, GetColoId(tryGetValue.Headers));
 
                         if (String.IsNullOrWhiteSpace(tryGetValue.Body))
                         {
-                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers)));
+                            FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers))
+                            {
+                                // Same attribution rule as everywhere else: the target is only blamed
+                                // on a real status code or a timeout it owns.
+                                Outcome = probeVerdict.Outcome,
+                                FailureReasonCode = probeVerdict.FailureReasonCode,
+                            });
                         }
                         else
                         {
@@ -383,7 +402,13 @@ namespace Action_Delay_API_Core.Jobs.AI
                             {
                                 _logger.LogWarning(ex,
                                     $"Failure parsing response for {model.Name} from {completedLocation.Name}");
-                                FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers)));
+                                FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers))
+                            {
+                                // Same attribution rule as everywhere else: the target is only blamed
+                                // on a real status code or a timeout it owns.
+                                Outcome = probeVerdict.Outcome,
+                                FailureReasonCode = probeVerdict.FailureReasonCode,
+                            });
                             }
 
                             if (parsedResult != null)
@@ -394,7 +419,7 @@ namespace Action_Delay_API_Core.Jobs.AI
                                         new AILocationReturn(parsedResult.Success,
                                             (uint)tryGetValue.ResponseTimeMs.Value,
                                             tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens, TryGetBindingDir(tryGetValue.Headers)));
+                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens, TryGetBindingDir(tryGetValue.Headers)) { Outcome = RunOutcome.Deployed });
 
                                 }
                                 else if (parsedResult is { Success: false, Error: not null })
@@ -410,11 +435,23 @@ namespace Action_Delay_API_Core.Jobs.AI
                                         new AILocationReturn(parsedResult.Success,
                                             (uint)tryGetValue.ResponseTimeMs.Value,
                                             tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens, TryGetBindingDir(tryGetValue.Headers)));
+                                            GetColoId(tryGetValue.Headers), parsedResult.Tokens, TryGetBindingDir(tryGetValue.Headers))
+                                        {
+                                            // The model itself reported an error - that is the service
+                                            // under test answering, so it counts against it.
+                                            Outcome = RunOutcome.UpstreamStatus,
+                                            FailureReasonCode = FailureReason.FromStatusCode(tryGetValue.StatusCode),
+                                        });
                                 }
                                 else
                                 {
-                                    FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers)));
+                                    FinishedLocationStatus.Add(completedLocation, new AILocationReturn(false, 0, DateTime.UtcNow, GetColoId(tryGetValue.Headers), null, TryGetBindingDir(tryGetValue.Headers))
+                            {
+                                // Same attribution rule as everywhere else: the target is only blamed
+                                // on a real status code or a timeout it owns.
+                                Outcome = probeVerdict.Outcome,
+                                FailureReasonCode = probeVerdict.FailureReasonCode,
+                            });
                                 }
                             }
                         }
@@ -466,12 +503,24 @@ namespace Action_Delay_API_Core.Jobs.AI
 
       
 
+                var successfulLocationCount = FinishedLocationStatus.Count(kvp => kvp.Value.Success);
+                var requiredLocationCount = locations.Count() / 2;
+
                 FinishedRunInsertLater(
                     new ClickhouseJobRun()
                     {
                         JobName = model.Name,
-                        RunStatus = (FinishedLocationStatus.All(kvp => kvp.Value.Success) || (FinishedLocationStatus.Count(kvp => kvp.Value.Success) >=
-                                                           (locations.Count() / 2) )) ? "Success": "Failure",
+                        // Half the locations succeeding is the bar. Written once and used for both
+                        // fields: the previous "All(...) ||" disjunct was vacuously true when nothing
+                        // reported at all, so a run where every location fell over recorded
+                        // RunStatus "Success" against an Outcome of insufficient_coverage.
+                        RunStatus = successfulLocationCount >= requiredLocationCount ? "Success" : "Failure",
+                        // Same split as the propagation jobs: a run that missed the bar because our
+                        // own probes fell over is probe_degraded, not insufficient_coverage.
+                        Outcome = (successfulLocationCount >= requiredLocationCount
+                            ? RunOutcome.Deployed
+                            : RunOutcomeExtensions.RefineCoverageOutcome(
+                                FinishedLocationStatus.Values.Select(loc => loc.Outcome))).ToColumnValue(),
                         RunLength = averageTokensOfSuccessful,
                         RunTime = DateTime.UtcNow,
                         ResponseLatency = averageOfSuccessFull,
@@ -481,6 +530,8 @@ namespace Action_Delay_API_Core.Jobs.AI
                             {
                                 JobName = model.Name,
                                 RunStatus = locationDataKv.Value.Success ? "Success": "Failure",
+                                Outcome = locationDataKv.Value.Outcome.ToColumnValue(),
+                                FailureReason = FailureReason.Sanitize(locationDataKv.Value.FailureReasonCode),
                                 LocationName = locationDataKv.Key.Name,
                                 RunLength = (ulong)(locationDataKv.Value.Tokens ?? 0),
                                 RunTime = locationDataKv.Value.ResponseUtc,

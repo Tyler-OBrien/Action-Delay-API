@@ -1,4 +1,6 @@
-﻿using Action_Delay_API_Core.Jobs.PropagationJobs;
+﻿using Action_Delay_API_Core_Tests;
+using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -31,7 +33,7 @@ public class TestableBasePropagationJob : BasePropagationJob
         bool shouldFailAction = false,
         bool shouldFailRepeatableAction = false,
         bool shouldDelayRunAction = false)
-        : base(config, logger, clickhouse, context, queue)
+        : base(config, logger, clickhouse, context, queue, StaticLocationProvider.From(config))
     {
         _shouldFailPrewarm = shouldFailPrewarm;
         _shouldFailAction = shouldFailAction;
@@ -62,6 +64,30 @@ public class TestableBasePropagationJob : BasePropagationJob
         _locationResults[locationName] = success;
     }
 
+    private readonly Dictionary<string, RunLocationResult> _customResults = new();
+
+    /// <summary>Returns a specific result for a location, so classification can be driven directly.</summary>
+    public void SetLocationResult(string locationName, RunLocationResult result)
+    {
+        _customResults[locationName] = result;
+    }
+
+    /// <summary>Blocks a location forever, so the 80%-done deadline cancels it.</summary>
+    public HashSet<string> HangingLocations { get; } = new();
+
+    /// <summary>
+    /// Locations to put back to <see cref="RunOutcome.None"/> once the location loop is over, standing
+    /// in for a run that abandoned them still pending.
+    /// </summary>
+    /// <remarks>
+    /// That state is what the emission path has to turn into <c>no_result</c>, and in production it is
+    /// reached only through the location loop's defensive catch, which a test cannot trigger without
+    /// contriving an unrelated failure. Applied from <see cref="HandleCompletion"/>, which runs after
+    /// the loop and before the outcome is refined and emitted - the same window the real path leaves
+    /// them in.
+    /// </remarks>
+    public HashSet<string> LocationsThatNeverReport { get; } = new();
+
     public override async Task PreWarmRunLocation(Location location)
     {
         if (_shouldFailPrewarm)
@@ -88,6 +114,10 @@ public class TestableBasePropagationJob : BasePropagationJob
     {
         if (_shouldDelayRunAction)
             await Task.Delay(1000);
+        if (HangingLocations.Contains(location.Name))
+            await Task.Delay(Timeout.Infinite, token);
+        if (_customResults.TryGetValue(location.Name, out var custom))
+            return custom;
         if (_locationResults.TryGetValue(location.Name, out bool success))
         {
             return success
@@ -97,7 +127,15 @@ public class TestableBasePropagationJob : BasePropagationJob
         return new RunLocationResult(true, "Success", DateTime.UtcNow, 100, 1);
     }
 
-    public override Task HandleCompletion() => Task.CompletedTask;
+    public override Task HandleCompletion()
+    {
+        foreach (var location in RunningLocationsOutcome.Keys.ToList())
+        {
+            if (LocationsThatNeverReport.Contains(location.Name))
+                RunningLocationsOutcome[location] = RunOutcome.None;
+        }
+        return Task.CompletedTask;
+    }
 }
 
 public class PropagationJobTests : IDisposable

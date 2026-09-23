@@ -69,6 +69,7 @@ namespace Action_Delay_API_Worker.Services
                     {
 
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Connect,
                         Info = $"Internal Error when trying to resolve Hostname into IP: {ex.Message}"
                     };
                 }
@@ -82,6 +83,7 @@ namespace Action_Delay_API_Worker.Services
                     {
 
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Timeout,
 
                         Info = $"Timeout on resolving Hostname :("
                     };
@@ -94,6 +96,7 @@ namespace Action_Delay_API_Worker.Services
                     return new SerializablePingResponse()
                     {
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         Info = $"Unhandled Internal Error when trying to resolve Hostname into IP :("
                     };
                 }
@@ -108,6 +111,7 @@ namespace Action_Delay_API_Worker.Services
                     {
 
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Dns,
                         Info =
                             $"Unable to resolve hostname {request.Hostname}, trying to net type {request.NetType.ToString() ?? "Either"} w/ override {request.CustomDNSServerOverride}"
                     };
@@ -177,6 +181,12 @@ namespace Action_Delay_API_Worker.Services
                     {
                         Info = exceptionInfo,
                         WasSuccess = false,
+                        // Every ping got a definite negative from the network rather than failing on
+                        // our side, so ProxyFailure stays unset. Naming the timeout lets Core count
+                        // it against the target instead of against us.
+                        FailureKind = exceptionInfo is "Timeout" or nameof(IPStatus.TimedOut)
+                            ? ProbeFailureKind.Timeout
+                            : null,
                     };
             }
             

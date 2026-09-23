@@ -1,4 +1,5 @@
-﻿using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Models.Jobs;
+using Action_Delay_API_Core.Services.Locations;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -358,7 +359,14 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         if (taskResult == null || (taskResult?.IsFailed ?? true) || taskResult.ValueOrDefault == null)
                         {
                             finishedLocationStatus.Add(
-                                new PerformanceLocationReturn(completedLocation, false, 0, DateTime.UtcNow, null, null));
+                                new PerformanceLocationReturn(completedLocation, false, 0, DateTime.UtcNow, null, null)
+                                {
+                                    // The request never reached a worker, or the reply was unusable.
+                                    // Says nothing about the target being measured.
+                                    Outcome = RunOutcome.TransportFailed,
+                                    FailureReasonCode = FailureReason.FromQueueErrorKind(
+                                        QueueError.KindOf(taskResult?.Errors) ?? QueueErrorKind.Connection),
+                                });
                             continue;
                         }
 
@@ -371,11 +379,13 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 new PerformanceLocationReturn(completedLocation, tryGetValue.WasSuccess,
                                     (uint)(tryGetValue.ResponseTimeMs.HasValue == false ? 0 : tryGetValue.ResponseTimeMs.Value) ,
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                    GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
+                                    GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)) { Outcome = RunOutcome.Deployed });
 
                         }
                         else if (tryGetValue.WasSuccess == false)
                         {
+                            // One rule for "whose fault was this", shared with the propagation jobs.
+                            var probeVerdict = RunLocationResult.FromProbe(tryGetValue, tryGetValue.ResponseTimeMs, -1);
                             _logger.LogInformation($"Non-Success for {name}, location: {completedLocation.DisplayName ?? completedLocation.Name}, status: {tryGetValue.StatusCode} and error looks like: {tryGetValue.Body?.IntelligentCloudflareErrorsS3FriendlyTruncate(50)}");
                             if (tryGetValue.ProxyFailure == false)
                             {
@@ -394,7 +404,11 @@ namespace Action_Delay_API_Core.Jobs.Performance
                                 new PerformanceLocationReturn(completedLocation, tryGetValue.WasSuccess,
                                     (uint)(tryGetValue?.ResponseTimeMs.HasValue == false ? 0 : tryGetValue!.ResponseTimeMs!.Value),
                                     tryGetValue.ResponseUTC ?? DateTime.UtcNow,
-                                    GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers)));
+                                    GetColoId(tryGetValue.Headers), TryGetBindingDir(tryGetValue.Headers))
+                                {
+                                    Outcome = probeVerdict.Outcome,
+                                    FailureReasonCode = probeVerdict.FailureReasonCode,
+                                });
                         }
 
 
@@ -454,6 +468,12 @@ namespace Action_Delay_API_Core.Jobs.Performance
                     {
                         JobName = name,
                         RunStatus = runStatus,
+                        // Same split as the propagation jobs: a run that missed the bar because our
+                        // own probes fell over is probe_degraded, not insufficient_coverage.
+                        Outcome = (runStatus == "Success"
+                            ? RunOutcome.Deployed
+                            : RunOutcomeExtensions.RefineCoverageOutcome(
+                                finishedLocationStatus.Select(loc => loc.Outcome))).ToColumnValue(),
                         RunLength = 0,
                         RunTime = DateTime.UtcNow,
                         ResponseLatency = averageOfSuccessFull,
@@ -463,6 +483,8 @@ namespace Action_Delay_API_Core.Jobs.Performance
                         {
                             JobName = name,
                             RunStatus = locationDataKv.Success ? "Success" : "Failure",
+                            Outcome = locationDataKv.Outcome.ToColumnValue(),
+                            FailureReason = FailureReason.Sanitize(locationDataKv.FailureReasonCode),
                             LocationName = locationDataKv.Location.Name,
                             RunLength = 0,
                             RunTime = locationDataKv.ResponseUtc,
@@ -672,6 +694,12 @@ namespace Action_Delay_API_Core.Jobs.Performance
     }
     public class PerformanceLocationReturn
     {
+        /// <summary>What this run concluded about this location. See <c>RunOutcome</c>.</summary>
+        public RunOutcome Outcome { get; set; } = RunOutcome.None;
+
+        /// <summary>Bounded sub-classification, from <c>FailureReason</c>.</summary>
+        public string FailureReasonCode { get; set; } = Action_Delay_API_Core.Models.Jobs.FailureReason.None;
+
         public PerformanceLocationReturn(Location location, bool success, uint duration, DateTime responseUtc, string? locationId, uint? bindingDuration)
         {
             Location = location;

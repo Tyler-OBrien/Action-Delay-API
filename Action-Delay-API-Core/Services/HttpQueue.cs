@@ -33,7 +33,8 @@ namespace Action_Delay_API_Core.Services
     
         public Task<Result<SerializableDNSResponse>> DNS(NATSDNSRequest request, Location location, CancellationToken token)
         {
-            return Task.FromResult(Result.Fail<SerializableDNSResponse>("DNS is not supported in HttpQueue mode"));
+            return Task.FromResult(Result.Fail<SerializableDNSResponse>(
+                new QueueError(QueueErrorKind.Unsupported, "DNS is not supported in HttpQueue mode")));
         }
 
         public async Task<Result<SerializableHttpResponse>> HTTP(NATSHttpRequest request, Location location, CancellationToken token, int secondsTimeout = 30)
@@ -102,8 +103,8 @@ namespace Action_Delay_API_Core.Services
                 {
                     _logger.LogCritical(
                         $"Could not get response {request.URL} from API, API returned nothing, Status Code: {sendRequest.StatusCode}");
-                    return Result.Fail(
-                        $"Could not get response {request.URL} from API, API returned nothing, Status Code: {sendRequest.StatusCode}");
+                    return Result.Fail(new QueueError(QueueErrorKind.Decode,
+                        $"Could not get response {request.URL} from API, API returned nothing, Status Code: {sendRequest.StatusCode}"));
                 }
 
                 SerializableHttpResponse? response = null;
@@ -116,15 +117,16 @@ namespace Action_Delay_API_Core.Services
                     // Better messages for Deserialization errors
                     _logger.LogCritical(ex, "Failed to Deserialize: {ex} Response: {rawString}, Response: {rawString}", ex.Message,
                         rawString.IntelligentCloudflareErrorsFriendlyTruncate(50), rawString.IntelligentCloudflareErrorsFriendlyTruncate(50));
-                    return Result.Fail(
-                        $"Issue reading response, Status Code: {sendRequest.StatusCode}: {sendRequest.ReasonPhrase}");
+                    return Result.Fail(new QueueError(QueueErrorKind.Decode,
+                        $"Issue reading response, Status Code: {sendRequest.StatusCode}: {sendRequest.ReasonPhrase}"));
                 }
 
                 if (response == null)
                 {
                     _logger.LogCritical(
                         $"Could not get response {request.URL} from API, status code: {sendRequest.StatusCode} Response: {rawString.IntelligentCloudflareErrorsFriendlyTruncate(50)}");
-                    return Result.Fail($"Could not get response {request.URL} from API, status code: {sendRequest.StatusCode}");
+                    return Result.Fail(new QueueError(QueueErrorKind.Decode,
+                        $"Could not get response {request.URL} from API, status code: {sendRequest.StatusCode}"));
                 }
 
                 return response;
@@ -132,23 +134,25 @@ namespace Action_Delay_API_Core.Services
             catch (HttpRequestException ex)
             {
                 _logger.LogCritical(ex, $"Unexpected HTTP Error: API Returned: {ex?.StatusCode} - {ex.Message}");
-                return Result.Fail($"Unexpected HTTP Error: API Returned: {ex?.StatusCode} - {ex.Message}");
+                return Result.Fail(new QueueError(QueueErrorKind.Connection,
+                    $"Unexpected HTTP Error: API Returned: {ex?.StatusCode} - {ex.Message}"));
             }
             catch (OperationCanceledException ex)
             {
                 _logger.LogCritical(ex, $"Unexpected Timeout Error: {ex.Message}");
-                return Result.Fail($"Unexpected Timeout Error: {ex.Message}");
+                return Result.Fail(new QueueError(QueueErrorKind.Timeout, $"Unexpected Timeout Error: {ex.Message}"));
             }
             catch (Exception ex)
             {
                 _logger.LogCritical(ex, $"Unexpected Error");
-                return Result.Fail($"Unexpected Error");
+                return Result.Fail(new QueueError(QueueErrorKind.Connection, "Unexpected Error"));
             }
         }
 
         public Task<Result<SerializablePingResponse>> Ping(NATSPingRequest request, Location location, CancellationToken token)
         {
-            return Task.FromResult(Result.Fail<SerializablePingResponse>("Ping is not supported in HttpQueue mode"));
+            return Task.FromResult(Result.Fail<SerializablePingResponse>(
+                new QueueError(QueueErrorKind.Unsupported, "Ping is not supported in HttpQueue mode")));
         }
 
         public Task JobStatusUpdate(string jobName, string? newStatus, ulong? runLength, DateTime? lastUpdate)

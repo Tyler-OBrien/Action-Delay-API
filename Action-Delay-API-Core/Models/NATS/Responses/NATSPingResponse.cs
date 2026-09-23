@@ -18,6 +18,13 @@ namespace Action_Delay_API_Core.Models.NATS.Responses
         [JsonPropertyName("info")]
         public string? Info { get; set; }
 
+        /// <summary>
+        /// Why the probe failed, from <see cref="ProbeFailureKind"/>. Null on success, and null from
+        /// workers predating this field.
+        /// </summary>
+        [JsonPropertyName("failureKind")]
+        public string? FailureKind { get; set; }
+
         [JsonPropertyName("responseTimeMsAvg")]
         public double ResponseTimeMsAvg { get; set; }
     }

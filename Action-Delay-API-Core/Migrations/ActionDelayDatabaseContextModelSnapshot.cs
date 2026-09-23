@@ -17,7 +17,7 @@ namespace Action_Delay_API_Core.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -221,6 +221,9 @@ namespace Action_Delay_API_Core.Migrations
                     b.Property<DateTime?>("CurrentRunTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text");
+
                     b.Property<string>("JobName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -238,6 +241,9 @@ namespace Action_Delay_API_Core.Migrations
 
                     b.Property<DateTime?>("LastRunTime")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Outcome")
+                        .HasColumnType("text");
 
                     b.HasKey("InternalJobName", "LocationName");
 

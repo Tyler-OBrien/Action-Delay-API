@@ -128,7 +128,7 @@ namespace Action_Delay_API_Core.Services
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
             if (tryGetReply.ValueOrDefault == null)
-                return Result.Fail("Failed to get result");
+                return Result.Fail(new QueueError(QueueErrorKind.Decode, "Failed to get result"));
             return tryGetReply.ValueOrDefault;
         }
 
@@ -154,7 +154,7 @@ namespace Action_Delay_API_Core.Services
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
             if (tryGetReply.ValueOrDefault == null) 
-                return Result.Fail("Failed to get result");
+                return Result.Fail(new QueueError(QueueErrorKind.Decode, "Failed to get result"));
             return tryGetReply.ValueOrDefault;
         }
         public async Task<Result<SerializablePingResponse>> Ping(NATSPingRequest request, Location location, CancellationToken token)
@@ -165,7 +165,7 @@ namespace Action_Delay_API_Core.Services
             if (tryGetReply.IsFailed)
                 return Result.Fail(tryGetReply.Errors);
             if (tryGetReply.ValueOrDefault == null)
-                return Result.Fail("Failed to get result");
+                return Result.Fail(new QueueError(QueueErrorKind.Decode, "Failed to get result"));
             return tryGetReply.ValueOrDefault;
         }
 
@@ -183,6 +183,26 @@ namespace Action_Delay_API_Core.Services
                     { JobName = jobName, LocationName = locationName, RunLength = runLength, RunTime = lastUpdate, Status = newStatus }, CancellationToken.None, 30, true);
         }
 
+
+        /// <summary>
+        /// Maps a transport exception onto a <see cref="QueueErrorKind"/>.
+        /// </summary>
+        /// <remarks>
+        /// Everything reaching the catch-all used to become the string "NATS Connection Failed",
+        /// which meant an offline edge worker, a slow one, and a corrupt reply were all recorded
+        /// identically - and all of them counted against the system being monitored.
+        /// </remarks>
+        internal static QueueErrorKind ClassifyTransportException(Exception ex) => ex switch
+        {
+            NatsNoRespondersException => QueueErrorKind.NoResponders,
+            NatsNoReplyException or NatsTimeoutException => QueueErrorKind.Timeout,
+            TimeoutException or OperationCanceledException => QueueErrorKind.Timeout,
+            NatsDeserializeException or JsonException => QueueErrorKind.Decode,
+            NatsConnectionFailedException or NatsServerException => QueueErrorKind.Connection,
+            // NatsException is the base type, so it has to come after its subclasses above.
+            NatsException => QueueErrorKind.Connection,
+            _ => QueueErrorKind.Connection,
+        };
 
         public static JsonSerializerOptions DefaultJsonSerializerOptions = new JsonSerializerOptions()
         {
@@ -232,7 +252,7 @@ namespace Action_Delay_API_Core.Services
                     if (outgoingData.Length == 0)
                     {
                         span?.Finish(SpanStatus.InternalError);
-                        return Result.Fail($"Failed to compress");
+                        return Result.Fail(new QueueError(QueueErrorKind.Compress, "Failed to compress"));
                     }
 
 
@@ -258,10 +278,11 @@ namespace Action_Delay_API_Core.Services
             {
                 span?.Finish(ex);
                 _logger.LogWarning(ex, "NATS Connection to {subject} failed.", subject);
+                return Result.Fail(new QueueError(ClassifyTransportException(ex),
+                    $"NATS publish to {subject} failed: {ex.Message}"));
             }
-       
 
-            return Result.Fail("NATS Connection Failed");
+            return Result.Fail(new QueueError(QueueErrorKind.Connection, "NATS Connection Failed"));
         }
 
         public async Task<Result<tOut?>> SendMessage<TIn, tOut>(string subject, TIn message, CancellationToken cancellationToken, int secondsTimeout = 30, bool compressed = false)
@@ -303,7 +324,7 @@ namespace Action_Delay_API_Core.Services
                     if (outgoingData.Length == 0)
                     {
                         span?.Finish(SpanStatus.InternalError);
-                        return Result.Fail($"Failed to compress");
+                        return Result.Fail(new QueueError(QueueErrorKind.Compress, "Failed to compress"));
                     }
 
 
@@ -323,7 +344,8 @@ namespace Action_Delay_API_Core.Services
                         {
                             span?.SetExtra("Error", tryGetMessage.Error.Message);
                             span?.Finish(SpanStatus.InternalError);
-                            return Result.Fail($"Failed to get message from {subject}");
+                            return Result.Fail(new QueueError(QueueErrorKind.WorkerError,
+                                $"Failed to get message from {subject}: {tryGetMessage.Error.Message}"));
                         }
 
                         Decompressor getDecomp = null;
@@ -340,6 +362,18 @@ namespace Action_Delay_API_Core.Services
                             span?.Finish();
 
                             return deserializedData;
+                        }
+                        // Cancellation is the caller giving up, not a bad reply - let the outer handler
+                        // classify it as a timeout rather than filing it under a codec fault.
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            // A reply arrived and we could not make sense of it. Distinct from never
+                            // hearing back: the worker is up, so this is a codec or contract fault on
+                            // one side or the other, and it must not read as an unreachable location.
+                            span?.Finish(ex);
+                            _logger.LogWarning(ex, "Could not decode the reply from {subject}.", subject);
+                            return Result.Fail(new QueueError(QueueErrorKind.Decode,
+                                $"Could not decode the reply from {subject}: {ex.Message}"));
                         }
                         finally
                         {
@@ -368,7 +402,8 @@ namespace Action_Delay_API_Core.Services
                     {
                         span?.Finish(SpanStatus.InternalError);
 
-                        return Result.Fail($"Failed to get message from {subject}");
+                        return Result.Fail(new QueueError(QueueErrorKind.Decode,
+                            $"Empty reply from {subject}"));
                     }
 
                     span?.Finish();
@@ -379,9 +414,11 @@ namespace Action_Delay_API_Core.Services
             {
                 span?.Finish(ex);
                 _logger.LogWarning(ex, "NATS Connection to {subject} failed.", subject);
+                return Result.Fail(new QueueError(ClassifyTransportException(ex),
+                    $"NATS request to {subject} failed: {ex.Message}"));
             }
 
-            return Result.Fail("NATS Connection Failed");
+            return Result.Fail(new QueueError(QueueErrorKind.Connection, "NATS Connection Failed"));
         }
 
 

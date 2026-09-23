@@ -31,5 +31,12 @@ namespace Action_Delay_API_Worker.Models.API.Response
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? GeneratedRandomBytesSha256 { get; set; }
 
+        /// <summary>
+        /// Why the probe failed, from <see cref="ProbeFailureKind"/>. Null on success, and null from
+        /// workers predating this field - Core treats absent as "fall back to ProxyFailure".
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? FailureKind { get; set; }
+
     }
 }

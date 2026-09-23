@@ -6,6 +6,7 @@ using FluentResults;
 using Microsoft.EntityFrameworkCore;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Errors;
+using Action_Delay_API_Core.Models.Jobs;
 using System.Xml.Linq;
 using System.Text.Json.Serialization;
 using Action_Delay_API.Models.API.Requests.DTOs;
@@ -209,6 +210,11 @@ namespace Action_Delay_API.Services.v2
                         RunLength = jobRequest.RunLengthMs,
                         RunTime = jobRequest.RunTime,
                         ResponseLatency = jobRequest.APIResponseLatency ?? 0,
+                        // Externally pushed runs carry no probe detail, so there is nothing to
+                        // classify beyond whether they claimed success.
+                        Outcome = (jobRequest.RunStatus == Status.STATUS_DEPLOYED
+                            ? RunOutcome.Deployed
+                            : RunOutcome.Unknown).ToColumnValue(),
                     }, new List<ClickhouseJobLocationRun>(), null);
             }
             catch (Exception ex)

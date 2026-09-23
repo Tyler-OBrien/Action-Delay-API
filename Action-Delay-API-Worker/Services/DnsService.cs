@@ -63,6 +63,7 @@ namespace Action_Delay_API_Worker.Services
                         QueryType = queryType,
                         ResponseCode = DnsHeaderResponseCode.Refused.ToString(),
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Invalid QueryType: {queryType}, trying to query {queryName} via {dnsServer}"
                     };
@@ -97,6 +98,7 @@ namespace Action_Delay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Connect,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Internal Error when trying to resolve DnsServer into IP: {ex.Message}"
@@ -113,6 +115,7 @@ namespace Action_Delay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Timeout,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Timeout on resolving DnsServer :("
@@ -128,6 +131,7 @@ namespace Action_Delay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Internal,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Unhandled Internal Error when trying to resolve DnsServer into IP :("
@@ -145,6 +149,7 @@ namespace Action_Delay_API_Worker.Services
                         QueryName = queryName,
                         QueryType = queryType,
                         ProxyFailure = true,
+                        FailureKind = ProbeFailureKind.Dns,
                         ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                         Answers = new List<SerializableDnsAnswer>(),
                         Info = $"Unable to resolve DNS server: {dnsServer}, trying to query {queryType} of {queryName}"
@@ -278,6 +283,7 @@ namespace Action_Delay_API_Worker.Services
                     QueryName = queryName,
                     QueryType = queryType,
                     ProxyFailure = true,
+                    FailureKind = ProbeFailureKind.Timeout,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                     Answers = new List<SerializableDnsAnswer>(),
                     Info = $"Timeout :("
@@ -293,6 +299,7 @@ namespace Action_Delay_API_Worker.Services
                     QueryName = queryName,
                     QueryType = queryType,
                     ProxyFailure = true,
+                    FailureKind = ProbeFailureKind.Internal,
                     ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
                     Answers = new List<SerializableDnsAnswer>(),
                     Info = $"Unhandled Internal Error :("

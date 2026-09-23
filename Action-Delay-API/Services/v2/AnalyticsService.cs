@@ -640,7 +640,7 @@ public class AnalyticsService : IAnalyticsService
         return new DataResponse<ErrorJobAnalyticsDTO>(new ErrorJobAnalyticsDTO(getAnalytics, tryGetJobInternalName, allUniqueErrors.DistinctBy(e => e.ErrorHash).ToDictionary(keyKvp => keyKvp.ErrorHash, valKvp => $"{(String.IsNullOrWhiteSpace(valKvp.ErrorType) ? "" : $"[{valKvp.ErrorType}]: ")}{valKvp.ErrorDescription}")));
     }
 
-    public async Task<Result<DataResponse<JobSuccessRateDTO>>> GetJobSuccessRate(string jobName, DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100)
+    public async Task<Result<DataResponse<JobSuccessRateDTO>>> GetJobSuccessRate(string jobName, DateTime startDateTime, DateTime endDateTime, CancellationToken token, int maxPoints = 100, bool excludeInfrastructureFailures = false)
     {
         var tryValidate = ValidateParams(startDateTime, endDateTime, JobAnalyticsRequestOptions.MedianRunLength, maxPoints);
         if (tryValidate.IsFailed)
@@ -666,7 +666,7 @@ public class AnalyticsService : IAnalyticsService
         else
             config = JobAnalyticsWorkersDelayConfig;
 
-        var getAnalytics = await _clickhouseService.GetJobSuccessRate(new[] { tryGetJobInternalName }, startDateTime, endDateTime, config, maxPoints, token);
+        var getAnalytics = await _clickhouseService.GetJobSuccessRate(new[] { tryGetJobInternalName }, startDateTime, endDateTime, config, maxPoints, excludeInfrastructureFailures, token);
 
         return new DataResponse<JobSuccessRateDTO>(new JobSuccessRateDTO(getAnalytics, tryGetJobInternalName));
     }

@@ -1,4 +1,6 @@
-﻿using Action_Delay_API_Core.Jobs.PropagationJobs;
+﻿using Action_Delay_API_Core_Tests;
+using Action_Delay_API_Core.Services.Locations;
+using Action_Delay_API_Core.Jobs.PropagationJobs;
 using Action_Delay_API_Core.Models.Database.Clickhouse;
 using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Errors;
@@ -22,7 +24,9 @@ public class TestJob : BaseJob
         ILogger<BaseJob> logger,
         IClickHouseService clickhouse,
         ActionDelayDatabaseContext context,
-        IQueue queue) : base(config, logger, clickhouse, context, queue)
+        IQueue queue,
+        ILocationProvider? locationProvider = null) : base(config, logger, clickhouse, context, queue,
+        locationProvider ?? StaticLocationProvider.From(config))
     {
     }
 
@@ -162,7 +166,9 @@ public class TestPropagationJob : BasePropagationJob
         ILogger<BasePropagationJob> logger,
         IClickHouseService clickhouse,
         ActionDelayDatabaseContext context,
-        IQueue queue) : base(config, logger, clickhouse, context, queue)
+        IQueue queue,
+        ILocationProvider? locationProvider = null) : base(config, logger, clickhouse, context, queue,
+        locationProvider ?? StaticLocationProvider.From(config))
     {
     }
 
@@ -235,6 +241,59 @@ public class BasePropagationJobTests : IDisposable
             _context,
             _queueMock.Object
         );
+    }
+
+    [Fact]
+    public async Task BaseRun_CapturesTheRosterOnce_SoAMidRunShrinkCannotMoveTheGoalposts()
+    {
+        // A roster that shrinks on every read. If BaseRun did not snapshot it, the fan-out, the
+        // JobLocations rows and the 80%/75% thresholds would each see a different fleet size.
+        var shrinking = new ShrinkingLocationProvider(new List<Location>
+        {
+            new() { Name = "test1" },
+            new() { Name = "test2" },
+            new() { Name = "test3" },
+            new() { Name = "test4" }
+        });
+
+        var job = new TestPropagationJob(_configMock.Object, _loggerMock.Object, _clickhouseMock.Object,
+            _context, _queueMock.Object, shrinking);
+        job.SetLocationShouldFail(false);
+
+        await job.BaseRun();
+
+        Assert.Equal(1, shrinking.CallCount);
+
+        var locationData = await _context.JobLocations
+            .Where(l => l.InternalJobName == job.InternalName)
+            .ToListAsync();
+        Assert.Equal(4, locationData.Count);
+
+        var jobData = await _context.JobData.FirstOrDefaultAsync(j => j.InternalJobName == job.InternalName);
+        Assert.Equal(Status.STATUS_DEPLOYED, jobData!.CurrentRunStatus);
+    }
+
+    private sealed class ShrinkingLocationProvider : ILocationProvider
+    {
+        private readonly List<Location> _locations;
+
+        public ShrinkingLocationProvider(List<Location> locations) => _locations = locations;
+
+        public int CallCount { get; private set; }
+
+        public IReadOnlyList<Location> GetEnabledLocations()
+        {
+            CallCount++;
+            var snapshot = _locations.ToList();
+            if (_locations.Count > 1)
+                _locations.RemoveAt(_locations.Count - 1);
+            return snapshot;
+        }
+
+        public IReadOnlyList<Location> GetAllLocations() => _locations;
+
+        public LocationRosterSnapshot GetSnapshot() =>
+            LocationRosterSnapshot.Create(_locations, RosterSource.Configuration);
     }
 
     [Fact]

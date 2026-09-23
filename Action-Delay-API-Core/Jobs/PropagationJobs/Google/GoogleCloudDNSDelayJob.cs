@@ -98,19 +98,19 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Google
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"{location.Name}: Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}");
-                return new RunLocationResult("Queue Error", null, -1);
+                return RunLocationResult.TransportFailure(tryGetResult.Errors, null, -1);
             }
 
             var getResponse = tryGetResult.Value;
-            if (tryGetResult.Value.ProxyFailure)
+            if (getResponse.IsProbeAbort())
             {
                 _logger.LogInformation($"{location.Name}: Proxy Failure {getResponse.Info}, aborting loc");
-                return new RunLocationResult("Proxy Failure", null, -1);
+                return RunLocationResult.FromProbe(getResponse, null, -1);
             }
             if (tryGetResult.Value.ResponseCode != "NoError" && (getResponse.Answers == null || getResponse.Answers.Any() == false))
             {
                 _logger.LogInformation($"{location.Name}: Proxy Failure {getResponse.Info} based on response {getResponse.ResponseCode}, aborting loc");
-                return new RunLocationResult("Proxy Failure", null, -1);
+                return RunLocationResult.FromProbe(getResponse, null, -1);
             }
 
             // GCP TXT records are returned with surrounding quotes — strip them before comparing

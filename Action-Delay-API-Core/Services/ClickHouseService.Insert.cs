@@ -95,6 +95,7 @@ namespace Action_Delay_API_Core.Services
                                 run_status = run.RunStatus,
                                 run_info = apiError?.ErrorDescription ?? string.Empty,
                                 response_latency = run.ResponseLatency,
+                                outcome = run.Outcome,
                             }),
                         });
                     }
@@ -115,6 +116,8 @@ namespace Action_Delay_API_Core.Services
                                     run_status = loc.RunStatus,
                                     response_latency = loc.ResponseLatency,
                                     colo_id = loc.ColoId,
+                                    outcome = loc.Outcome,
+                                    failure_reason = loc.FailureReason,
                                 }),
                             });
                         }
@@ -155,6 +158,9 @@ namespace Action_Delay_API_Core.Services
                         using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
                         {
                             DestinationTableName = "job_runs_locations",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "location_name", "run_time", "run_length", "run_status", "response_latency", "colo_id", "outcome", "failure_reason" },
                             BatchSize = 100000
                         };
                         await bulkCopyInterface.InitAsync();
@@ -162,7 +168,8 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime, server.RunLength,
-                                    server.RunStatus, server.ResponseLatency, (uint)server.ColoId
+                                    server.RunStatus, server.ResponseLatency, (uint)server.ColoId,
+                                    server.Outcome, server.FailureReason
                                 })
                                 .ToArray(), token);
                     }
@@ -179,6 +186,9 @@ namespace Action_Delay_API_Core.Services
                     using var bulkCopyRun = new ClickHouseBulkCopy(connection)
                     {
                         DestinationTableName = "job_runs",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "run_time", "run_length", "run_status", "run_info", "response_latency", "outcome" },
                         BatchSize = 100000
                     };
                     await bulkCopyRun.InitAsync();
@@ -189,7 +199,8 @@ namespace Action_Delay_API_Core.Services
                             new object[]
                             {
                                 run.JobName, run.RunTime, run.RunLength, run.RunStatus,
-                                apiError?.ErrorDescription ?? string.Empty, run.ResponseLatency
+                                apiError?.ErrorDescription ?? string.Empty, run.ResponseLatency,
+                                run.Outcome
                             }
                         }, token);
 
@@ -207,6 +218,9 @@ namespace Action_Delay_API_Core.Services
                         using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
                         {
                             DestinationTableName = "api_errors",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "run_time", "error_type", "error_description", "error_hash", "response_latency" },
                             BatchSize = 100000
                         };
                         await bulkCopyApiError.InitAsync();
@@ -256,6 +270,7 @@ namespace Action_Delay_API_Core.Services
                                     run_status = run.RunStatus,
                                     average_response_latency = run.ResponseLatency,
                                     average_binding_response_latency = run.BindingResponseLatency,
+                                    outcome = run.Outcome,
                                 }),
                             });
                         }
@@ -278,6 +293,8 @@ namespace Action_Delay_API_Core.Services
                                     response_latency = loc.ResponseLatency,
                                     colo_id = loc.ColoId,
                                     binding_response_latency = loc.BindingResponseLatency,
+                                    outcome = loc.Outcome,
+                                    failure_reason = loc.FailureReason,
                                 }),
                             });
                         }
@@ -323,6 +340,9 @@ namespace Action_Delay_API_Core.Services
                         using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
                         {
                             DestinationTableName = "job_runs_locations_ai",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "location_name", "run_time", "run_length", "run_status", "response_latency", "colo_id", "binding_response_latency", "outcome", "failure_reason" },
                             BatchSize = 100000
                         };
                         await bulkCopyInterface.InitAsync();
@@ -330,7 +350,8 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime, server.RunLength,
-                                    server.RunStatus, server.ResponseLatency, (Int32)server.ColoId, server.BindingResponseLatency
+                                    server.RunStatus, server.ResponseLatency, (Int32)server.ColoId, server.BindingResponseLatency,
+                                    server.Outcome, server.FailureReason
                                 })
                                 .ToArray(), token);
                     }
@@ -347,6 +368,9 @@ namespace Action_Delay_API_Core.Services
                     using var bulkCopyRun = new ClickHouseBulkCopy(connection)
                     {
                         DestinationTableName = "job_runs_ai",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "run_time", "run_length", "run_status", "run_info", "average_response_latency", "average_binding_response_latency", "outcome" },
                         BatchSize = 100000
                     };
                     await bulkCopyRun.InitAsync();
@@ -354,7 +378,8 @@ namespace Action_Delay_API_Core.Services
                         runs.Select(run => new object[]
                             {
                                 run.JobName, run.RunTime, run.RunLength, run.RunStatus,
-                                string.Empty, run.ResponseLatency, run.BindingResponseLatency
+                                string.Empty, run.ResponseLatency, run.BindingResponseLatency,
+                                run.Outcome
                             })
                             .ToArray(), token);
 
@@ -372,6 +397,9 @@ namespace Action_Delay_API_Core.Services
                         using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
                         {
                             DestinationTableName = "api_errors_ai",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "location_name", "run_time", "error_type", "error_description", "error_hash", "response_latency" },
                             BatchSize = 100000
                         };
                         await bulkCopyApiError.InitAsync();
@@ -420,6 +448,7 @@ namespace Action_Delay_API_Core.Services
                                     run_status = run.RunStatus,
                                     average_response_latency = run.ResponseLatency,
                                     average_binding_response_latency = run.BindingResponseLatency,
+                                    outcome = run.Outcome,
                                 }),
                             });
                         }
@@ -441,6 +470,8 @@ namespace Action_Delay_API_Core.Services
                                     response_latency = loc.ResponseLatency,
                                     location_id = loc.LocationId,
                                     binding_response_latency = loc.BindingResponseLatency,
+                                    outcome = loc.Outcome,
+                                    failure_reason = loc.FailureReason,
                                 }),
                             });
                         }
@@ -486,13 +517,17 @@ namespace Action_Delay_API_Core.Services
                     using var bulkCopyRun = new ClickHouseBulkCopy(connection)
                     {
                         DestinationTableName = "job_runs_perf",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "run_time", "run_status", "average_response_latency", "average_binding_response_latency", "outcome" },
                         BatchSize = 100000
                     };
                     await bulkCopyRun.InitAsync();
                     await bulkCopyRun.WriteToServerAsync(
                         runs.Select(run => new object[]
                             {
-                                run.JobName, run.RunTime, run.RunStatus, run.ResponseLatency, run.BindingResponseLatency
+                                run.JobName, run.RunTime, run.RunStatus, run.ResponseLatency, run.BindingResponseLatency,
+                                run.Outcome
                             })
                             .ToArray(), token);
 
@@ -510,6 +545,9 @@ namespace Action_Delay_API_Core.Services
                         using var bulkCopyInterface = new ClickHouseBulkCopy(connection)
                         {
                             DestinationTableName = "job_runs_locations_perf",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "location_name", "run_time", "run_status", "response_latency", "location_id", "binding_response_latency", "outcome", "failure_reason" },
                             BatchSize = 100000
                         };
                         await bulkCopyInterface.InitAsync();
@@ -517,7 +555,8 @@ namespace Action_Delay_API_Core.Services
                             locations.Select(server => new object[]
                                 {
                                     server.JobName, server.LocationName, server.RunTime,
-                                    server.RunStatus, server.ResponseLatency, server.LocationId, server.BindingResponseLatency
+                                    server.RunStatus, server.ResponseLatency, server.LocationId, server.BindingResponseLatency,
+                                    server.Outcome, server.FailureReason
                                 })
                                 .ToArray(), token);
                     }
@@ -539,6 +578,9 @@ namespace Action_Delay_API_Core.Services
                         using var bulkCopyApiError = new ClickHouseBulkCopy(connection)
                         {
                             DestinationTableName = "api_errors_perf",
+                            // Named, not positional: a column added anywhere but the
+                            // physical end used to shift every value one slot left.
+                            ColumnNames = new[] { "job_name", "location_name", "run_time", "error_type", "error_description", "error_hash", "response_latency", "location_id" },
                             BatchSize = 100000
                         };
                         await bulkCopyApiError.InitAsync();

@@ -155,7 +155,7 @@ public class PageRuleDelayJob : BasePropagationJob
         {
             _logger.LogInformation(
                 $"Error getting response {tryGetResult.Errors.FirstOrDefault()?.Message}, aborting location..");
-            return new RunLocationResult("Queue Error", null, -1);
+            return RunLocationResult.TransportFailure(tryGetResult.Errors, null, -1);
         }
 
         var getResponse = tryGetResult.Value;
@@ -187,11 +187,11 @@ public class PageRuleDelayJob : BasePropagationJob
         if (RateLimitedEventLogger.ShouldLog())
             _logger.LogInformation(
             $"{location.Name}:{getResponse.GetColoId()} sees {locationHeader} instead of {_valueToLookFor}, and {getResponse.StatusCode} instead of {HttpStatusCode.UnsupportedMediaType.ToString()}! Let's try again...");
-        if (getResponse is { WasSuccess: false, ProxyFailure: true })
+        if (getResponse is { WasSuccess: false } && getResponse.IsProbeAbort())
         {
             _logger.LogInformation(
                 $"{location.Name}:{getResponse.GetColoId()} a non-success status code of: Bad Gateway / {getResponse.StatusCode} ABORTING!!!!! Headers: {string.Join(" | ", getResponse.Headers.Select(headers => $"{headers.Key}: {headers.Value}"))}");
-            return new RunLocationResult("Proxy Error", null, getResponse.GetColoId());
+            return RunLocationResult.FromProbe(getResponse, null, getResponse.GetColoId());
         }
 
         return new RunLocationResult(false, "Undeployed", getResponse.ResponseUTC, getResponse.ResponseTimeMs,

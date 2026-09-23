@@ -84,6 +84,17 @@ public class JobDataLocation : BaseEntityClass
 
     public string? CurrentRunStatus { get; set; }
 
+    /// <summary>
+    /// What this run concluded, from <c>RunOutcome</c>. Sits beside <see cref="CurrentRunStatus"/>
+    /// rather than replacing it: status only says "was it a success", and answers "Errored" for a
+    /// dead edge worker, a timing-out origin and a location we cancelled while it was still
+    /// propagating. This tells them apart.
+    /// </summary>
+    public string? Outcome { get; set; }
+
+    /// <summary>Bounded sub-classification. Always a <c>FailureReason</c> value.</summary>
+    public string? FailureReason { get; set; }
+
     [NotMapped]
     [JsonIgnore]
     public double? ResponseTimeUtc { get; set; }
@@ -100,6 +111,8 @@ public class JobDataLocation : BaseEntityClass
         this.CurrentRunTime = data.CurrentRunTime;
         this.CurrentRunLengthMs = data.CurrentRunLengthMs;
         this.CurrentRunStatus = data.CurrentRunStatus;
+        this.Outcome = data.Outcome;
+        this.FailureReason = data.FailureReason;
         this.ResponseTimeUtc = data.ResponseTimeUtc;
         this.ColoId = data.ColoId;
     }
@@ -116,6 +129,8 @@ public class JobDataLocation : BaseEntityClass
         newJobDataLocation.CurrentRunTime = this.CurrentRunTime;
         newJobDataLocation.CurrentRunLengthMs = this.CurrentRunLengthMs;
         newJobDataLocation.CurrentRunStatus = this.CurrentRunStatus;
+        newJobDataLocation.Outcome = this.Outcome;
+        newJobDataLocation.FailureReason = this.FailureReason;
         newJobDataLocation.ResponseTimeUtc = this.ResponseTimeUtc;
         newJobDataLocation.ColoId = this.ColoId;
         return newJobDataLocation;

@@ -12,5 +12,13 @@
         public UInt32 BindingResponseLatency { get; set; }
 
         public int ColoId { get; set; }
+
+        /// <summary>
+        /// What this run concluded, from <c>RunOutcome</c>. Rides alongside <see cref="RunStatus"/>
+        /// rather than replacing it, because the status values are read verbatim by the dashboards,
+        /// the website and the success-only materialized views.
+        /// </summary>
+        public string Outcome { get; set; } = string.Empty;
+
     }
 }

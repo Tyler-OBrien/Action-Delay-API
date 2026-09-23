@@ -4,7 +4,8 @@ CREATE TABLE job_runs_perf
  `run_time` DateTime CODEC(Delta, ZSTD),
  `run_status` LowCardinality(String),
  `average_response_latency` UInt32,
- `average_binding_response_latency` UInt32
+ `average_binding_response_latency` UInt32,
+ `outcome` LowCardinality(String) DEFAULT ''
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name)
@@ -37,12 +38,22 @@ CREATE TABLE job_runs_locations_perf
  `run_status` LowCardinality(String),
  `response_latency` UInt32,
  `location_id` LowCardinality(String),
- `binding_response_latency` UInt32
+ `binding_response_latency` UInt32,
+ `outcome` LowCardinality(String) DEFAULT '',
+ `failure_reason` LowCardinality(String) DEFAULT ''
 )
 ENGINE = MergeTree
 PRIMARY KEY (run_time, job_name, location_name)
 PARTITION BY toYYYYMM(run_time)
 ORDER BY (run_time, job_name, location_name);
+
+-- See data.txt for what these mean. Migration for already-created tables:
+ALTER TABLE job_runs_perf
+    ADD COLUMN IF NOT EXISTS `outcome` LowCardinality(String) DEFAULT '';
+
+ALTER TABLE job_runs_locations_perf
+    ADD COLUMN IF NOT EXISTS `outcome` LowCardinality(String) DEFAULT '',
+    ADD COLUMN IF NOT EXISTS `failure_reason` LowCardinality(String) DEFAULT '';
 
 
 

@@ -13,6 +13,19 @@
         public DateTime? ResponseUTC { get; set; }
         public double? ResponseTimeMs { get; set; }
 
+        /// <summary>
+        /// Why the probe failed, from <see cref="ProbeFailureKind"/>. Null on success, and null from
+        /// workers predating this field. A returned rcode lands in <see cref="ResponseCode"/>
+        /// instead: that is an answer from the resolver, not a failure to reach it.
+        /// </summary>
+        public string? FailureKind { get; set; }
+
+        /// <summary>
+        /// True when the probe produced no usable observation. See the HTTP equivalent - timeouts no
+        /// longer set <see cref="ProxyFailure"/>, so both have to be checked.
+        /// </summary>
+        public bool IsProbeAbort() => ProxyFailure || FailureKind == ProbeFailureKind.Timeout;
+
         public int? TryGetColoId()
         {
             if (String.IsNullOrEmpty(NSID)) return -1;

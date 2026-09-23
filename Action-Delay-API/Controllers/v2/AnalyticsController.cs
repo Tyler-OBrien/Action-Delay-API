@@ -179,7 +179,7 @@ public class AnalyticsController : CustomBaseController
         if (tryGetRequestOptions.IsFailed)
             return tryGetRequestOptions.MapToResult();
 
-        return (await _analyticsService.GetJobSuccessRate(jobName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, token, queryParams.MaxPoints)).MapToResult();
+        return (await _analyticsService.GetJobSuccessRate(jobName, queryParams.StartDateTime!.Value, queryParams.EndDateTime!.Value, token, queryParams.MaxPoints, queryParams.ExcludeInfrastructureFailures)).MapToResult();
     }
 
 

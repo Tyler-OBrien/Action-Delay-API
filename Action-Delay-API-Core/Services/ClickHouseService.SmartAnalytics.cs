@@ -169,7 +169,7 @@ namespace Action_Delay_API_Core.Services
         /// rate. Window is expected to be capped by the caller; counts over the run_time primary-key range
         /// are cheap.
         /// </summary>
-        public async Task<JobSuccessRateAnalytics> GetJobSuccessRate(string[] jobs, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, CancellationToken token = default)
+        public async Task<JobSuccessRateAnalytics> GetJobSuccessRate(string[] jobs, DateTime startTime, DateTime endTime, JobAnalyticsConfiguration config, int maxPoints = 100, bool excludeInfrastructureFailures = false, CancellationToken token = default)
         {
             var output = PickRightDataSet(startTime, endTime, maxPoints);
 
@@ -177,8 +177,27 @@ namespace Action_Delay_API_Core.Services
             string dataSetName = config.NormalDataSet;
             string successFilter = config.NormalDataSetRunStatusFilter;
 
+            // Opt-in: drop runs whose failure was ours rather than the monitored system's, so the rate
+            // measures what it claims to. Off by default because turning it on moves the number.
+            //
+            // Only these two can appear in a job-level table. Per-location causes such as
+            // transport_failed and no_result live on job_runs_locations and would be dead predicates
+            // here. api_error stays in the denominator on purpose: the provider API rejecting the
+            // change is a real failure of the thing being measured. cancelled likewise never reaches
+            // this table, and would not belong if it did - a run that missed coverage because
+            // propagation was slow is a genuine failure.
+            //
+            // Rows written before the outcome column existed carry '' and are kept.
+            //
+            // Valid on job_runs_ai and job_runs_perf as well: those writers share the same
+            // coverage-refinement rule and so record probe_degraded on the same terms. They cannot
+            // produce job_error, so only the one predicate can match there.
+            string outcomeFilter = excludeInfrastructureFailures
+                ? " and outcome not in ('job_error','probe_degraded')"
+                : string.Empty;
+
             string commandText =
-                $"SELECT toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period, countIf(run_status = {{successStatus:String}}) AS \"success_count\", count() AS \"total_count\" FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and run_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}} Group by time_period ORDER BY time_period";
+                $"SELECT toStartOfInterval(run_time, INTERVAL {output.Interval} MINUTES) as time_period, countIf(run_status = {{successStatus:String}}) AS \"success_count\", count() AS \"total_count\" FROM \"default\".\"{dataSetName}\" WHERE run_time > {{startDateTime:DateTime}} and run_time < {{endDateTime:DateTime}} and job_name in {{jobs:Array(String)}}{outcomeFilter} Group by time_period ORDER BY time_period";
 
             await using var connection = CreateConnection();
 

@@ -35,6 +35,32 @@ namespace Action_Delay_API.Models.API.Requests.DTOs.v2.Analytics
       
         [SwaggerParameter("Max Points to Return, default 100.", Required = false)]
         public int MaxPoints { get; set; } = 100;
+
+        /// <summary>
+        /// Exclude runs that failed because of our own measuring apparatus rather than the system
+        /// being monitored, so the rate reflects the target. Two cases qualify: an unexpected internal
+        /// error (<c>job_error</c>), and a run that missed its coverage threshold mostly because
+        /// probes failed rather than because the change did not propagate (<c>probe_degraded</c>).
+        /// <para>
+        /// Runs rejected by the provider API (<c>api_error</c>) are <b>not</b> excluded - that is a
+        /// real failure of the monitored system. Nor are runs that missed coverage because propagation
+        /// was genuinely slow.
+        /// </para>
+        /// <para>
+        /// Per-location attribution - transport loss, a dead edge worker, a probe that never reported -
+        /// is not visible at this level. Query <c>job_runs_locations.outcome</c> for that.
+        /// </para>
+        /// <para>
+        /// Applies to AI and Perf jobs too: they write to separate tables but share the same
+        /// coverage-refinement rule, so they record <c>probe_degraded</c> on the same terms. They still
+        /// never record <c>job_error</c> - their <c>BaseRun</c> overrides record nothing at all on an
+        /// unhandled error - so only the one predicate can match there.
+        /// </para>
+        /// Off by default; runs recorded before outcomes were tracked carry none and are kept.
+        /// Success-rate endpoint only.
+        /// </summary>
+        [SwaggerParameter("Exclude runs that failed due to our own probe infrastructure (job_error, probe_degraded) rather than the monitored system. Provider API errors are still counted. Default false.", Required = false)]
+        public bool ExcludeInfrastructureFailures { get; set; }
     }
 
     // lazy way of overriding the metrics comment for now.

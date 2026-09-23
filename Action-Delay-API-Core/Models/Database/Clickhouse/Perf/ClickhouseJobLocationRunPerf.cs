@@ -14,5 +14,15 @@
         public UInt32 BindingResponseLatency { get; set; }
         public string LocationId { get; set; }
 
+        /// <summary>
+        /// What this run concluded about this location, from <c>RunOutcome</c>. This is the column
+        /// that separates a failure of the monitored system from a failure of our own probes.
+        /// </summary>
+        public string Outcome { get; set; } = string.Empty;
+
+        /// <summary>Bounded sub-classification, from <c>FailureReason</c>. Empty on success.</summary>
+        public string FailureReason { get; set; } = string.Empty;
+
+
     }
 }

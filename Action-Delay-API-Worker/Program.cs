@@ -289,6 +289,7 @@ namespace Action_Delay_API_Worker
                 QueryName = "Unknown",
                 ProxyFailure = true,
                 ResponseCode = DnsHeaderResponseCode.ServerFailure.ToString(),
+                FailureKind = ProbeFailureKind.Internal,
                 Info = reason
             };
         }
@@ -301,6 +302,7 @@ namespace Action_Delay_API_Worker
                 Headers = new Dictionary<string, string>(),
                 StatusCode = HttpStatusCode.BadGateway,
                 ProxyFailure = true,
+                FailureKind = ProbeFailureKind.Internal,
                 Info = reason,
             };
         }
@@ -309,6 +311,7 @@ namespace Action_Delay_API_Worker
             return new SerializablePingResponse()
             {
                 ProxyFailure = true,
+                FailureKind = ProbeFailureKind.Internal,
                 Info = reason
             };
         }

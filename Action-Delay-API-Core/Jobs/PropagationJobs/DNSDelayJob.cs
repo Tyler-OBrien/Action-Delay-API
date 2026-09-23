@@ -125,14 +125,14 @@ namespace Action_Delay_API_Core.Jobs
             if (tryGetResult.IsFailed)
             {
                 _logger.LogInformation($"{location.Name}: Error getting response for {location.Name}: {tryGetResult.Errors.FirstOrDefault()?.Message}");
-                return new RunLocationResult("Queue Error", null, -1);
+                return RunLocationResult.TransportFailure(tryGetResult.Errors, null, -1);
             }
 
             var getResponse = tryGetResult.Value;
-            if (tryGetResult.Value.ProxyFailure)
+            if (getResponse.IsProbeAbort())
             {
                 _logger.LogInformation($"{location.Name}: Proxy Failure for {location.Name}: {getResponse.Info}, aborting loc");
-                return new RunLocationResult("Proxy Failure", null, -1);
+                return RunLocationResult.FromProbe(getResponse, null, -1);
             }
 
 
