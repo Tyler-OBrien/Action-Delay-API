@@ -162,6 +162,21 @@ public class Program
                     options.UseNpgsql(baseConfiguration.PostgresConnectionString);
                 });
 
+                // Pooled like the primary above. Registered unconditionally because jobs are
+                // reflection-constructed further down and the container does not honour optional
+                // constructor parameters - so it falls back to the primary connection when no local
+                // one is configured, and callers skip it entirely in that case.
+                services.AddPooledDbContextFactory<LocalActionDelayDatabaseContext>(options =>
+                {
+                    options.UseNpgsql(String.IsNullOrWhiteSpace(baseConfiguration.PostgresConnectionStringLocal)
+                        ? baseConfiguration.PostgresConnectionString
+                        : baseConfiguration.PostgresConnectionStringLocal);
+                });
+
+                Log.Information(String.IsNullOrWhiteSpace(baseConfiguration.PostgresConnectionStringLocal)
+                    ? "Local marker database not configured, markers are written to the primary only"
+                    : "Local marker database configured, markers will also be written locally before purging");
+
              
 
                 services.AddSingleton<IClickHouseService, ClickHouseService>();
@@ -188,6 +203,16 @@ public class Program
                     .AddPolicyHandler(GetRetryPolicy());
 
                 services.AddHttpClient<IGoogleCloudAPIBroker, GoogleCloudAPIBroker>()
+                    .ConfigureHttpClient(httpClient =>
+                    {
+                        httpClient.DefaultRequestVersion = HttpVersion.Version10;
+                        httpClient.DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher;
+                        httpClient.DefaultRequestHeaders.ConnectionClose = false;
+                    })
+                    .SetHandlerLifetime(TimeSpan.FromMinutes(5))
+                    .AddPolicyHandler(GetRetryPolicy());
+
+                services.AddHttpClient<IGoogleComputeAPIBroker, GoogleComputeAPIBroker>()
                     .ConfigureHttpClient(httpClient =>
                     {
                         httpClient.DefaultRequestVersion = HttpVersion.Version10;

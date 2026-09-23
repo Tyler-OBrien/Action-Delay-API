@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -28,11 +29,11 @@ namespace Action_Delay_API_Core.Broker.Google
 
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<GoogleServiceAccountTokenProvider> _logger;
-        private readonly SemaphoreSlim _lock = new(1, 1);
 
-        private string? _cachedToken;
-        private DateTime _cachedExpiryUtc = DateTime.MinValue;
-        private string? _cachedForKey;
+        // One cache slot per (scope, key) pair. A single shared slot would have the jobs evict each
+        // other every run - Cloud DNS and Compute ask for different scopes - forcing a fresh RS256
+        // sign and token exchange on every call, all queued behind one lock.
+        private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
 
         public GoogleServiceAccountTokenProvider(IHttpClientFactory httpClientFactory,
             ILogger<GoogleServiceAccountTokenProvider> logger)
@@ -44,31 +45,36 @@ namespace Action_Delay_API_Core.Broker.Google
         public async Task<string> GetAccessTokenAsync(string serviceAccountJson, string scope, CancellationToken token)
         {
             var cacheKey = $"{scope}\n{serviceAccountJson}";
+            var entry = _cache.GetOrAdd(cacheKey, _ => new CacheEntry());
 
-            // Serialize all callers: an uncontended acquire is trivial, and the only time it blocks
-            // across an await is the once-per-hour refresh — which is exactly the stampede prevention
-            // we want when many locations ask for a token at the same moment.
-            await _lock.WaitAsync(token);
+            // Fast path: a still-valid token is a single volatile reference read, no lock at all.
+            var cached = entry.Current;
+            if (IsUsable(cached)) return cached!.Value;
+
+            // Serialize refreshes for this key only: the once-per-hour mint is exactly the stampede
+            // we want to collapse when every location asks at the same moment.
+            await entry.Lock.WaitAsync(token);
             try
             {
-                // Reuse a still-valid cached token (refresh 60s early to avoid mid-flight expiry).
-                if (_cachedToken != null && _cachedForKey == cacheKey && DateTime.UtcNow < _cachedExpiryUtc.AddSeconds(-60))
-                    return _cachedToken;
+                cached = entry.Current;
+                if (IsUsable(cached)) return cached!.Value;
 
                 var credentials = ParseServiceAccount(serviceAccountJson);
                 var assertion = BuildSignedJwt(credentials, scope);
                 var (accessToken, expiresIn) = await ExchangeAsync(credentials.TokenUri, assertion, token);
 
-                _cachedToken = accessToken;
-                _cachedExpiryUtc = DateTime.UtcNow.AddSeconds(expiresIn);
-                _cachedForKey = cacheKey;
+                entry.Current = new CachedToken(accessToken, DateTime.UtcNow.AddSeconds(expiresIn));
                 return accessToken;
             }
             finally
             {
-                _lock.Release();
+                entry.Lock.Release();
             }
         }
+
+        // Refresh 60s early so a token can't expire mid-flight.
+        private static bool IsUsable(CachedToken? cached) =>
+            cached != null && DateTime.UtcNow < cached.ExpiryUtc.AddSeconds(-60);
 
         private static ServiceAccountCredentials ParseServiceAccount(string serviceAccountJson)
         {
@@ -149,6 +155,16 @@ namespace Action_Delay_API_Core.Broker.Google
 
         private static string Base64UrlEncode(byte[] bytes) =>
             Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        private sealed class CacheEntry
+        {
+            public readonly SemaphoreSlim Lock = new(1, 1);
+
+            /// <summary>Swapped wholesale, so an unlocked reader never sees a token with someone else's expiry.</summary>
+            public volatile CachedToken? Current;
+        }
+
+        private sealed record CachedToken(string Value, DateTime ExpiryUtc);
 
         private class ServiceAccountCredentials
         {

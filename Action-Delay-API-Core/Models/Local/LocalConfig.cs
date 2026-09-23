@@ -24,6 +24,12 @@ namespace Action_Delay_API_Core.Models.Local
 
         public string PostgresConnectionString { get; set; }
 
+        /// <summary>
+        /// The database this node's origin API reads, when that is not the same one we write to.
+        /// Blank disables the local marker write, leaving the primary-only behaviour.
+        /// </summary>
+        public string? PostgresConnectionStringLocal { get; set; }
+
 
         public bool SendClickhouseResultsToNATS { get; set; }
 
@@ -58,6 +64,8 @@ namespace Action_Delay_API_Core.Models.Local
 
         public DNSDelayJobConfig? BunnyDNSJob { get; set; }
         public GoogleCloudDNSDelayJobConfig? GoogleCloudDNSJob { get; set; }
+        public GoogleCloudLoadBalancerDelayJobConfig? GoogleCloudLoadBalancerJob { get; set; }
+        public GoogleCloudArmorDelayJobConfig? GoogleCloudArmorJob { get; set; }
         public BunnyEdgeScriptDelayJobConfig? BunnyEdgeScriptJob { get; set; }
         public BunnyEdgeRuleDelayJobConfig? BunnyEdgeRuleJob { get; set; }
         public BunnyUploadReplicationDelayJobConfig? BunnyUploadReplicationJob { get; set; }
@@ -377,6 +385,48 @@ namespace Action_Delay_API_Core.Models.Local
         public string ZoneName { get; set; }
         public string RecordName { get; set; }
         public string NameServers { get; set; }
+    }
+
+    public class GoogleCloudLoadBalancerDelayJobConfig : BaseConfig
+    {
+        // Service-account JSON key (inline). Used to mint an OAuth2 bearer token for compute writes.
+        public string ServiceAccountJson { get; set; }
+        public string ProjectId { get; set; }
+        public string UrlMapName { get; set; }
+        public string PathMatcherName { get; set; }
+
+        // Full selfLink of the backend service the path matcher falls back to. Sent on every patch
+        // because pathMatchers is replaced wholesale, and a path matcher must name a default.
+        public string DefaultService { get; set; }
+
+        // Fixed path the redirect rule matches on; only the redirect target changes per run.
+        public string ProbePath { get; set; }
+
+        // Hostname resolving to the load balancer's anycast VIP.
+        public string LbHostname { get; set; }
+
+        // Base hostname the probe path is redirected to; the per-run marker is prefixed onto it.
+        public string TargetRedirectHostname { get; set; }
+    }
+
+    public class GoogleCloudArmorDelayJobConfig : BaseConfig
+    {
+        // Service-account JSON key (inline). Used to mint an OAuth2 bearer token for compute writes.
+        public string ServiceAccountJson { get; set; }
+        public string ProjectId { get; set; }
+        public string SecurityPolicyName { get; set; }
+
+        // Priority of the rule the job rewrites each run. The rule must already exist.
+        public int RulePriority { get; set; }
+
+        // Request header carrying the per-run marker the Cloud Armor rule matches on.
+        public string ProbeHeaderName { get; set; }
+
+        // A path the backend serves 200 for, so the pre-propagation state is unambiguous.
+        public string ProbePath { get; set; }
+
+        // Hostname resolving to the load balancer's anycast VIP.
+        public string LbHostname { get; set; }
     }
 
     public class CustomRuleUpdateConfig : BaseConfig

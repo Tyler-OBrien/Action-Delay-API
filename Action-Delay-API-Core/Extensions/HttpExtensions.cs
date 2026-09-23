@@ -480,6 +480,21 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
         public static async Task<Result<GoogleCloudAPIResponse?>> ProcessHttpRequestAsyncGoogleCloud(
 this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogger logger)
         {
+            var result = await client.ProcessHttpRequestAsyncGoogleCloud<GoogleCloudAPIResponse>(httpRequest, assetName, logger);
+            return result.IsFailed
+                ? Result.Fail<GoogleCloudAPIResponse?>(result.Errors)
+                : Result.Ok<GoogleCloudAPIResponse?>(result.Value);
+        }
+
+        /// <summary>
+        /// As above, but deserializes into a richer <typeparamref name="TResponse"/> so callers that need the
+        /// resource body - not just the shared <c>{"error": {...}}</c> envelope - keep the same Sentry span,
+        /// precise timing and error classification.
+        /// </summary>
+        public static async Task<Result<TResponse?>> ProcessHttpRequestAsyncGoogleCloud<TResponse>(
+this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogger logger)
+            where TResponse : GoogleCloudAPIResponse
+        {
             var span = SentrySdk.GetSpan();
             if (span != null)
             {
@@ -501,10 +516,10 @@ this HttpClient client, HttpRequestMessage httpRequest, string assetName, ILogge
                     return Result.Fail(new CustomAPIError($"Could not get response {assetName} from API, API returned nothing, Status Code: {httpResponse.StatusCode}", (int)httpResponse.StatusCode, "API Empty Response", "", listener.GetTime(), httpResponse.GetColoId()));
                 }
 
-                GoogleCloudAPIResponse? response = null;
+                TResponse? response = null;
                 try
                 {
-                    response = JsonSerializer.Deserialize<GoogleCloudAPIResponse>(rawString);
+                    response = JsonSerializer.Deserialize<TResponse>(rawString);
                 }
                 catch (Exception ex)
                 {
