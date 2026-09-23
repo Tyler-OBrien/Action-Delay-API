@@ -168,8 +168,8 @@ namespace Action_Delay_API_Clickhouse_Worker
 
                             try
                             {
-                                List<Tuple<NatsJSMsg<byte[]>, ClickhouseRow>> messages =
-                                    new List<Tuple<NatsJSMsg<byte[]>, ClickhouseRow>>();
+                                List<Tuple<INatsJSMsg<byte[]>, ClickhouseRow>> messages =
+                                    new List<Tuple<INatsJSMsg<byte[]>, ClickhouseRow>>();
 
                                 Decompressor deCompressor = GetDecompressor();
 
@@ -180,7 +180,7 @@ namespace Action_Delay_API_Clickhouse_Worker
                                         var getData = deCompressor.Unwrap(msg.Data);
                                         var tryDeserialize =
                                             System.Text.Json.JsonSerializer.Deserialize<ClickhouseRow>(getData);
-                                        messages.Add(new Tuple<NatsJSMsg<byte[]>, ClickhouseRow>(msg, tryDeserialize));
+                                        messages.Add(new Tuple<INatsJSMsg<byte[]>, ClickhouseRow>(msg, tryDeserialize));
                                         if (messages.Count == maxMessages)
                                         {
                                             break;
