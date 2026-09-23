@@ -29,7 +29,7 @@ namespace Action_Delay_API_Core.Broker
                 CertificateAuthority = "google",
                 Type = "advanced",
                 ValidationMethod = "txt",
-                ValidityDays = 14,
+                ValidityDays = OrderCertificatePackRequest.DefaultValidityDays,
                 CloudflareBranding = false,
                 Hosts = hostname
             });

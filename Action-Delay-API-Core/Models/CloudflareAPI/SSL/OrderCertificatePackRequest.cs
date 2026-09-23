@@ -9,6 +9,12 @@ namespace Action_Delay_API_Core.Models.CloudflareAPI.SSL
 {
     public class OrderCertificatePackRequest
     {
+        /// <summary>
+        /// Validity requested for packs this system orders. CertificateDelayJob spaces its ladder against
+        /// the same number and fingerprints its own packs by it, so the two must not drift apart.
+        /// </summary>
+        public const int DefaultValidityDays = 14;
+
         [JsonPropertyName("certificate_authority")]
         public string CertificateAuthority { get; set; }
 
