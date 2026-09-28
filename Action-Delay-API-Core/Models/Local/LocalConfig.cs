@@ -66,6 +66,7 @@ namespace Action_Delay_API_Core.Models.Local
         public GoogleCloudDNSDelayJobConfig? GoogleCloudDNSJob { get; set; }
         public GoogleCloudLoadBalancerDelayJobConfig? GoogleCloudLoadBalancerJob { get; set; }
         public GoogleCloudArmorDelayJobConfig? GoogleCloudArmorJob { get; set; }
+        public GoogleCloudArmorDelayJobConfig? GoogleCloudArmorEdgeJob { get; set; }
         public BunnyEdgeScriptDelayJobConfig? BunnyEdgeScriptJob { get; set; }
         public BunnyEdgeRuleDelayJobConfig? BunnyEdgeRuleJob { get; set; }
         public BunnyUploadReplicationDelayJobConfig? BunnyUploadReplicationJob { get; set; }

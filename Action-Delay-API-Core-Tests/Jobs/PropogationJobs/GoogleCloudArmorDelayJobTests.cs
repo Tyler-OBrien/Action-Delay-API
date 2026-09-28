@@ -22,6 +22,7 @@ namespace Action_Delay_API_Core_Tests.Jobs.PropogationJobs;
 public class GoogleCloudArmorDelayJobTests : IDisposable
 {
     private const string ProbeHeader = "x-adapi-armor";
+    private const string EdgeProbeHeader = "x-adapi-armor-edge";
 
     private readonly DbContextOptions<ActionDelayDatabaseContext> _dbContextOptions;
     private readonly ActionDelayDatabaseContext _context;
@@ -57,6 +58,16 @@ public class GoogleCloudArmorDelayJobTests : IDisposable
                 ProbeHeaderName = ProbeHeader,
                 ProbePath = "/armor-probe",
                 LbHostname = "lb.delay.example.com",
+            },
+            GoogleCloudArmorEdgeJob = new GoogleCloudArmorDelayJobConfig
+            {
+                ServiceAccountJson = "{}",
+                ProjectId = "test-project",
+                SecurityPolicyName = "adapi-armor-edge",
+                RulePriority = 1001,
+                ProbeHeaderName = EdgeProbeHeader,
+                ProbePath = "/edge-probe",
+                LbHostname = "cdn.delay.example.com",
             }
         });
 
@@ -84,7 +95,7 @@ public class GoogleCloudArmorDelayJobTests : IDisposable
             .Setup(q => q.HTTP(It.IsAny<NATSHttpRequest>(), It.IsAny<Location>(), It.IsAny<CancellationToken>(),
                 It.IsAny<int>()))
             .ReturnsAsync((NATSHttpRequest request, Location _, CancellationToken _, int _) =>
-                Result.Ok(BuildEdgeResponse(request, capturedExpression)));
+                Result.Ok(BuildEdgeResponse(request, capturedExpression, ProbeHeader)));
 
         var job = new GoogleCloudArmorDelayJob(_brokerMock.Object, _configMock.Object, _loggerMock.Object,
             _queueMock.Object, _clickhouseMock.Object, _context, StaticLocationProvider.From(_configMock.Object));
@@ -115,7 +126,7 @@ public class GoogleCloudArmorDelayJobTests : IDisposable
             .Setup(q => q.HTTP(It.IsAny<NATSHttpRequest>(), It.IsAny<Location>(), It.IsAny<CancellationToken>(),
                 It.IsAny<int>()))
             .ReturnsAsync((NATSHttpRequest request, Location _, CancellationToken _, int _) =>
-                Result.Ok(BuildEdgeResponse(request, capturedExpression)));
+                Result.Ok(BuildEdgeResponse(request, capturedExpression, ProbeHeader)));
 
         var job = new GoogleCloudArmorDelayJob(_brokerMock.Object, _configMock.Object, _loggerMock.Object,
             _queueMock.Object, _clickhouseMock.Object, _context, StaticLocationProvider.From(_configMock.Object));
@@ -131,10 +142,69 @@ public class GoogleCloudArmorDelayJobTests : IDisposable
         Assert.False(result.Errored);
     }
 
-    /// <summary>Stands in for the edge: 403 when the rule in force matches the probe's marker header, else 200.</summary>
-    private static SerializableHttpResponse BuildEdgeResponse(NATSHttpRequest request, string ruleExpression)
+    [Fact]
+    public async Task EdgeJob_BaseRun_PatchesEdgePolicyAndProbesEdgeHostname()
     {
-        var blocked = request.Headers.TryGetValue(ProbeHeader, out var marker)
+        string capturedExpression = "";
+        _brokerMock
+            .Setup(b => b.PatchSecurityPolicyRule(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(),
+                It.IsAny<PatchSecurityPolicyRuleRequest>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, int, PatchSecurityPolicyRuleRequest, string, CancellationToken>(
+                (_, _, _, request, _, _) => capturedExpression = request.Match.Expr.Expression)
+            .ReturnsAsync(Result.Ok(new GoogleCloudAPIResponse { ResponseTimeMs = 5 }));
+
+        var probedUrls = new System.Collections.Concurrent.ConcurrentBag<string>();
+        _queueMock
+            .Setup(q => q.HTTP(It.IsAny<NATSHttpRequest>(), It.IsAny<Location>(), It.IsAny<CancellationToken>(),
+                It.IsAny<int>()))
+            .ReturnsAsync((NATSHttpRequest request, Location _, CancellationToken _, int _) =>
+            {
+                probedUrls.Add(request.URL);
+                return Result.Ok(BuildEdgeResponse(request, capturedExpression, EdgeProbeHeader));
+            });
+
+        var job = new GoogleCloudArmorEdgeDelayJob(_brokerMock.Object, _configMock.Object,
+            new Mock<ILogger<GoogleCloudArmorEdgeDelayJob>>().Object, _queueMock.Object, _clickhouseMock.Object,
+            _context, StaticLocationProvider.From(_configMock.Object));
+
+        await job.BaseRun();
+
+        _brokerMock.Verify(b => b.PatchSecurityPolicyRule("test-project", "adapi-armor-edge", 1001,
+            It.Is<PatchSecurityPolicyRuleRequest>(r => r.Match.Expr.Expression.Contains(EdgeProbeHeader)),
+            "{}", It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        _brokerMock.Verify(b => b.PatchSecurityPolicyRule(It.IsAny<string>(), "adapi-armor", It.IsAny<int>(),
+            It.IsAny<PatchSecurityPolicyRuleRequest>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.All(probedUrls, url => Assert.Equal("https://cdn.delay.example.com/edge-probe", url));
+
+        var jobData = await _context.JobData.FirstOrDefaultAsync(j => j.InternalJobName == "googlearmoredge");
+        Assert.NotNull(jobData);
+        Assert.Equal(Status.STATUS_DEPLOYED, jobData!.CurrentRunStatus);
+    }
+
+    [Fact]
+    public void EdgeJob_Enabled_FollowsOnlyItsOwnConfigSection()
+    {
+        var config = new Mock<IOptions<LocalConfig>>();
+        config.Setup(x => x.Value).Returns(new LocalConfig
+        {
+            Locations = new List<Location>(),
+            GoogleCloudArmorJob = new GoogleCloudArmorDelayJobConfig { Enabled = true },
+        });
+
+        var edgeJob = new GoogleCloudArmorEdgeDelayJob(_brokerMock.Object, config.Object,
+            new Mock<ILogger<GoogleCloudArmorEdgeDelayJob>>().Object, _queueMock.Object, _clickhouseMock.Object,
+            _context, StaticLocationProvider.From(config.Object));
+        var backendJob = new GoogleCloudArmorDelayJob(_brokerMock.Object, config.Object, _loggerMock.Object,
+            _queueMock.Object, _clickhouseMock.Object, _context, StaticLocationProvider.From(config.Object));
+
+        Assert.False(edgeJob.Enabled);
+        Assert.True(backendJob.Enabled);
+    }
+
+    /// <summary>Stands in for the edge: 403 when the rule in force matches the probe's marker header, else 200.</summary>
+    private static SerializableHttpResponse BuildEdgeResponse(NATSHttpRequest request, string ruleExpression, string probeHeader)
+    {
+        var blocked = request.Headers.TryGetValue(probeHeader, out var marker)
                       && string.IsNullOrEmpty(marker) == false
                       && ruleExpression.Contains($"'{marker}'");
 

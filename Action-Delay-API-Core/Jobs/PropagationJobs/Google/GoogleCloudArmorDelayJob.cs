@@ -26,14 +26,21 @@ namespace Action_Delay_API_Core.Jobs.PropagationJobs.Google
 
         private int _repeatedRunCount = 1;
 
-        public GoogleCloudArmorDelayJob(IGoogleComputeAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<GoogleCloudArmorDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
+        public GoogleCloudArmorDelayJob(IGoogleComputeAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<GoogleCloudArmorDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider)
+            : this(config.Value.GoogleCloudArmorJob, apiBroker, config, logger, queue, clickHouse, dbContext, locationProvider)
         {
-            _jobConfig = _config.GoogleCloudArmorJob;
+        }
+
+        // Lets a subclass drive the same probe against a different policy - the edge variant differs
+        // only in which config section it reads.
+        protected GoogleCloudArmorDelayJob(GoogleCloudArmorDelayJobConfig jobConfig, IGoogleComputeAPIBroker apiBroker, IOptions<LocalConfig> config, ILogger<GoogleCloudArmorDelayJob> logger, IQueue queue, IClickHouseService clickHouse, ActionDelayDatabaseContext dbContext, ILocationProvider locationProvider) : base(config, logger, clickHouse, dbContext, queue, locationProvider)
+        {
+            _jobConfig = jobConfig;
             _apiBroker = apiBroker;
         }
 
         public override int TargetExecutionSecond => 24;
-        public override bool Enabled => _config.GoogleCloudArmorJob != null && (_config.GoogleCloudArmorJob.Enabled.HasValue == false || _config.GoogleCloudArmorJob is { Enabled: true });
+        public override bool Enabled => _jobConfig != null && (_jobConfig.Enabled.HasValue == false || _jobConfig is { Enabled: true });
 
         public override string Name => "Google Cloud Armor Delay Job";
         public override string InternalName => "googlearmor";
