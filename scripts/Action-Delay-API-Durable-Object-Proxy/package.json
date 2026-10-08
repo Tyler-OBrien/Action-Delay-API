@@ -9,11 +9,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "wrangler": "^3.19.0"
-  },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20230814.0",
-    "typescript": "^5.1.6"
+    "@cloudflare/workers-types": "^5.20261006.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.148.0"
   }
 }

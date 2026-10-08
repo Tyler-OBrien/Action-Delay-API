@@ -8,9 +8,9 @@
 		"deploy": "wrangler deploy"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20241230.0",
-		"typescript": "^5.2.2",
-		"wrangler": "^3.99.0"
+		"@cloudflare/workers-types": "^5.20261006.1",
+		"typescript": "^5.9.3",
+		"wrangler": "^4.148.0"
 	},
 	"dependencies": {
 		"@libsql/client": "^0.14.0"

@@ -7,10 +7,10 @@
     "node": "^18.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@fastly/js-compute": "^3.36.0"
+    "@fastly/js-compute": "^3.46.0"
   },
   "scripts": {
     "build": "js-compute-runtime --enable-aot build/index.js bin/main.wasm",
