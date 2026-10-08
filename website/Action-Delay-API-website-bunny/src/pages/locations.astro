@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import type { LocationInfo } from '../../models/cloudflare/locationinfo';
 
-const locResp = await fetch('https://delay.cloudflare.chaika.me/v2/locations');
+const locResp = await fetch('https://api.bunny.chaika.me/v2/locations');
 
 let locations: LocationInfo[] = [];
 if (locResp.ok) {
@@ -74,7 +74,7 @@ const orderedGroups = [...grouped.entries()].sort(([a], [b]) => {
 				id="location-filter"
 				type="text"
 				placeholder="Filter locations..."
-				class="w-full max-w-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900 text-sm"
+				class="w-full max-w-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-sm bg-white dark:bg-gray-900 text-sm"
 			/>
 		</div>
 
@@ -96,7 +96,7 @@ const orderedGroups = [...grouped.entries()].sort(([a], [b]) => {
 							</td>
 						</tr>,
 						...locs.map(loc => (
-							<tr id={`${loc.iata}-row`} class={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors${!loc.enabled ? ' opacity-40' : ''}`}>
+							<tr id={`${loc.iata}-row`} class={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${!loc.enabled ? 'opacity-40' : ''}`}>
 								<td class="py-2 px-3">
 									<span class="font-mono font-bold text-sm">{loc.iata}</span>
 								</td>

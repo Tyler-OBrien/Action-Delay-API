@@ -2,14 +2,12 @@ import { defineConfig } from 'astro/config';
 import preact from "@astrojs/preact";
 import deno from '@deno/astro-adapter';
 
-import tailwind from "@astrojs/tailwind";
+import tailwindcss from "@tailwindcss/vite";
 // https://astro.build/config
 export default defineConfig({
   integrations: [preact({
     compat: true
-  }), tailwind({
-    applyBaseStyles: true,
-  }), 
+  }),
 ],
   prefetch: {
     prefetchAll: true
@@ -21,6 +19,7 @@ export default defineConfig({
     service: { entrypoint: 'astro/assets/services/noop' },
   },
   vite: {
+    plugins: [tailwindcss()],
     ssr: {
       noExternal: ['plotly.js-basic-dist-min', 'plotly.js-geo-dist-min']
     },

@@ -8,12 +8,12 @@ import type { Job } from '../../models/cloudflare/job';
 import { groupJobs } from '../data/jobCategories';
 
 const getJobs = async () => {
-	return (await (await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/Perf")).json()).data
+	return (await (await fetch("https://api.bunny.chaika.me/v2/jobs/type/Perf")).json()).data
 }
 var getJobsTask = getJobs()
 
 const getAnalytics = async () => {
-	return (await (await fetch("https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/Perf")).json());
+	return (await (await fetch("https://api.bunny.chaika.me/v1/quick/QuickAnalytics/type/Perf")).json());
 }
 var getAnalyticsTask = getAnalytics()
 

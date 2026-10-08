@@ -10,7 +10,7 @@ const encoded = jobName.replaceAll("/", "%2F");
 
 let locations: JobLocation[] = [];
 try {
-	const res = await fetch(`https://delay.cloudflare.chaika.me/v2/jobs/${encoded}/locations`);
+	const res = await fetch(`https://api.bunny.chaika.me/v2/jobs/${encoded}/locations`);
 	if (res.ok) locations = (await res.json()).data ?? [];
 } catch (e) {
 	console.log(`failed to fetch locations for ${jobName}`);

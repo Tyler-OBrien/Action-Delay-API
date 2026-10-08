@@ -16,8 +16,9 @@ read it for anything not Bunny-specific. This file only covers what diverges.
 
 ## Data wiring
 
-- **SSR pages** (`.astro` frontmatter fetches) use **`https://delay.cloudflare.chaika.me`** (the shared backend),
-  filtered to the `BunnyDelay` / `Perf` job types. The shared agent/colo data is identical on both hosts.
+- **SSR pages** (`.astro` frontmatter fetches) also use **`https://api.bunny.chaika.me`**, filtered to the
+  `BunnyDelay` / `Perf` job types. (They used `delay.cloudflare.chaika.me` until Oct 2026; both hosts serve
+  identical data.)
 - **Public / browser fetches** — the graph components (`src/components/graph/*.js|jsx`, mounted `client:only` /
   `client:visible`) and SignalR realtime (`src/scripts/signalr-*.js`) — use **`https://api.bunny.chaika.me`** so all
   browser-facing API traffic stays within the Bunny stack. `api.bunny.chaika.me` serves the same `/v1` + `/v2`

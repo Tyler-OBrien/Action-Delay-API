@@ -242,7 +242,7 @@ const ErrorGraph = ({ endpoint = 'api/errors', label = 'Error Graph', fullscreen
       <div className="w-full">
         {isLoading && data.length === 0 ? (
           <div
-            className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
+            className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded-sm"
             style={{ height: fullscreen ? '800px' : '700px' }}
           />
         ) : (

@@ -16,7 +16,7 @@ const getJobs = async () => {
   return (
     await (
       await fetch(
-        "https://delay.cloudflare.chaika.me/v2/jobs/type/BunnyDelay"
+        "https://api.bunny.chaika.me/v2/jobs/type/BunnyDelay"
       )
     ).json()
   ).data;
@@ -25,14 +25,14 @@ const getJobs = async () => {
 const getAnalytics = async () => {
   return await (
     await fetch(
-      "https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/type/BunnyDelay"
+      "https://api.bunny.chaika.me/v1/quick/QuickAnalytics/type/BunnyDelay"
     )
   ).json();
 };
 
 const getOverallAnalytics = async (): Promise<OverallAnalytics | null> => {
   try {
-    const r = await fetch("https://delay.cloudflare.chaika.me/v2/jobs/OverallAnalytics");
+    const r = await fetch("https://api.bunny.chaika.me/v2/jobs/OverallAnalytics");
     if (!r.ok) return null;
     const json = await r.json();
     return json.data ?? json;
@@ -41,7 +41,7 @@ const getOverallAnalytics = async (): Promise<OverallAnalytics | null> => {
 
 const getIncidents = async (): Promise<Incident[]> => {
   try {
-    const r = await fetch("https://delay.cloudflare.chaika.me/v2/incidents/type/BunnyDelay");
+    const r = await fetch("https://api.bunny.chaika.me/v2/incidents/type/BunnyDelay");
     return r.ok ? ((await r.json()).data ?? []) : [];
   } catch { return []; }
 };

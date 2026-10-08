@@ -15,10 +15,10 @@ interface Props {
 
 const { internalJobName } = Astro.params;
 
-const jobResp = await fetch("https://delay.cloudflare.chaika.me/v2/jobs/" + internalJobName);
+const jobResp = await fetch("https://api.bunny.chaika.me/v2/jobs/" + internalJobName);
 const job: Job = (await jobResp.json()).data;
 
-const quickAnalyticsResponse = await fetch('https://delay.cloudflare.chaika.me/v1/quick/QuickAnalytics/' + (job.internalJobName ?? job.jobName));
+const quickAnalyticsResponse = await fetch('https://api.bunny.chaika.me/v1/quick/QuickAnalytics/' + (job.internalJobName ?? job.jobName));
 let quickAnalyticsData = [];
 if (quickAnalyticsResponse.ok) {
 	quickAnalyticsData = await quickAnalyticsResponse.json();

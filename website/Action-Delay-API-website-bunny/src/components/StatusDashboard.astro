@@ -16,7 +16,7 @@ import { jobHealth, dotClass, type Health } from "../data/jobHealth";
 const getJobs = async () => {
   return (
     await (
-      await fetch("https://delay.cloudflare.chaika.me/v2/jobs/type/BunnyDelay")
+      await fetch("https://api.bunny.chaika.me/v2/jobs/type/BunnyDelay")
     ).json()
   ).data;
 };
@@ -24,7 +24,7 @@ const getJobs = async () => {
 const getIncidentsData = async () => {
   return (
     await (
-      await fetch("https://delay.cloudflare.chaika.me/v2/incidents/type/BunnyDelay")
+      await fetch("https://api.bunny.chaika.me/v2/incidents/type/BunnyDelay")
     ).json()
   ).data;
 };

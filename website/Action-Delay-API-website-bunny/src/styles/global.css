@@ -1,4 +1,29 @@
-/* Global variables */
+@import "tailwindcss";
+
+/* Class-based dark mode (BaseLayout/ThemeToggle put .dark on <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tailwind v3 defaults that v4 changed; kept so the site looks the same. */
+@layer base {
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: var(--color-gray-200, currentColor);
+	}
+	button:not(:disabled),
+	[role="button"]:not(:disabled) {
+		cursor: pointer;
+	}
+	input::placeholder,
+	textarea::placeholder {
+		color: var(--color-gray-400);
+	}
+}
+
+/* Global variables. Size/shadow tokens are --fs-* and --elevation-* because
+   Tailwind v4 reads --text-* and --shadow-* for its own utilities. */
 :root {
 	/* Colors */
 	--gray-0: #090b11;
@@ -45,23 +70,23 @@
 	--gradient-stroke: linear-gradient(180deg, var(--gray-900), var(--gray-700));
 
 	/* Shadows */
-	--shadow-sm: 0px 6px 3px rgba(9, 11, 17, 0.01), 0px 4px 2px rgba(9, 11, 17, 0.01),
+	--elevation-sm: 0px 6px 3px rgba(9, 11, 17, 0.01), 0px 4px 2px rgba(9, 11, 17, 0.01),
 		0px 2px 2px rgba(9, 11, 17, 0.02), 0px 0px 1px rgba(9, 11, 17, 0.03);
-	--shadow-md: 0px 28px 11px rgba(9, 11, 17, 0.01), 0px 16px 10px rgba(9, 11, 17, 0.03),
+	--elevation-md: 0px 28px 11px rgba(9, 11, 17, 0.01), 0px 16px 10px rgba(9, 11, 17, 0.03),
 		0px 7px 7px rgba(9, 11, 17, 0.05), 0px 2px 4px rgba(9, 11, 17, 0.06);
-	--shadow-lg: 0px 62px 25px rgba(9, 11, 17, 0.01), 0px 35px 21px rgba(9, 11, 17, 0.05),
+	--elevation-lg: 0px 62px 25px rgba(9, 11, 17, 0.01), 0px 35px 21px rgba(9, 11, 17, 0.05),
 		0px 16px 16px rgba(9, 11, 17, 0.1), 0px 4px 9px rgba(9, 11, 17, 0.12);
 
 	/* Text Sizes */
-	--text-sm: 0.875rem;
-	--text-base: 1rem;
-	--text-md: 1.125rem;
-	--text-lg: 1.25rem;
-	--text-xl: 1.625rem;
-	--text-2xl: 2.125rem;
-	--text-3xl: 2.625rem;
-	--text-4xl: 3.5rem;
-	--text-5xl: 4.5rem;
+	--fs-sm: 0.875rem;
+	--fs-base: 1rem;
+	--fs-md: 1.125rem;
+	--fs-lg: 1.25rem;
+	--fs-xl: 1.625rem;
+	--fs-2xl: 2.125rem;
+	--fs-3xl: 2.625rem;
+	--fs-4xl: 3.5rem;
+	--fs-5xl: 4.5rem;
 
 	/* Fonts */
 	--font-system: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
@@ -123,11 +148,11 @@
 	);
 	--gradient-stroke: linear-gradient(180deg, var(--gray-600), var(--gray-800));
 
-	--shadow-sm: 0px 6px 3px rgba(255, 255, 255, 0.01), 0px 4px 2px rgba(255, 255, 255, 0.01),
+	--elevation-sm: 0px 6px 3px rgba(255, 255, 255, 0.01), 0px 4px 2px rgba(255, 255, 255, 0.01),
 		0px 2px 2px rgba(255, 255, 255, 0.02), 0px 0px 1px rgba(255, 255, 255, 0.03);
-	--shadow-md: 0px 28px 11px rgba(255, 255, 255, 0.01), 0px 16px 10px rgba(255, 255, 255, 0.03),
+	--elevation-md: 0px 28px 11px rgba(255, 255, 255, 0.01), 0px 16px 10px rgba(255, 255, 255, 0.03),
 		0px 7px 7px rgba(255, 255, 255, 0.05), 0px 2px 4px rgba(255, 255, 255, 0.06);
-	--shadow-lg: 0px 62px 25px rgba(255, 255, 255, 0.01), 0px 35px 21px rgba(255, 255, 255, 0.05),
+	--elevation-lg: 0px 62px 25px rgba(255, 255, 255, 0.01), 0px 35px 21px rgba(255, 255, 255, 0.05),
 		0px 16px 16px rgba(255, 255, 255, 0.1), 0px 4px 9px rgba(255, 255, 255, 0.12);
 
 	/* Semantic status colors (health of a value) */
@@ -147,65 +172,69 @@
 	--page-glow: hsla(280, 89%, 55%, 0.16);
 }
 
-html,
-body {
-	min-height: 100%;
-	overflow-x: hidden;
-}
+/* Element defaults. Layered so Tailwind utilities override them, as they did
+   in v3 (where a utility's class selector out-ranked these element selectors). */
+@layer base {
+	html,
+	body {
+		min-height: 100%;
+		overflow-x: hidden;
+	}
 
-body {
-	background-color: var(--gray-999);
-	color: var(--gray-200);
-	font-family: var(--font-body);
-	-webkit-font-smoothing: antialiased;
-	line-height: 1.5;
-}
+	body {
+		background-color: var(--gray-999);
+		color: var(--gray-200);
+		font-family: var(--font-body);
+		-webkit-font-smoothing: antialiased;
+		line-height: 1.5;
+	}
 
-*,
-*::after,
-*::before {
-	box-sizing: border-box;
-	margin: 0;
-}
+	*,
+	*::after,
+	*::before {
+		box-sizing: border-box;
+		margin: 0;
+	}
 
-img {
-	max-width: 100%;
-	height: auto;
-}
+	img {
+		max-width: 100%;
+		height: auto;
+	}
 
-a {
-	color: var(--link-color);
-}
+	a {
+		color: var(--link-color);
+	}
 
-h1,
-h2,
-h3,
-h4,
-h5 {
-	line-height: 1.1;
-	font-family: var(--font-brand);
-	font-weight: 600;
-	color: var(--gray-100);
-}
+	h1,
+	h2,
+	h3,
+	h4,
+	h5 {
+		line-height: 1.1;
+		font-family: var(--font-brand);
+		font-weight: 600;
+		color: var(--gray-100);
+	}
 
-h1 {
-	font-size: var(--text-5xl);
-}
+	h1 {
+		font-size: var(--fs-5xl);
+	}
 
-h2 {
-	font-size: var(--text-4xl);
-}
+	h2 {
+		font-size: var(--fs-4xl);
+	}
 
-h3 {
-	font-size: var(--text-3xl);
-}
+	h3 {
+		font-size: var(--fs-3xl);
+	}
 
-h4 {
-	font-size: var(--text-2xl);
-}
+	h4 {
+		font-size: var(--fs-2xl);
+	}
 
-h5 {
-	font-size: var(--text-xl);
+	h5 {
+		font-size: var(--fs-xl);
+	}
 }
 
 /* Utilities */
@@ -215,7 +244,7 @@ h5 {
 	background-color: var(--surface-bg);
 	border: 1px solid var(--surface-border);
 	border-radius: 0.75rem;
-	box-shadow: var(--shadow-sm);
+	box-shadow: var(--elevation-sm);
 }
 
 .surface-hover {
@@ -227,7 +256,7 @@ h5 {
 
 .surface-hover:hover {
 	background-color: var(--surface-bg-hover);
-	box-shadow: var(--shadow-md);
+	box-shadow: var(--elevation-md);
 }
 
 /* Health-colored values (applied to the big delay/latency numbers). */
@@ -248,7 +277,7 @@ h5 {
 	gap: 0.4rem;
 	padding: 0.3rem 0.7rem;
 	border-radius: 999rem;
-	font-size: var(--text-sm);
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	line-height: 1;
 	white-space: nowrap;
@@ -292,7 +321,7 @@ h5 {
 	gap: 0.45rem;
 	padding: 0.3rem 0.75rem;
 	border-radius: 999rem;
-	font-size: var(--text-sm);
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	text-decoration: none;
 	color: var(--status-elevated);

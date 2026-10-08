@@ -160,7 +160,7 @@ const SuccessRateGraph = (props) => {
 
       {isLoading && points.length === 0 ? (
         <div
-          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded"
+          className="w-full animate-pulse bg-gray-200 dark:bg-gray-700 rounded-sm"
           style={{ height: '450px' }}
         />
       ) : (
