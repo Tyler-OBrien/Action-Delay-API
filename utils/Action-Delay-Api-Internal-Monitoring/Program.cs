@@ -9,7 +9,6 @@ using Action_Delay_API_Core.Models.Database.Postgres;
 using Action_Delay_API_Core.Models.Local;
 using System.Diagnostics;
 using System.Reflection;
-using Microsoft.OpenApi.Models;
 using Sentry.Extensibility;
 using Swashbuckle.AspNetCore.Filters;
 using Microsoft.AspNetCore.Http.Connections;
